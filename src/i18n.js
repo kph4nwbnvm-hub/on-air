@@ -1,4 +1,5 @@
 import TR from './tr.js';
+import TR_SHOP from './tr_shop.js';
 // The 53 languages of the Pi system, in the order the project owner supplied them.
 export const LANGS = [
   { code: 'ar', name: 'العربية', rtl: true }, { code: 'en', name: 'English' }, { code: 'af', name: 'Afrikaans' },
@@ -134,3 +135,4 @@ export const STR = {
   },
 };
 Object.assign(STR, TR);
+Object.entries(TR_SHOP).forEach(([k, v]) => { STR[k] = { ...(STR[k] || {}), ...v }; });

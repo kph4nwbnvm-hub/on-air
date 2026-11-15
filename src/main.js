@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { LANGS, STR } from './i18n.js';
 import { piSignIn, PiState } from './pi.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
+import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL } from './shop.js';
 
 /* ---------- storage, i18n, sound ---------- */
 const store = { get(k, d) { try { const v = localStorage.getItem('onair_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('onair_' + k, JSON.stringify(v)); } catch (e) {} } };
@@ -9,6 +10,16 @@ let lang = store.get('lang', 'ar');
 let soundOn = store.get('sound', true);
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
+const shop = makeShop(store);
+// One-time migration: keep whatever an existing player already wears.
+if (!store.get('shopv1', false)) { shop.grant(wornIds(avatar)); store.set('shopv1', true); }
+// Put back any worn item the player does not own (used after previewing in the creator).
+function stripUnowned() {
+  const d = DEFAULT_AVATAR;
+  ['hairStyle', 'hairColor', 'beard', 'top', 'bottom', 'shoes'].forEach((k) => { if (!shop.has(k + ':' + avatar[k])) avatar[k] = d[k]; });
+  ['topColor', 'bottomColor', 'capColor'].forEach((k) => { if (!shop.has('cloth:' + avatar[k])) avatar[k] = d[k]; });
+  Object.keys(avatar.acc).forEach((k) => { if (avatar.acc[k] && !shop.has('acc:' + k)) avatar.acc[k] = false; });
+}
 const $ = (id) => document.getElementById(id);
 function applyLang() {
   const L = LANGS.find((l) => l.code === lang) || LANGS[0];
@@ -267,7 +278,7 @@ const productOk = () => seg() === 1 || G.product;
 const allGood = () => productOk() && (G.feed === needCam() || G.grace > 0) && G.light && G.mess === 0;
 const isActive = (k) => (k === 'product' ? !G.product : k === 'camera' ? G.feed !== needCam() : k === 'light' ? !G.light : G.mess > 0);
 const trustNow = () => Math.max(0, Math.min(100, (G.time > 0.5 ? (G.good / G.time) * 100 : 100) + G.bonus));
-function addCoins(n) { G.coins += n; store.set('coins', G.coins); $('coinN').textContent = G.coins; }
+function addCoins(n) { G.coins += n; store.set('coins', G.coins); $('coinN').textContent = G.coins; if ($('crCoins')) $('crCoins').textContent = '🪙 ' + G.coins; }
 
 function syncScene() {
   const Z = ZONES[G.zone], st = G.zone === 'studio', lit = !st || G.light;
@@ -306,6 +317,8 @@ function endRound() {
   G.on = false; G.asking = false; $('qSheet').hidden = true; const missed = 3 - G.asked.length; G.bonus -= missed * 6;
   const trust = Math.max(0, Math.min(100, (G.good / ROUND) * 100 + G.bonus)) / 100; const pass = trust >= PASS; const coins = pass ? Math.round(100 + trust * 150) : Math.round(trust * 60);
   addCoins(coins); (pass ? sfx.win : sfx.lose)();
+  const xp = roundXp(trust, pass), up = shop.addXp(xp); showLevel();
+  $('rXp').textContent = '+' + xp + ' ' + t('xp') + ' · ' + t('lvl') + ' ' + shop.level; $('rUp').hidden = !up; if (up) $('rUp').textContent = '⭐ ' + t('level_up');
   $('rTitle').textContent = t(pass ? 'r_pass' : 'r_fail'); $('rTitle').className = pass ? 'pass' : 'fail';
   $('rTrust').textContent = Math.round(trust * 100) + '%'; $('rAir').textContent = fmt(G.good) + ' / ' + fmt(ROUND); $('rCoins').textContent = '+' + coins;
   const line = t(trust >= 0.85 ? 'sp_end_great' : pass ? 'sp_end_ok' : 'sp_end_bad'); $('rSponsor').textContent = line; speak(line);
@@ -402,24 +415,48 @@ function buildLangs() { const g = $('langGrid'); g.innerHTML = ''; LANGS.forEach
 function enterRoam() { lastAct = 0; G.on = false; G.zone = 'studio'; G.px = 0; G.pz = 3.3; G.face = Math.PI; player.armR.rotation.set(0, 0, 0); show('hud'); resize(); syncScene(); snapCam = true; say(t('roam_hint'), '', true); }
 // character creator
 let tab = 'skin';
+function showLevel() {
+  const lv = shop.level, a = xpFor(lv), b = xpFor(Math.min(MAX_LEVEL, lv + 1));
+  const pct = lv >= MAX_LEVEL ? 100 : Math.round(((shop.xp - a) / (b - a)) * 100);
+  $('lvlBox').textContent = '⭐ ' + lv; $('crLvl').textContent = '⭐ ' + t('lvl') + ' ' + lv; $('crXp').style.width = pct + '%'; $('crCoins').textContent = '🪙 ' + G.coins;
+}
+function toast(msg) { const el = $('crToast'); el.textContent = msg; el.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => { el.hidden = true; }, 2200); }
 function buildCreator() {
-  const tabs = $('crTabs'); tabs.innerHTML = ''; ['skin', 'hair', 'clothes', 'acc'].forEach((k) => { const b = document.createElement('button'); b.textContent = t('t_' + k); if (k === tab) b.className = 'sel'; b.onclick = () => { tab = k; sfx.click(); buildCreator(); }; tabs.appendChild(b); });
+  showLevel();
+  const tabs = $('crTabs'); tabs.innerHTML = ''; ['skin', 'hair', 'clothes', 'acc', 'packs'].forEach((k) => { const b = document.createElement('button'); b.textContent = t('t_' + k); if (k === tab) b.className = 'sel'; b.onclick = () => { tab = k; sfx.click(); buildCreator(); }; tabs.appendChild(b); });
   const body = $('crBody'); body.innerHTML = '';
   const row = (label) => { const h = document.createElement('h4'); h.textContent = label; body.appendChild(h); const d = document.createElement('div'); d.className = 'opts'; body.appendChild(d); return d; };
-  const set = (k, v) => { avatar[k] = v; changed(); };
   const changed = () => { store.set('avatar', avatar); rebuildPlayer(); sfx.click(); buildCreator(); };
-  const swatches = (label, cols, k) => { const d = row(label); cols.forEach((c, i) => { const b = document.createElement('button'); b.className = 'sw' + (avatar[k] === i ? ' sel' : ''); b.style.background = '#' + c.toString(16).padStart(6, '0'); b.onclick = () => set(k, i); d.appendChild(b); }); };
-  const chips = (label, names, k) => { const d = row(label); names.forEach((n, i) => { const b = document.createElement('button'); b.className = 'chip' + (avatar[k] === i ? ' sel' : ''); b.textContent = n; b.onclick = () => set(k, i); d.appendChild(b); }); };
+  // Locked (level too low): explain. Available but not owned: preview it; the buy bar appears.
+  const gate = (id, apply) => () => { if (!shop.available(id)) { sfx.bad(); toast(t('need_lvl').replace('{n}', reqLevel(id))); return; } apply(); changed(); };
+  const mark = (b, id) => { if (shop.has(id)) return; const tag = document.createElement('i'); tag.className = 'tag'; if (shop.available(id)) tag.textContent = '🪙' + price(id); else { tag.textContent = '🔒' + reqLevel(id); b.classList.add('locked'); } b.appendChild(tag); };
+  const swatches = (label, cols, k, field) => { const d = row(label); cols.forEach((c, i) => { const id = (field || k) + ':' + i; const b = document.createElement('button'); b.className = 'sw' + (avatar[k] === i ? ' sel' : ''); b.style.background = '#' + c.toString(16).padStart(6, '0'); b.onclick = gate(id, () => { avatar[k] = i; }); if (k !== 'skin') mark(b, id); d.appendChild(b); }); };
+  const chips = (label, names, k) => { const d = row(label); names.forEach((n, i) => { const id = k + ':' + i; const b = document.createElement('button'); b.className = 'chip' + (avatar[k] === i ? ' sel' : ''); b.textContent = n; b.onclick = gate(id, () => { avatar[k] = i; }); mark(b, id); d.appendChild(b); }); };
   if (tab === 'skin') swatches(t('c_color'), OPT.skin, 'skin');
   if (tab === 'hair') { chips(t('c_style'), ['1', '2', '3', '4', '5', '6'], 'hairStyle'); swatches(t('c_color'), OPT.hairColor, 'hairColor'); chips(t('c_beard'), OPT.beard.map((b) => t('o_' + b)), 'beard'); }
-  if (tab === 'clothes') { chips(t('c_top'), OPT.top.map((b) => t('o_' + b)), 'top'); swatches(t('c_color'), OPT.cloth, 'topColor'); chips(t('c_bottom'), OPT.bottom.map((b) => t('o_' + b)), 'bottom'); swatches(t('c_color'), OPT.cloth, 'bottomColor'); swatches(t('c_shoes'), OPT.shoes, 'shoes'); }
-  if (tab === 'acc') { const d = row(t('t_acc')); OPT.acc.forEach((n) => { const b = document.createElement('button'); b.className = 'chip' + (avatar.acc[n] ? ' sel' : ''); b.textContent = t('o_' + n); b.onclick = () => { avatar.acc[n] = !avatar.acc[n]; changed(); }; d.appendChild(b); }); swatches(t('c_cap'), OPT.cloth, 'capColor'); }
+  if (tab === 'clothes') { chips(t('c_top'), OPT.top.map((b) => t('o_' + b)), 'top'); swatches(t('c_color'), OPT.cloth, 'topColor', 'cloth'); chips(t('c_bottom'), OPT.bottom.map((b) => t('o_' + b)), 'bottom'); swatches(t('c_color'), OPT.cloth, 'bottomColor', 'cloth'); swatches(t('c_shoes'), OPT.shoes, 'shoes'); }
+  if (tab === 'acc') { const d = row(t('t_acc')); OPT.acc.forEach((n) => { const id = 'acc:' + n; const b = document.createElement('button'); b.className = 'chip' + (avatar.acc[n] ? ' sel' : ''); b.textContent = t('o_' + n); b.onclick = gate(id, () => { avatar.acc[n] = !avatar.acc[n]; }); mark(b, id); d.appendChild(b); }); swatches(t('c_cap'), OPT.cloth, 'capColor', 'cloth'); }
+  if (tab === 'packs') PACKS.forEach((p) => {
+    const card = document.createElement('div'); card.className = 'pack'; const own = shop.packOwned(p), open = shop.level >= p.level;
+    const names = p.items.map((id) => { const [f, v] = id.split(':'); return f === 'acc' ? t('o_' + v) : f === 'cloth' ? '🎨' : f === 'top' ? t('o_' + OPT.top[v]) : f === 'bottom' ? t('o_' + OPT.bottom[v]) : f === 'shoes' ? '👟' : f === 'beard' ? t('o_' + OPT.beard[v]) : '💇'; });
+    const worth = p.items.reduce((s, id) => s + price(id), 0);
+    card.innerHTML = '<b></b><small></small><button></button>'; card.children[0].textContent = t('pk_' + p.id); card.children[1].textContent = names.join(' · ') + '  —  ' + p.items.length + ' ' + t('pk_items');
+    const btn = card.children[2];
+    if (own) { btn.textContent = '✓ ' + t('owned'); btn.disabled = true; }
+    else if (!open) { btn.textContent = '🔒 ' + t('lvl') + ' ' + p.level; btn.onclick = () => { sfx.bad(); toast(t('need_lvl').replace('{n}', p.level)); }; }
+    else { btn.innerHTML = '<s></s> 🪙 <span></span>'; btn.children[0].textContent = worth; btn.children[1].textContent = p.cost; btn.onclick = () => { if (G.coins < p.cost) { sfx.bad(); toast(t('no_coins')); return; } addCoins(-p.cost); shop.grant(p.items); sfx.win(); toast('🎉 ' + t('bought')); buildCreator(); }; }
+    body.appendChild(card);
+  });
+  // Buy bar: total for the previewed items the player does not own yet.
+  const unowned = wornIds(avatar).filter((id) => !shop.has(id)), total = unowned.reduce((s, id) => s + price(id), 0), bb = $('crBuy');
+  bb.hidden = !unowned.length; if (unowned.length) { bb.textContent = t('buy_all') + ' 🪙 ' + total; bb.className = 'big' + (G.coins < total ? ' poor' : ''); bb.onclick = () => { if (G.coins < total) { sfx.bad(); toast(t('no_coins')); return; } addCoins(-total); shop.grant(unowned); store.set('avatar', avatar); sfx.win(); toast('🎉 ' + t('bought')); buildCreator(); }; }
+  $('crHint').hidden = !unowned.length;
 }
 function showPiUser() { const el = $('piUser'); el.hidden = !PiState.user; if (PiState.user) el.textContent = 'π ' + PiState.user; }
-piSignIn().then(showPiUser);
+piSignIn().then(showPiUser); showLevel();
 $('bPlay').onclick = () => { sfx.click(); enterRoam(); }; $('bAgain').onclick = startRound; $('bMenu').onclick = enterRoam;
 $('bHow').onclick = () => show('how'); $('bHowBack').onclick = () => show('menu'); $('langBtn').onclick = () => { buildLangs(); show('langs'); }; $('bLangBack').onclick = () => show('menu');
-$('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }; $('bCharDone').onclick = () => { sfx.click(); show('menu'); };
+$('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }; $('bCharDone').onclick = () => { sfx.click(); stripUnowned(); store.set('avatar', avatar); rebuildPlayer(); show('menu'); };
 $('sndBtn').onclick = () => { soundOn = !soundOn; store.set('sound', soundOn); if (!soundOn && window.speechSynthesis) speechSynthesis.cancel(); applyLang(); sfx.click(); };
 $('bHome').onclick = () => { if (G.on) return; G.zone = 'studio'; syncScene(); show('menu'); };
 

@@ -10,7 +10,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#140f26;color:#fff;
   font-family:system-ui,-apple-system,"Segoe UI","Noto Sans","Noto Sans Arabic",Tahoma,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
 #c{position:fixed;inset:0;width:100%;height:100%;display:block}
 .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px;text-align:center}
-.screen[hidden]{display:none}
+.screen[hidden],[hidden]{display:none!important}
 .panel{background:rgba(20,14,40,.88);border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:22px 20px;width:min(440px,100%);max-height:92vh;overflow:auto;touch-action:pan-y;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 h1{margin:0;font-size:46px;line-height:1.1}
 h1 span{display:inline-block;background:#ff3b4e;border-radius:12px;padding:2px 16px 6px;box-shadow:0 0 28px rgba(255,59,78,.6)}
@@ -70,8 +70,8 @@ button{font:inherit;color:#fff;border:0;border-radius:16px;cursor:pointer}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 #creator{padding:0;justify-content:flex-end}
 #crPanel{width:100%;height:54%;background:#1a1333;border-radius:22px 22px 0 0;border-top:1px solid rgba(255,255,255,.2);padding:12px 14px 14px;display:flex;flex-direction:column;max-width:560px}
-#crTabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
-#crTabs button{background:rgba(255,255,255,.1);padding:10px 2px;font-size:14px;font-weight:700;border-radius:12px}
+#crTabs{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+#crTabs button{background:rgba(255,255,255,.1);padding:10px 2px;font-size:13px;font-weight:700;border-radius:12px}
 #crTabs button.sel{background:#ffcf3f;color:#2a1c00}
 #crBody{flex:1;overflow:auto;touch-action:pan-y;text-align:start;padding:4px 2px}
 #crBody h4{margin:10px 0 6px;font-size:13px;opacity:.7}
@@ -81,6 +81,24 @@ button{font:inherit;color:#fff;border:0;border-radius:16px;cursor:pointer}
 .chip{background:rgba(255,255,255,.1);padding:9px 14px;font-size:14px;border-radius:999px}
 .chip.sel{background:#ffcf3f;color:#2a1c00;font-weight:700}
 #crPanel .big{margin-top:8px;padding:12px}
+#crHead{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-weight:800;font-size:14px}
+#crHead .xp{flex:1;height:8px;background:rgba(255,255,255,.12);border-radius:9px;overflow:hidden}
+#crXp{height:100%;width:0;background:linear-gradient(90deg,#ffcf3f,#ff8a3d)}
+.sw,.chip{position:relative}
+.tag{position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);font-style:normal;font-size:9px;font-weight:800;background:#2a1c4a;border:1px solid rgba(255,255,255,.3);border-radius:8px;padding:0 4px;white-space:nowrap;color:#ffcf3f;line-height:14px}
+.chip .tag{position:static;transform:none;margin-inline-start:6px;font-size:10px}
+.locked{opacity:.45}
+.pack{background:rgba(255,255,255,.07);border:1px solid rgba(255,207,63,.35);border-radius:14px;padding:10px 12px;margin:8px 0;display:grid;gap:4px}
+.pack b{font-size:15px}.pack small{font-size:12px;opacity:.8}
+.pack button{background:#ffcf3f;color:#2a1c00;font-weight:800;padding:9px;border-radius:12px}
+.pack button:disabled{background:rgba(61,220,151,.25);color:#3ddc97}
+.pack s{opacity:.6;font-weight:600}
+#crBuy{background:#3ddc97;color:#06281a}
+#crBuy.poor{background:#555;color:#ddd}
+#crHint{font-size:12px;opacity:.75;margin:6px 0 0}
+#crToast{position:absolute;left:50%;bottom:58%;transform:translateX(-50%);background:rgba(10,8,25,.92);border:1px solid rgba(255,207,63,.5);padding:10px 16px;border-radius:14px;font-weight:700;font-size:14px;max-width:86%;text-align:center}
+#lvlBox{background:rgba(20,14,40,.85);border-radius:12px;padding:9px 12px;font-weight:800;font-size:15px}
+#rXp{margin:4px 0 0;font-weight:800;color:#ffcf3f}#rUp{margin:4px 0;font-weight:800;color:#3ddc97}
 /* report */
 .pass{color:#3ddc97}.fail{color:#ff8a3d}
 #rTitle{font-size:28px;margin:0 0 10px}
@@ -135,14 +153,19 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
 
 <section id="creator" class="screen" hidden>
   <div id="crPanel">
+    <div id="crHead"><span id="crLvl"></span><div class="xp"><div id="crXp"></div></div><span id="crCoins"></span></div>
     <div id="crTabs"></div>
     <div id="crBody"></div>
+    <p id="crHint" data-t="try_hint" hidden></p>
+    <button id="crBuy" class="big" hidden></button>
     <button id="bCharDone" class="big" data-t="done"></button>
+  </div>
+  <div id="crToast" hidden>
   </div>
 </section>
 
 <section id="hud" class="screen" hidden>
-  <div id="roamBar"><button id="bHome">☰</button><span id="piUser" hidden></span><span id="coinBox">🪙 <b id="coinN">0</b></span></div>
+  <div id="roamBar"><button id="bHome">☰</button><span id="piUser" hidden></span><span id="lvlBox"></span><span id="coinBox">🪙 <b id="coinN">0</b></span></div>
   <div class="top">
     <span id="live" class="live" data-t="live"></span>
     <div class="trust"><small><span data-t="trust"></span><span id="trustPct">100%</span></small><div class="bar"><div id="trustFill"></div></div></div>
@@ -163,6 +186,7 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
       <div><b id="rAir" dir="ltr"></b><small data-t="r_air"></small></div>
       <div><b id="rCoins"></b><small data-t="r_coins"></small></div>
     </div>
+    <p id="rXp"></p><p id="rUp" hidden></p>
     <div id="rSponsor"></div>
     <h3 data-t="r_what"></h3>
     <ul id="rList" class="rl"></ul>
