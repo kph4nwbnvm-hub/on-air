@@ -299,7 +299,7 @@ function firePrank() {
 function markFixed(k) { const p = G.pranks.slice().reverse().find((x) => x.k === k && x.fixed === null); if (p) { p.fixed = G.time; sfx.fix(); say(t('sp_ok'), 'ok', true); } }
 const selfPrank = (k) => G.pranks.push({ k, at: G.time, fixed: null, told: true, self: true });
 function startRound() {
-  Object.assign(G, { on: true, zone: 'studio', time: 0, good: 0, bonus: 0, product: true, feed: 0, light: true, mess: 0, pranks: [], next: 9, asked: [], askCd: 0, asking: false, grace: 0, px: 0, pz: 3.3, face: Math.PI });
+  lastAct = 0; Object.assign(G, { on: true, zone: 'studio', time: 0, good: 0, bonus: 0, product: true, feed: 0, light: true, mess: 0, pranks: [], next: 9, asked: [], askCd: 0, asking: false, grace: 0, px: 0, pz: 3.3, face: Math.PI });
   confetti.forEach((c) => { c.m.visible = false; }); $('qSheet').hidden = true; show('hud'); syncScene(); resize(); snapCam = true; sfx.seg(); say(t('sp_start'));
 }
 function endRound() {
@@ -399,7 +399,7 @@ function resize() { const w = window.innerWidth, h = window.innerHeight; rendere
 window.addEventListener('resize', resize);
 function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator'].forEach((s) => { $(s).hidden = s !== id; }); }
 function buildLangs() { const g = $('langGrid'); g.innerHTML = ''; LANGS.forEach((l) => { const b = document.createElement('button'); b.textContent = l.name; b.dir = l.rtl ? 'rtl' : 'ltr'; if (l.code === lang) b.className = 'sel'; b.onclick = () => { lang = l.code; store.set('lang', lang); applyLang(); show('menu'); }; g.appendChild(b); }); }
-function enterRoam() { G.on = false; G.zone = 'studio'; G.px = 0; G.pz = 3.3; G.face = Math.PI; player.armR.rotation.set(0, 0, 0); show('hud'); resize(); syncScene(); snapCam = true; say(t('roam_hint'), '', true); }
+function enterRoam() { lastAct = 0; G.on = false; G.zone = 'studio'; G.px = 0; G.pz = 3.3; G.face = Math.PI; player.armR.rotation.set(0, 0, 0); show('hud'); resize(); syncScene(); snapCam = true; say(t('roam_hint'), '', true); }
 // character creator
 let tab = 'skin';
 function buildCreator() {
