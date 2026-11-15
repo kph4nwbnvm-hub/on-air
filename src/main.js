@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { LANGS, STR } from './i18n.js';
 import { piSignIn, PiState } from './pi.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
-import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL } from './shop.js';
+import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL, isExclusive } from './shop.js';
+import { preview as dailyPreview, claim as dailyClaim, rewardFor, isBig, CYCLE } from './daily.js';
 
 /* ---------- storage, i18n, sound ---------- */
 const store = { get(k, d) { try { const v = localStorage.getItem('onair_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('onair_' + k, JSON.stringify(v)); } catch (e) {} } };
@@ -436,7 +437,7 @@ function followCam(dt) {
 let pip = { x: 0, y: 0, w: 0, h: 0 };
 function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); const r = $('pip').getBoundingClientRect(); pip = { x: r.left, y: h - r.bottom, w: r.width, h: r.height }; }
 window.addEventListener('resize', resize);
-function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator'].forEach((s) => { $(s).hidden = s !== id; }); }
+function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator'].forEach((s) => { $(s).hidden = s !== id; }); if (id === 'menu') checkDaily(); }
 function buildLangs() { const g = $('langGrid'); g.innerHTML = ''; LANGS.forEach((l) => { const b = document.createElement('button'); b.textContent = l.name; b.dir = l.rtl ? 'rtl' : 'ltr'; if (l.code === lang) b.className = 'sel'; b.onclick = () => { lang = l.code; store.set('lang', lang); applyLang(); show('menu'); }; g.appendChild(b); }); }
 function enterRoam() { lastAct = 0; G.on = false; G.zone = 'studio'; G.px = 0; G.pz = 3.3; G.face = Math.PI; player.armR.rotation.set(0, 0, 0); show('hud'); resize(); syncScene(); snapCam = true; say(t('roam_hint'), '', true); }
 // character creator
@@ -454,8 +455,8 @@ function buildCreator() {
   const row = (label) => { const h = document.createElement('h4'); h.textContent = label; body.appendChild(h); const d = document.createElement('div'); d.className = 'opts'; body.appendChild(d); return d; };
   const changed = () => { store.set('avatar', avatar); rebuildPlayer(); sfx.click(); buildCreator(); };
   // Locked (level too low): explain. Available but not owned: preview it; the buy bar appears.
-  const gate = (id, apply) => () => { if (!shop.available(id)) { sfx.bad(); toast(t('need_lvl').replace('{n}', reqLevel(id))); return; } apply(); changed(); };
-  const mark = (b, id) => { if (shop.has(id)) return; const tag = document.createElement('i'); tag.className = 'tag'; if (shop.available(id)) tag.textContent = '🪙' + price(id); else { tag.textContent = '🔒' + reqLevel(id); b.classList.add('locked'); } b.appendChild(tag); };
+  const gate = (id, apply) => () => { if (!shop.available(id) && isExclusive(id)) { sfx.bad(); toast('👑 ' + t('d_excl')); return; } if (!shop.available(id)) { sfx.bad(); toast(t('need_lvl').replace('{n}', reqLevel(id))); return; } apply(); changed(); };
+  const mark = (b, id) => { if (shop.has(id)) return; const tag = document.createElement('i'); tag.className = 'tag'; if (isExclusive(id)) { tag.textContent = '👑30'; b.classList.add('locked'); } else if (shop.available(id)) tag.textContent = '🪙' + price(id); else { tag.textContent = '🔒' + reqLevel(id); b.classList.add('locked'); } b.appendChild(tag); };
   const swatches = (label, cols, k, field) => { const d = row(label); cols.forEach((c, i) => { const id = (field || k) + ':' + i; const b = document.createElement('button'); b.className = 'sw' + (avatar[k] === i ? ' sel' : ''); b.style.background = '#' + c.toString(16).padStart(6, '0'); b.onclick = gate(id, () => { avatar[k] = i; }); if (k !== 'skin') mark(b, id); d.appendChild(b); }); };
   const chips = (label, names, k) => { const d = row(label); names.forEach((n, i) => { const id = k + ':' + i; const b = document.createElement('button'); b.className = 'chip' + (avatar[k] === i ? ' sel' : ''); b.textContent = n; b.onclick = gate(id, () => { avatar[k] = i; }); mark(b, id); d.appendChild(b); }); };
   if (tab === 'skin') swatches(t('c_color'), OPT.skin, 'skin');
@@ -478,6 +479,26 @@ function buildCreator() {
   bb.hidden = !unowned.length; if (unowned.length) { bb.textContent = t('buy_all') + ' 🪙 ' + total; bb.className = 'big' + (G.coins < total ? ' poor' : ''); bb.onclick = () => { if (G.coins < total) { sfx.bad(); toast(t('no_coins')); return; } addCoins(-total); shop.grant(unowned); store.set('avatar', avatar); sfx.win(); toast('🎉 ' + t('bought')); buildCreator(); }; }
   $('crHint').hidden = !unowned.length;
 }
+// daily login reward
+let dailyState = store.get('daily', { last: null, day: 0, cycle: 0, graceUsed: false });
+function checkDaily() {
+  const p = dailyPreview(dailyState); if (!p.due) return;
+  $('dDay').textContent = t('d_day').replace('{n}', p.day);
+  const g = $('dGrid'); g.innerHTML = '';
+  for (let d = 1; d <= CYCLE; d++) { const c = document.createElement('i'); c.textContent = d === CYCLE ? '👑' : isBig(d) ? '🎁' : d; c.className = (isBig(d) ? 'gift ' : '') + (d < p.day ? 'done' : d === p.day ? 'now' : ''); g.appendChild(c); }
+  const note = $('dNote'); note.hidden = !p.note; if (p.note) note.textContent = t('d_' + p.note);
+  $('dReward').textContent = '🪙 ' + rewardFor(p.day) + (p.day === CYCLE ? ' + 👑' : '');
+  $('daily').hidden = false;
+}
+$('dClaim').onclick = () => {
+  const r = dailyClaim(dailyState); $('daily').hidden = true; if (!r) return;
+  dailyState = r.state; store.set('daily', dailyState); addCoins(r.coins); sfx.win();
+  if (r.grand) {
+    const id = shop.nextExclusive(); if (id) shop.grant([id]); else addCoins(500);
+    $('dGrid').innerHTML = ''; $('dNote').hidden = false; $('dNote').textContent = '👑 ' + t('d_grand'); $('daily').hidden = false;
+    $('dClaim').hidden = true; setTimeout(() => { $('daily').hidden = true; $('dClaim').hidden = false; }, 3500);
+  }
+};
 function showPiUser() { const el = $('piUser'); el.hidden = !PiState.user; if (PiState.user) el.textContent = 'π ' + PiState.user; }
 piSignIn().then(showPiUser); showLevel();
 $('bPlay').onclick = () => { sfx.click(); enterRoam(); }; $('bAgain').onclick = startRound; $('bMenu').onclick = enterRoam;

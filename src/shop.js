@@ -18,6 +18,11 @@ export const LEVEL_ITEMS = {
 };
 export const MAX_LEVEL = 7;
 
+// Exclusive items: never sold; one is granted with each day-30 daily grand prize, in this order.
+export const EXCLUSIVE = ['cloth:10', 'shoes:5', 'cloth:11', 'hairColor:8'];
+const EXCL = new Set(EXCLUSIVE);
+export const isExclusive = (id) => EXCL.has(id);
+
 const REQ = {};
 Object.entries(LEVEL_ITEMS).forEach(([lv, ids]) => ids.forEach((id) => { REQ[id] = +lv; }));
 export const reqLevel = (id) => REQ[id] || 1;
@@ -41,7 +46,8 @@ export function makeShop(store) {
     xp: store.get('xp', 0),
     get level() { return levelOf(S.xp); },
     has: (id) => FREE.has(id) || owned.has(id),
-    available: (id) => S.has(id) || S.level >= reqLevel(id),
+    available: (id) => S.has(id) || (!EXCL.has(id) && S.level >= reqLevel(id)),
+    nextExclusive: () => EXCLUSIVE.find((id) => !S.has(id)) || null,
     grant(ids) { ids.forEach((id) => owned.add(id)); store.set('owned', [...owned]); },
     addXp(n) { const before = S.level; S.xp += n; store.set('xp', S.xp); return S.level > before; },
     packOwned: (p) => p.items.every((id) => S.has(id)),

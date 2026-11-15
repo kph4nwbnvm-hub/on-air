@@ -13,11 +13,11 @@ export function at(m, x, y, z, parent) { m.position.set(x, y, z); if (parent) pa
 
 export const OPT = {
   skin: [0xf6d3b3, 0xf0c8a0, 0xd9a877, 0xc68e62, 0x9a6a44, 0x6b4630],
-  hairColor: [0x1c130d, 0x2a1c14, 0x5a3a1c, 0x8a5a2b, 0xd9b36a, 0xb0b0b8, 0xd9342b, 0x3a6cff],
+  hairColor: [0x1c130d, 0x2a1c14, 0x5a3a1c, 0x8a5a2b, 0xd9b36a, 0xb0b0b8, 0xd9342b, 0x3a6cff, 0xeae6df],
   hairStyle: 6, beard: ['none', 'full', 'goatee', 'mustache'],
   top: ['tshirt', 'hoodie', 'jacket'], bottom: ['pants', 'shorts'],
-  cloth: [0x2e7df6, 0xd9342b, 0x19a05e, 0xffcf3f, 0xff8a3d, 0x8a63f0, 0xffffff, 0x23233a, 0xff6fa8, 0x2ab8b0],
-  shoes: [0xffffff, 0x222222, 0xd9342b, 0xffcf3f, 0x2e7df6],
+  cloth: [0x2e7df6, 0xd9342b, 0x19a05e, 0xffcf3f, 0xff8a3d, 0x8a63f0, 0xffffff, 0x23233a, 0xff6fa8, 0x2ab8b0, 0xd4af37, 0xc8ccd6],
+  shoes: [0xffffff, 0x222222, 0xd9342b, 0xffcf3f, 0x2e7df6, 0xd4af37],
   acc: ['cap', 'glasses', 'headphones', 'earring', 'chain', 'bracelet', 'watch', 'bag'],
 };
 export const DEFAULT_AVATAR = { skin: 1, hairStyle: 0, hairColor: 1, beard: 0, top: 1, topColor: 0, bottom: 0, bottomColor: 7, shoes: 0, capColor: 1, acc: {} };

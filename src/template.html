@@ -120,6 +120,14 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
 #langGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
 #langGrid button{background:rgba(255,255,255,.1);padding:11px 6px;font-size:15px}
 #langGrid button.sel{background:#ffcf3f;color:#2a1c00;font-weight:700}
+#daily{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(5,3,15,.6)}
+#dGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:12px 0}
+#dGrid i{display:flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;font-weight:800;border-radius:10px;height:30px;padding:0;line-height:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12)}
+#dGrid i.gift{border-color:rgba(255,207,63,.6)}
+#dGrid i.done{background:#19a05e;color:#fff}
+#dGrid i.now{background:#ffcf3f;color:#2a1c00;transform:scale(1.08)}
+#dReward{font-size:22px;font-weight:800;margin:4px 0 10px}
+#dNote{font-size:13px;opacity:.85;margin:0 0 8px}
 </style>
 </head>
 <body>
@@ -165,6 +173,17 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
   <div id="crToast" hidden>
   </div>
 </section>
+
+<div id="daily" hidden>
+  <div class="panel">
+    <h3 data-t="d_title"></h3>
+    <p id="dDay"></p>
+    <div id="dGrid"></div>
+    <p id="dNote" hidden></p>
+    <p id="dReward"></p>
+    <button id="dClaim" class="big" data-t="d_claim"></button>
+  </div>
+</div>
 
 <section id="hud" class="screen" hidden>
   <div id="roamBar"><button id="bHome">☰</button><span id="piUser" hidden></span><span id="lvlBox"></span><span id="coinBox">🪙 <b id="coinN">0</b></span></div>
