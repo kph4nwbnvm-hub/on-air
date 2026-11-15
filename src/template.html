@@ -60,6 +60,8 @@ button{font:inherit;color:#fff;border:0;border-radius:16px;cursor:pointer}
 #roamBar{position:absolute;top:10px;left:10px;display:flex;gap:8px;align-items:center;direction:ltr}
 #bHome{width:44px;height:44px;border-radius:12px;background:rgba(20,14,40,.85);font-size:20px}
 #coinBox{background:rgba(20,14,40,.85);border-radius:12px;padding:9px 14px;font-weight:800;font-size:16px}
+#piUser{background:#6b3fd9;border-radius:12px;padding:9px 12px;font-weight:800;font-size:14px}
+#piUser[hidden]{display:none}
 #coinBox.pop{animation:pop .5s}
 @keyframes pop{40%{transform:scale(1.35);background:#ffcf3f;color:#2a1c00}}
 #hud.round #roamBar{display:none}
@@ -140,7 +142,7 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
 </section>
 
 <section id="hud" class="screen" hidden>
-  <div id="roamBar"><button id="bHome">☰</button><span id="coinBox">🪙 <b id="coinN">0</b></span></div>
+  <div id="roamBar"><button id="bHome">☰</button><span id="piUser" hidden></span><span id="coinBox">🪙 <b id="coinN">0</b></span></div>
   <div class="top">
     <span id="live" class="live" data-t="live"></span>
     <div class="trust"><small><span data-t="trust"></span><span id="trustPct">100%</span></small><div class="bar"><div id="trustFill"></div></div></div>

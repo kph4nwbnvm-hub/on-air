@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { LANGS, STR } from './i18n.js';
+import { piSignIn, PiState } from './pi.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
 
 /* ---------- storage, i18n, sound ---------- */
@@ -414,6 +415,8 @@ function buildCreator() {
   if (tab === 'clothes') { chips(t('c_top'), OPT.top.map((b) => t('o_' + b)), 'top'); swatches(t('c_color'), OPT.cloth, 'topColor'); chips(t('c_bottom'), OPT.bottom.map((b) => t('o_' + b)), 'bottom'); swatches(t('c_color'), OPT.cloth, 'bottomColor'); swatches(t('c_shoes'), OPT.shoes, 'shoes'); }
   if (tab === 'acc') { const d = row(t('t_acc')); OPT.acc.forEach((n) => { const b = document.createElement('button'); b.className = 'chip' + (avatar.acc[n] ? ' sel' : ''); b.textContent = t('o_' + n); b.onclick = () => { avatar.acc[n] = !avatar.acc[n]; changed(); }; d.appendChild(b); }); swatches(t('c_cap'), OPT.cloth, 'capColor'); }
 }
+function showPiUser() { const el = $('piUser'); el.hidden = !PiState.user; if (PiState.user) el.textContent = 'π ' + PiState.user; }
+piSignIn().then(showPiUser);
 $('bPlay').onclick = () => { sfx.click(); enterRoam(); }; $('bAgain').onclick = startRound; $('bMenu').onclick = enterRoam;
 $('bHow').onclick = () => show('how'); $('bHowBack').onclick = () => show('menu'); $('langBtn').onclick = () => { buildLangs(); show('langs'); }; $('bLangBack').onclick = () => show('menu');
 $('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }; $('bCharDone').onclick = () => { sfx.click(); show('menu'); };
@@ -469,7 +472,7 @@ function frame(now) {
 }
 
 // hook for automated checks only
-window.__onair = { G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 applyLang(); syncScene(); show('menu'); resize();
 requestAnimationFrame(frame);
