@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>على الهوا | نموذج أولي</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:#140f26;color:#fff;
+  font-family:system-ui,-apple-system,"Segoe UI","Noto Sans","Noto Sans Arabic",Tahoma,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:14px;text-align:center}
+.screen[hidden]{display:none}
+.panel{background:rgba(20,14,40,.88);border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:22px 20px;width:min(440px,100%);max-height:92vh;overflow:auto;touch-action:pan-y;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+h1{margin:0;font-size:46px;line-height:1.1}
+h1 span{display:inline-block;background:#ff3b4e;border-radius:12px;padding:2px 16px 6px;box-shadow:0 0 28px rgba(255,59,78,.6)}
+.tag{margin:10px 0 4px;font-size:17px;opacity:.9}
+.proto{font-size:13px;opacity:.65;margin:0 0 16px}
+button{font:inherit;color:#fff;border:0;border-radius:16px;cursor:pointer}
+.big{display:block;width:100%;padding:16px;font-size:20px;font-weight:700;background:#ffcf3f;color:#2a1c00;margin-top:10px}
+.ghost{display:block;width:100%;padding:13px;font-size:16px;background:rgba(255,255,255,.12);margin-top:10px}
+.big:active,.ghost:active{transform:scale(.97)}
+/* HUD */
+#hud{display:block;padding:0;pointer-events:none}
+#hud[hidden]{display:none}
+#hud>*{pointer-events:auto}
+.top{position:absolute;top:10px;left:10px;right:10px;display:flex;align-items:center;gap:10px;direction:ltr}
+.live{background:#ff3b4e;border-radius:9px;padding:5px 10px;font-weight:800;font-size:13px;white-space:nowrap;animation:pulse 1.2s infinite}
+.live.off{background:#555;animation:none}
+@keyframes pulse{50%{opacity:.6}}
+#timer{font-variant-numeric:tabular-nums;font-size:24px;font-weight:800;min-width:58px;text-shadow:0 2px 6px #000}
+.trust{flex:1;min-width:0}
+.trust small{display:flex;justify-content:space-between;font-size:12px;text-shadow:0 1px 4px #000}
+.bar{height:10px;background:rgba(0,0,0,.5);border-radius:6px;overflow:hidden;margin-top:3px}
+#trustFill{height:100%;width:100%;background:#3ddc97;transition:width .3s}
+#trustFill.low{background:#ff8a3d}
+#leftcol{position:absolute;top:58px;left:10px;max-width:calc(100% - min(46vw,250px) - 30px);display:flex;flex-direction:column;align-items:flex-start;gap:6px;pointer-events:none}
+#hud.roam #leftcol{top:62px}
+#segName{background:rgba(20,14,40,.85);border-radius:10px;padding:5px 10px;font-size:13px;font-weight:700;text-align:start}
+#pip{position:absolute;top:58px;right:10px;width:min(46vw,250px);aspect-ratio:16/9;border:3px solid #3ddc97;border-radius:6px;pointer-events:none;box-shadow:0 4px 18px rgba(0,0,0,.6)}
+#pip.wrong{border-color:#ff8a3d}
+#pipLabel{position:absolute;left:0;bottom:0;background:rgba(0,0,0,.7);font-size:11px;font-weight:700;padding:2px 7px;border-top-right-radius:6px;direction:ltr}
+#pipFlash{position:absolute;inset:0;background:#fff;opacity:0}
+#pipFlash.go{animation:fl .35s ease-out}
+@keyframes fl{0%{opacity:.9}100%{opacity:0}}
+.bubble{background:#fff;color:#1b1430;border-radius:14px;padding:9px 12px;font-size:14px;font-weight:600;opacity:0;transform:translateY(-8px);transition:.25s;pointer-events:none;text-align:start}
+.bubble.show{opacity:1;transform:none}
+.bubble.warn{background:#ffe0d6}.bubble.ok{background:#d9ffe9}
+#joy{position:absolute;left:22px;bottom:26px;width:128px;height:128px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);touch-action:none}
+#knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(255,255,255,.85);pointer-events:none}
+#actBtn{position:absolute;right:22px;bottom:34px;width:112px;height:112px;border-radius:50%;background:#ffcf3f;color:#2a1c00;font-weight:800;font-size:13px;line-height:1.15;box-shadow:0 6px 20px rgba(0,0,0,.5);touch-action:none;padding:6px}
+#actBtn[hidden]{display:none}
+#actBtn:active{transform:scale(.94)}
+#actIcon{display:block;font-size:30px;line-height:1.1}
+#qSheet{position:absolute;left:0;right:0;bottom:0;background:rgba(20,14,40,.96);border-radius:22px 22px 0 0;padding:16px 14px 20px;border-top:1px solid rgba(255,255,255,.2)}
+#qSheet[hidden]{display:none}
+#qSheet h3{margin:0 0 8px;text-align:center}
+#qList button{display:block;width:100%;text-align:start;background:rgba(255,255,255,.12);padding:13px 14px;font-size:16px;margin-top:8px}
+#qList button:active{background:#ffcf3f;color:#2a1c00}
+#roamBar{position:absolute;top:10px;left:10px;display:flex;gap:8px;align-items:center;direction:ltr}
+#bHome{width:44px;height:44px;border-radius:12px;background:rgba(20,14,40,.85);font-size:20px}
+#coinBox{background:rgba(20,14,40,.85);border-radius:12px;padding:9px 14px;font-weight:800;font-size:16px}
+#coinBox.pop{animation:pop .5s}
+@keyframes pop{40%{transform:scale(1.35);background:#ffcf3f;color:#2a1c00}}
+#hud.round #roamBar{display:none}
+#hud.roam .top,#hud.roam #pip{display:none}
+#hud.roam #leftcol{max-width:calc(100% - 20px)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+#creator{padding:0;justify-content:flex-end}
+#crPanel{width:100%;height:54%;background:#1a1333;border-radius:22px 22px 0 0;border-top:1px solid rgba(255,255,255,.2);padding:12px 14px 14px;display:flex;flex-direction:column;max-width:560px}
+#crTabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+#crTabs button{background:rgba(255,255,255,.1);padding:10px 2px;font-size:14px;font-weight:700;border-radius:12px}
+#crTabs button.sel{background:#ffcf3f;color:#2a1c00}
+#crBody{flex:1;overflow:auto;touch-action:pan-y;text-align:start;padding:4px 2px}
+#crBody h4{margin:10px 0 6px;font-size:13px;opacity:.7}
+.opts{display:flex;flex-wrap:wrap;gap:8px}
+.sw{width:40px;height:40px;border-radius:50%;border:3px solid rgba(255,255,255,.25)}
+.sw.sel{border-color:#ffcf3f;box-shadow:0 0 0 3px rgba(255,207,63,.4)}
+.chip{background:rgba(255,255,255,.1);padding:9px 14px;font-size:14px;border-radius:999px}
+.chip.sel{background:#ffcf3f;color:#2a1c00;font-weight:700}
+#crPanel .big{margin-top:8px;padding:12px}
+/* report */
+.pass{color:#3ddc97}.fail{color:#ff8a3d}
+#rTitle{font-size:28px;margin:0 0 10px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}
+.stats div{background:rgba(255,255,255,.08);border-radius:14px;padding:10px 4px}
+.stats b{display:block;font-size:19px;font-variant-numeric:tabular-nums}
+.stats small{font-size:11px;opacity:.75}
+#rSponsor{background:#fff;color:#1b1430;border-radius:14px;padding:10px;font-weight:600;font-size:15px;margin:8px 0}
+h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
+.rl{list-style:none;margin:0;padding:0;text-align:start;font-size:14px}
+.rl li{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.1)}
+.rl b{font-variant-numeric:tabular-nums;opacity:.7;min-width:30px}
+.rl span{flex:1}
+.rl i{font-style:normal;opacity:.8;white-space:nowrap}
+.rl li.bad i,.rl li.bad b{color:#ff8a3d}
+.howp{text-align:start;font-size:15px;line-height:1.6;margin:0 0 10px}
+#langGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
+#langGrid button{background:rgba(255,255,255,.1);padding:11px 6px;font-size:15px}
+#langGrid button.sel{background:#ffcf3f;color:#2a1c00;font-weight:700}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<section id="menu" class="screen">
+  <div class="panel">
+    <h1><span data-t="title"></span></h1>
+    <p class="tag" data-t="tagline"></p>
+    <p class="proto" data-t="proto"></p>
+    <button id="bPlay" class="big" data-t="play"></button>
+    <button id="bChar" class="ghost" data-t="customize"></button>
+    <button id="bHow" class="ghost" data-t="how"></button>
+    <div class="two"><button id="langBtn" class="ghost"></button><button id="sndBtn" class="ghost"></button></div>
+  </div>
+</section>
+
+<section id="how" class="screen" hidden>
+  <div class="panel">
+    <p class="howp" data-t="how1"></p><p class="howp" data-t="how2"></p><p class="howp" data-t="how3"></p>
+    <p class="howp" data-t="how4"></p><p class="howp" data-t="how5"></p>
+    <button id="bHowBack" class="ghost" data-t="back"></button>
+  </div>
+</section>
+
+<section id="langs" class="screen" hidden>
+  <div class="panel">
+    <h3 data-t="language"></h3>
+    <div id="langGrid"></div>
+    <button id="bLangBack" class="ghost" data-t="back"></button>
+  </div>
+</section>
+
+<section id="creator" class="screen" hidden>
+  <div id="crPanel">
+    <div id="crTabs"></div>
+    <div id="crBody"></div>
+    <button id="bCharDone" class="big" data-t="done"></button>
+  </div>
+</section>
+
+<section id="hud" class="screen" hidden>
+  <div id="roamBar"><button id="bHome">☰</button><span id="coinBox">🪙 <b id="coinN">0</b></span></div>
+  <div class="top">
+    <span id="live" class="live" data-t="live"></span>
+    <div class="trust"><small><span data-t="trust"></span><span id="trustPct">100%</span></small><div class="bar"><div id="trustFill"></div></div></div>
+    <span id="timer">3:00</span>
+  </div>
+  <div id="leftcol"><div id="segName"></div><div id="bubble" class="bubble"></div></div>
+  <div id="pip"><div id="pipFlash"></div><div id="pipLabel"></div></div>
+  <div id="joy"><div id="knob"></div></div>
+  <button id="actBtn" hidden><span id="actIcon"></span><span id="actLabel"></span></button>
+  <div id="qSheet" hidden><h3 data-t="iv_pick"></h3><div id="qList"></div></div>
+</section>
+
+<section id="report" class="screen" hidden>
+  <div class="panel">
+    <h2 id="rTitle"></h2>
+    <div class="stats">
+      <div><b id="rTrust"></b><small data-t="r_trust"></small></div>
+      <div><b id="rAir" dir="ltr"></b><small data-t="r_air"></small></div>
+      <div><b id="rCoins"></b><small data-t="r_coins"></small></div>
+    </div>
+    <div id="rSponsor"></div>
+    <h3 data-t="r_what"></h3>
+    <ul id="rList" class="rl"></ul>
+    <h3 data-t="r_iv"></h3>
+    <ul id="rIv" class="rl"></ul>
+    <button id="bAgain" class="big" data-t="again"></button>
+    <button id="bMenu" class="ghost" data-t="roam"></button>
+  </div>
+</section>
+
+<script>/*BUNDLE*/</script>
+</body>
+</html>
