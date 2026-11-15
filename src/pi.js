@@ -1,6 +1,6 @@
 // Pi Network sign-in. Inside Pi Browser the SDK signs the player in with their Pi account.
 // Outside Pi Browser (a PC browser) the game keeps working without a Pi account.
-// Add ?sandbox=1 to the URL to test against the Pi sandbox from a desktop browser.
+// Inside the Pi sandbox frame (or with ?sandbox=1) the SDK runs in sandbox mode.
 export const PiState = { ready: false, user: null, inPi: false, error: null };
 
 function loadSdk() {
@@ -17,8 +17,11 @@ function loadSdk() {
 const timeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 
 export async function piSignIn() {
-  const sandbox = /[?&]sandbox=1/.test(location.search);
-  const inPi = /PiBrowser/i.test(navigator.userAgent) || sandbox;
+  const piBrowser = /PiBrowser/i.test(navigator.userAgent);
+  let framed = false; try { framed = window.self !== window.top; } catch (e) { framed = true; }
+  // The Pi sandbox (sandbox.minepi.com) loads the development URL inside a frame on a desktop browser.
+  const sandbox = /[?&]sandbox=1/.test(location.search) || (!piBrowser && framed);
+  const inPi = piBrowser || sandbox;
   PiState.inPi = inPi;
   if (!inPi) return PiState;
   try {

@@ -1,3 +1,4 @@
+import TR from './tr.js';
 // The 53 languages of the Pi system, in the order the project owner supplied them.
 export const LANGS = [
   { code: 'ar', name: 'العربية', rtl: true }, { code: 'en', name: 'English' }, { code: 'af', name: 'Afrikaans' },
@@ -132,3 +133,4 @@ export const STR = {
     again: 'Play again', menu: 'Menu', language: 'Language',
   },
 };
+Object.assign(STR, TR);
