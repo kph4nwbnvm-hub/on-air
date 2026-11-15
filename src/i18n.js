@@ -77,7 +77,7 @@ export const STR = {
     again: 'جولة ثانية', menu: 'القائمة', language: 'اللغة',
   },
   en: {
-    title: 'On Air', tagline: 'The live-stream prank game', play: 'Play', how: 'How to play', back: 'Back',
+    title: 'On Air Studio', tagline: 'The live-stream prank game', play: 'Play', how: 'How to play', back: 'Back',
     proto: 'Prototype: a studio, a street and an awards night',
     how1: 'A round lasts three minutes: 90 seconds of sponsor segment, then 90 seconds interviewing Captain Barq.',
     how2: 'Joystick or arrow keys: up and down to walk, left and right to turn. Walk up to something and the action button appears (or press Space).',
