@@ -44,9 +44,35 @@ const sfx = {
   win: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.22, 'triangle', i * 0.12)), lose: () => [392, 330, 262].forEach((f, i) => tone(f, 0.3, 'sawtooth', i * 0.18, 0.06)),
   seg: () => { tone(880, 0.1); tone(880, 0.1, 'sine', 0.18); },
 };
-function speak(text) {
+// Device voices: pick the most natural voice the device offers for the current language,
+// and give each speaker their own pitch/rate so the sponsor, director and guests sound different.
+let VOICES = [];
+function loadVoices() { try { VOICES = speechSynthesis.getVoices() || []; } catch (e) { VOICES = []; } }
+if (window.speechSynthesis) { loadVoices(); try { speechSynthesis.addEventListener('voiceschanged', loadVoices); } catch (e) {} }
+const ttsLang = () => (lang === 'zh-Hans' ? 'zh-CN' : lang === 'zh-Hant' ? 'zh-TW' : lang === 'fil' ? 'fil-PH' : lang === 'no' ? 'nb-NO' : lang);
+function bestVoice() {
+  const want = ttsLang().toLowerCase(), base = want.split('-')[0];
+  const pref = { ar: 'ar-sa', en: 'en-us', es: 'es-es', fr: 'fr-fr', pt: 'pt-br', 'zh-cn': 'zh-cn', 'zh-tw': 'zh-tw' }[want] || want;
+  let best = null, top = -1;
+  VOICES.forEach((v) => {
+    const vl = (v.lang || '').replace('_', '-').toLowerCase(); if (vl.split('-')[0] !== base) return;
+    if ((want === 'zh-cn' || want === 'zh-tw') && !vl.startsWith(want)) return;
+    let sc = 1; const n = v.name || '';
+    if (/natural|neural|premium|enhanced|siri|wavenet|online/i.test(n)) sc += 6; if (/google/i.test(n)) sc += 3;
+    if (/compact|eloquence|espeak/i.test(n)) sc -= 4; if (vl === pref) sc += 2; if (v.localService === false) sc += 1;
+    if (sc > top) { top = sc; best = v; }
+  });
+  return best;
+}
+const VOICE_STYLE = [{ pitch: 0.82, rate: 0.98 }, { pitch: 1.08, rate: 1.04 }, { pitch: 0.95, rate: 1.0 }, { pitch: 1.2, rate: 1.06 }, { pitch: 0.9, rate: 1.02 }];
+function speak(text, who) {
   if (!soundOn || !window.speechSynthesis) return;
-  try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(text.replace(/^[^:：]{1,28}[:：]\s*/, '')); u.lang = lang === 'zh-Hans' ? 'zh-CN' : lang === 'zh-Hant' ? 'zh-TW' : lang; u.rate = 1.05; speechSynthesis.speak(u); } catch (e) {}
+  try {
+    const m = text.match(/^([^:：]{1,28})[:：]\s*/); const name = who || (m ? m[1] : 'guest'); const body = m ? text.slice(m[0].length) : text;
+    const v = bestVoice(); if (!v && VOICES.length) return; // no voice for this language: stay silent rather than read it wrongly
+    let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; const st = VOICE_STYLE[h % VOICE_STYLE.length];
+    speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(body); u.lang = ttsLang(); if (v) u.voice = v; u.pitch = st.pitch; u.rate = st.rate; speechSynthesis.speak(u);
+  } catch (e) {}
 }
 
 /* ---------- renderer ---------- */
