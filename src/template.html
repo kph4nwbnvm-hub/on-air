@@ -128,6 +128,23 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
 #dGrid i.now{background:#ffcf3f;color:#2a1c00;transform:scale(1.08)}
 #dReward{font-size:22px;font-weight:800;margin:4px 0 10px}
 #dNote{font-size:13px;opacity:.85;margin:0 0 8px}
+.fld{display:grid;gap:4px;text-align:start;margin:6px 0 10px}
+.fld small{opacity:.75;font-size:13px}
+.fld input{font:inherit;font-size:17px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff}
+.pi{font-size:13px;opacity:.85;margin:0 0 8px}
+#pLvl{font-weight:800;margin:4px 0}
+#profile .xp{height:8px;background:rgba(255,255,255,.12);border-radius:9px;overflow:hidden;margin:6px 0}
+#pXp{height:100%;width:0;background:linear-gradient(90deg,#ffcf3f,#ff8a3d)}
+#pStats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 4px}
+#pStats div{background:rgba(255,255,255,.07);border-radius:12px;padding:9px 6px}
+#pStats b{display:block;font-size:19px;color:#ffcf3f}
+#pStats small{font-size:12px;opacity:.8}
+.srow{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.07);border-radius:14px;padding:10px 14px;margin-top:8px;width:100%;font-size:15px}
+.srow span:last-child{font-weight:800;color:#ffcf3f}
+.lnk{text-decoration:none;color:#fff;font-size:14px;box-sizing:border-box}
+.danger{background:rgba(217,52,43,.25)!important}
+.danger.armed{background:#d9342b!important}
+.ver{font-size:12px;opacity:.55;margin:10px 0 0}
 </style>
 </head>
 <body>
@@ -141,7 +158,31 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
     <button id="bPlay" class="big" data-t="play"></button>
     <button id="bChar" class="ghost" data-t="customize"></button>
     <button id="bHow" class="ghost" data-t="how"></button>
-    <div class="two"><button id="langBtn" class="ghost"></button><button id="sndBtn" class="ghost"></button></div>
+    <div class="two"><button id="bProfile" class="ghost"></button><button id="bSettings" class="ghost"></button></div>
+  </div>
+</section>
+
+<section id="profile" class="screen" hidden>
+  <div class="panel">
+    <h3 data-t="profile"></h3>
+    <label class="fld"><small data-t="p_name"></small><input id="pName" maxlength="16" autocomplete="off" spellcheck="false"></label>
+    <p id="pPi" class="pi"></p>
+    <div id="pLvl"></div>
+    <div class="xp"><div id="pXp"></div></div>
+    <div id="pStats"></div>
+    <button id="bProfBack" class="ghost" data-t="back"></button>
+  </div>
+</section>
+
+<section id="settings" class="screen" hidden>
+  <div class="panel">
+    <h3 data-t="settings"></h3>
+    <button id="langBtn" class="ghost"></button>
+    <div id="setRows"></div>
+    <div class="two"><a class="ghost lnk" href="privacy.html" target="_blank" rel="noopener" data-t="s_privacy"></a><a class="ghost lnk" href="terms.html" target="_blank" rel="noopener" data-t="s_terms"></a></div>
+    <button id="bReset" class="ghost danger" data-t="s_reset"></button>
+    <p id="setVer" class="ver"></p>
+    <button id="bSetBack" class="ghost" data-t="back"></button>
   </div>
 </section>
 

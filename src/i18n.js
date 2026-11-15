@@ -1,6 +1,7 @@
 import TR from './tr.js';
 import TR_SHOP from './tr_shop.js';
 import TR_DAILY from './tr_daily.js';
+import TR_PROFILE from './tr_profile.js';
 // The 53 languages of the Pi system, in the order the project owner supplied them.
 export const LANGS = [
   { code: 'ar', name: 'العربية', rtl: true }, { code: 'en', name: 'English' }, { code: 'af', name: 'Afrikaans' },
@@ -138,3 +139,4 @@ export const STR = {
 Object.assign(STR, TR);
 Object.entries(TR_SHOP).forEach(([k, v]) => { STR[k] = { ...(STR[k] || {}), ...v }; });
 Object.entries(TR_DAILY).forEach(([k, v]) => { STR[k] = { ...(STR[k] || {}), ...v }; });
+Object.entries(TR_PROFILE).forEach(([k, v]) => { STR[k] = { ...(STR[k] || {}), ...v }; });

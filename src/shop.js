@@ -26,13 +26,14 @@ export const isExclusive = (id) => EXCL.has(id);
 const REQ = {};
 Object.entries(LEVEL_ITEMS).forEach(([lv, ids]) => ids.forEach((id) => { REQ[id] = +lv; }));
 export const reqLevel = (id) => REQ[id] || 1;
-export const price = (id) => (FREE.has(id) ? 0 : 30 * reqLevel(id) + (id.startsWith('acc:') ? 20 : 0));
+// Balanced band from the 10,000-scenario study: an item costs ~1.5-2.3x a round's earnings (not easy, not hard).
+export const price = (id) => (FREE.has(id) ? 0 : 60 * reqLevel(id) + (id.startsWith('acc:') ? 40 : 0));
 
 // Bundles: sold at a discount; a pack grants its items even before the player reaches their level.
 export const PACKS = [
-  { id: 'street', level: 2, cost: 250, items: ['acc:cap', 'bottom:1', 'cloth:4', 'shoes:2'] },
-  { id: 'star', level: 4, cost: 390, items: ['top:2', 'acc:glasses', 'acc:watch', 'cloth:6'] },
-  { id: 'night', level: 6, cost: 690, items: ['acc:headphones', 'acc:earring', 'acc:chain', 'acc:bag', 'cloth:9'] },
+  { id: 'street', level: 2, cost: 500, items: ['acc:cap', 'bottom:1', 'cloth:4', 'shoes:2'] },
+  { id: 'star', level: 4, cost: 780, items: ['top:2', 'acc:glasses', 'acc:watch', 'cloth:6'] },
+  { id: 'night', level: 6, cost: 1380, items: ['acc:headphones', 'acc:earring', 'acc:chain', 'acc:bag', 'cloth:9'] },
 ];
 
 // XP needed to reach a level (cumulative): L2 100, L3 300, L4 600, L5 1000, L6 1500, L7 2100.

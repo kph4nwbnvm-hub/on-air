@@ -2,13 +2,17 @@ import * as THREE from 'three';
 import { LANGS, STR } from './i18n.js';
 import { piSignIn, PiState } from './pi.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
-import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL, isExclusive } from './shop.js';
+import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL, isExclusive, EXCLUSIVE } from './shop.js';
 import { preview as dailyPreview, claim as dailyClaim, rewardFor, isBig, CYCLE } from './daily.js';
 
 /* ---------- storage, i18n, sound ---------- */
 const store = { get(k, d) { try { const v = localStorage.getItem('onair_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('onair_' + k, JSON.stringify(v)); } catch (e) {} } };
 let lang = store.get('lang', 'ar');
 let soundOn = store.get('sound', true);
+const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('quality', 'high') };
+const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
+const VERSION = '1.3.0';
+const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
 const shop = makeShop(store);
@@ -26,7 +30,8 @@ function applyLang() {
   const L = LANGS.find((l) => l.code === lang) || LANGS[0];
   document.documentElement.lang = L.code; document.documentElement.dir = L.rtl ? 'rtl' : 'ltr';
   document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
-  $('langBtn').textContent = '🌐 ' + L.name; $('sndBtn').textContent = (soundOn ? '🔊 ' : '🔇 ') + t('sound');
+  $('langBtn').textContent = '🌐 ' + L.name; $('bProfile').textContent = '👤 ' + t('profile'); $('bSettings').textContent = '⚙️ ' + t('settings');
+  if (!$('settings').hidden) buildSettings(); if (!$('profile').hidden) buildProfile();
 }
 let AC = null;
 function tone(f, dur, type = 'sine', when = 0, vol = 0.12) {
@@ -67,7 +72,7 @@ function bestVoice() {
 }
 const VOICE_STYLE = [{ pitch: 0.82, rate: 0.98 }, { pitch: 1.08, rate: 1.04 }, { pitch: 0.95, rate: 1.0 }, { pitch: 1.2, rate: 1.06 }, { pitch: 0.9, rate: 1.02 }];
 function speak(text, who) {
-  if (!soundOn || !window.speechSynthesis) return;
+  if (!soundOn || !cfg.voice || !window.speechSynthesis) return;
   try {
     const m = text.match(/^([^:：]{1,28})[:：]\s*/); const name = who || (m ? m[1] : 'guest'); const body = m ? text.slice(m[0].length) : text;
     const v = bestVoice(); if (!v && VOICES.length) return; // no voice for this language: stay silent rather than read it wrongly
@@ -79,7 +84,8 @@ function speak(text, who) {
 /* ---------- renderer ---------- */
 const canvas = $('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+const pixelRatio = () => (cfg.quality === 'low' ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+renderer.setPixelRatio(pixelRatio());
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
 const scene = new THREE.Scene();
 const cam = new THREE.PerspectiveCamera(60, 1, 0.1, 110);
@@ -343,7 +349,8 @@ function startRound() {
 function endRound() {
   G.on = false; G.asking = false; $('qSheet').hidden = true; const missed = 3 - G.asked.length; G.bonus -= missed * 6;
   const trust = Math.max(0, Math.min(100, (G.good / ROUND) * 100 + G.bonus)) / 100; const pass = trust >= PASS; const coins = pass ? Math.round(100 + trust * 150) : Math.round(trust * 60);
-  addCoins(coins); (pass ? sfx.win : sfx.lose)();
+  addCoins(coins); (pass ? sfx.win : sfx.lose)(); buzz(pass ? [60, 40, 120] : 200);
+  stats.rounds++; if (pass) stats.wins++; stats.best = Math.max(stats.best, Math.round(trust * 100)); store.set('stats', stats);
   const xp = roundXp(trust, pass), up = shop.addXp(xp); showLevel();
   $('rXp').textContent = '+' + xp + ' ' + t('xp') + ' · ' + t('lvl') + ' ' + shop.level; $('rUp').hidden = !up; if (up) $('rUp').textContent = '⭐ ' + t('level_up');
   $('rTitle').textContent = t(pass ? 'r_pass' : 'r_fail'); $('rTitle').className = pass ? 'pass' : 'fail';
@@ -437,8 +444,8 @@ function followCam(dt) {
 let pip = { x: 0, y: 0, w: 0, h: 0 };
 function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); const r = $('pip').getBoundingClientRect(); pip = { x: r.left, y: h - r.bottom, w: r.width, h: r.height }; }
 window.addEventListener('resize', resize);
-function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator'].forEach((s) => { $(s).hidden = s !== id; }); if (id === 'menu') checkDaily(); }
-function buildLangs() { const g = $('langGrid'); g.innerHTML = ''; LANGS.forEach((l) => { const b = document.createElement('button'); b.textContent = l.name; b.dir = l.rtl ? 'rtl' : 'ltr'; if (l.code === lang) b.className = 'sel'; b.onclick = () => { lang = l.code; store.set('lang', lang); applyLang(); show('menu'); }; g.appendChild(b); }); }
+function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator', 'profile', 'settings'].forEach((s) => { $(s).hidden = s !== id; }); if (id === 'menu') checkDaily(); }
+function buildLangs() { const g = $('langGrid'); g.innerHTML = ''; LANGS.forEach((l) => { const b = document.createElement('button'); b.textContent = l.name; b.dir = l.rtl ? 'rtl' : 'ltr'; if (l.code === lang) b.className = 'sel'; b.onclick = () => { lang = l.code; store.set('lang', lang); applyLang(); show('settings'); buildSettings(); }; g.appendChild(b); }); }
 function enterRoam() { lastAct = 0; G.on = false; G.zone = 'studio'; G.px = 0; G.pz = 3.3; G.face = Math.PI; player.armR.rotation.set(0, 0, 0); show('hud'); resize(); syncScene(); snapCam = true; say(t('roam_hint'), '', true); }
 // character creator
 let tab = 'skin';
@@ -502,9 +509,38 @@ $('dClaim').onclick = () => {
 function showPiUser() { const el = $('piUser'); el.hidden = !PiState.user; if (PiState.user) el.textContent = 'π ' + PiState.user; }
 piSignIn().then(showPiUser); showLevel();
 $('bPlay').onclick = () => { sfx.click(); enterRoam(); }; $('bAgain').onclick = startRound; $('bMenu').onclick = enterRoam;
-$('bHow').onclick = () => show('how'); $('bHowBack').onclick = () => show('menu'); $('langBtn').onclick = () => { buildLangs(); show('langs'); }; $('bLangBack').onclick = () => show('menu');
+$('bHow').onclick = () => show('how'); $('bHowBack').onclick = () => show('menu'); $('langBtn').onclick = () => { buildLangs(); show('langs'); }; $('bLangBack').onclick = () => { show('settings'); buildSettings(); };
 $('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }; $('bCharDone').onclick = () => { sfx.click(); stripUnowned(); store.set('avatar', avatar); rebuildPlayer(); show('menu'); };
-$('sndBtn').onclick = () => { soundOn = !soundOn; store.set('sound', soundOn); if (!soundOn && window.speechSynthesis) speechSynthesis.cancel(); applyLang(); sfx.click(); };
+// profile & settings
+function buildProfile() {
+  const n = $('pName'); n.value = store.get('name', '') || PiState.user || ''; n.placeholder = PiState.user || t('p_guest');
+  $('pPi').textContent = PiState.user ? 'π ' + PiState.user + ' · ' + t('p_pi_on') : t('p_pi_off');
+  const lv = shop.level, a = xpFor(lv), b = xpFor(Math.min(MAX_LEVEL, lv + 1));
+  $('pLvl').textContent = '⭐ ' + t('lvl') + ' ' + lv + '   🪙 ' + G.coins; $('pXp').style.width = (lv >= MAX_LEVEL ? 100 : Math.round(((shop.xp - a) / (b - a)) * 100)) + '%';
+  const owned = store.get('owned', []).length, excl = EXCLUSIVE.filter((id) => shop.has(id)).length;
+  let since = ''; try { since = new Date(stats.since).toLocaleDateString(lang, { year: 'numeric', month: 'short', day: 'numeric' }); } catch (e) { since = new Date(stats.since).toISOString().slice(0, 10); }
+  const cells = [[stats.rounds, 'p_rounds'], [stats.wins, 'p_wins'], [stats.best + '%', 'p_best'], [owned, 'p_items'], [excl + '/' + EXCLUSIVE.length, 'p_excl'], [(dailyState.day || 0) + '/30', 'p_streak']];
+  const g = $('pStats'); g.innerHTML = ''; cells.forEach(([v, k]) => { const d = document.createElement('div'); d.innerHTML = '<b></b><small></small>'; d.children[0].textContent = v; d.children[1].textContent = t(k); g.appendChild(d); });
+  const sd = document.createElement('div'); sd.style.gridColumn = '1 / -1'; sd.innerHTML = '<small></small>'; sd.children[0].textContent = t('p_since') + ' ' + since; g.appendChild(sd);
+}
+$('pName').addEventListener('change', () => { const v = $('pName').value.replace(/[<>]/g, '').trim().slice(0, 16); $('pName').value = v; store.set('name', v); });
+function buildSettings() {
+  const rows = $('setRows'); rows.innerHTML = '';
+  const row = (icon, label, val, fn) => { const b = document.createElement('button'); b.className = 'srow'; b.innerHTML = '<span></span><span></span>'; b.children[0].textContent = icon + ' ' + label; b.children[1].textContent = val; b.onclick = () => { fn(); sfx.click(); buildSettings(); }; rows.appendChild(b); };
+  row(soundOn ? '🔊' : '🔇', t('sound'), t(soundOn ? 'on' : 'off'), () => { soundOn = !soundOn; store.set('sound', soundOn); if (!soundOn && window.speechSynthesis) speechSynthesis.cancel(); });
+  row('🗣️', t('s_voice'), t(cfg.voice ? 'on' : 'off'), () => { cfg.voice = !cfg.voice; store.set('voice', cfg.voice); if (!cfg.voice && window.speechSynthesis) speechSynthesis.cancel(); });
+  row('📳', t('s_vibe'), t(cfg.vibe ? 'on' : 'off'), () => { cfg.vibe = !cfg.vibe; store.set('vibe', cfg.vibe); buzz(80); });
+  row('🖥️', t('s_quality'), t(cfg.quality === 'low' ? 'q_low' : 'q_high'), () => { cfg.quality = cfg.quality === 'low' ? 'high' : 'low'; store.set('quality', cfg.quality); renderer.setPixelRatio(pixelRatio()); resize(); });
+  $('setVer').textContent = t('s_version') + ' ' + VERSION; const r = $('bReset'); r.classList.remove('armed'); r.textContent = t('s_reset');
+}
+$('bReset').onclick = () => {
+  const r = $('bReset');
+  if (!r.classList.contains('armed')) { r.classList.add('armed'); r.textContent = t('s_reset_confirm'); sfx.bad(); return; }
+  try { Object.keys(localStorage).filter((k) => k.startsWith('onair_') && k !== 'onair_lang').forEach((k) => localStorage.removeItem(k)); } catch (e) {}
+  location.reload();
+};
+$('bProfile').onclick = () => { sfx.click(); buildProfile(); show('profile'); }; $('bProfBack').onclick = () => { $('pName').dispatchEvent(new Event('change')); show('menu'); };
+$('bSettings').onclick = () => { sfx.click(); buildSettings(); show('settings'); }; $('bSetBack').onclick = () => show('menu');
 $('bHome').onclick = () => { if (G.on) return; G.zone = 'studio'; syncScene(); show('menu'); };
 
 /* ---------- loop ---------- */
