@@ -32,7 +32,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.3.7';
+const VERSION = '1.4.0';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -602,7 +602,7 @@ function buildCreator() {
 // daily login reward
 let dailyState = store.get('daily', { last: null, day: 0, cycle: 0, graceUsed: false });
 function checkDaily() {
-  if (tourI >= 0 || !store.get('tour_done', false)) return;
+  if (tourI >= 0 || storyOn || afterCreator || !store.get('story_done', false)) return;
   const p = dailyPreview(dailyState); if (!p.due) return;
   $('dDay').textContent = t('d_day').replace('{n}', p.day);
   const g = $('dGrid'); g.innerHTML = '';
@@ -625,12 +625,52 @@ function showPiUser() { const el = $('piUser'); el.hidden = !PiState.user; if (P
 piSignIn().then(showPiUser); showLevel();
 $('bPlay').onclick = () => { sfx.click(); enterRoam(); }; $('bAgain').onclick = startRound; $('bMenu').onclick = enterRoam;
 $('bHow').onclick = () => show('how'); $('bHowBack').onclick = () => show('menu'); $('langBtn').onclick = () => { buildLangs(); show('langs'); }; $('bLangBack').onclick = () => { show('settings'); buildSettings(); };
-$('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }; $('bCharDone').onclick = () => { sfx.click(); stripUnowned(); store.set('avatar', avatar); rebuildPlayer(); show('menu'); };
+$('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }; $('bCharDone').onclick = () => { sfx.click(); stripUnowned(); store.set('avatar', avatar); rebuildPlayer(); if (afterCreator) { afterCreator = false; startStory(); } else show('menu'); };
 // app-token store
 function gToast(msg) { const el = $('gToast'); el.textContent = msg; el.hidden = false; clearTimeout(gToast.h); gToast.h = setTimeout(() => { el.hidden = true; }, 2200); }
 const cs = makeStore({ store, t, getLang: () => lang, sfx, toast: gToast, $ });
 $('bStore').onclick = () => { sfx.click(); cs.closeSheet(); cs.render(); show('storeS'); };
 $('stBack').onclick = () => { sfx.click(); cs.closeSheet(); show('menu'); };
+
+// ───────── opening story (shown once per player, never repeated) ─────────
+// scenes 1–3: father's will → Uncle Saleh at the door → abandoned studio → cleaning. Later scenes hook in as their features land.
+const ruin = new THREE.Group(); ruin.visible = false; ZG.studio.add(ruin);
+const DUST = []; const dustM = new THREE.MeshStandardMaterial({ color: 0x5e4d3a, roughness: 1 }), sheetM = new THREE.MeshStandardMaterial({ color: 0xd9d4c8, roughness: 0.95 });
+function dustPile(x, z) { const g = new THREE.Group(); const m = new THREE.Mesh(new THREE.SphereGeometry(0.5, 14, 10), dustM); m.scale.set(1.15, 0.16, 0.85); m.position.y = 0.05; g.add(m);
+  for (let i = 0; i < 5; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(0.12 + Math.random() * 0.15, 0.04, 0.1 + Math.random() * 0.12), dustM); b.position.set((Math.random() - 0.5) * 0.9, 0.06, (Math.random() - 0.5) * 0.7); b.rotation.y = Math.random() * 3; g.add(b); }
+  g.position.set(x, 0, z); ruin.add(g); return g; }
+function sheet(x, z, w, h, d) { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), sheetM); m.position.set(x, h / 2, z); m.castShadow = true; ruin.add(m); return m; }
+[[-3.6, 1.4], [1.3, 2.6], [3.9, 0.9], [-0.9, -0.6], [5.0, -0.9], [-5.0, -0.2]].forEach(([x, z]) => DUST.push({ m: dustPile(x, z), x, z, done: false }));
+[[DESK.x, DESK.z + 0.9, 3.5, 1.5, 1.6], [CON.x, CON.z + 0.4, 1.8, 1.5, 1.3], [IV.x, IV.z + 0.1, 3.3, 1.15, 1.6]].forEach(([x, z, w, h, d]) => DUST.push({ m: sheet(x, z, w, h, d), x, z: z + d / 2 + 0.3, done: false }));
+let storyOn = false, cleaning = false, SI = -1, afterCreator = false;
+const salehAv = { skin: 2, hairStyle: 1, hairColor: 5, beard: 1, top: 2, topColor: 4, bottom: 0, bottomColor: 3, shoes: 1 };
+const salehSt = makeChar(salehAv); salehSt.g.visible = false; ZG.street.add(salehSt.g);
+const salehIn = makeChar(salehAv); salehIn.g.visible = false; ZG.studio.add(salehIn.g);
+DUST.forEach((d) => interact('studio', d.x, d.z, 1.05, 'a_clean', '🧹', () => cleaning && !d.done, () => cleanOne(d)));
+function ruinGear(on) { tripods.forEach((tp) => { tp.g.visible = !on; }); beams.forEach((b) => { if (b && b.isObject3D) b.visible = !on; }); }
+function cleanOne(d) { d.done = true; d.m.visible = false; sfx.fix(); const left = DUST.filter((x) => !x.done).length; if (left) say('🧹 ' + left, '', true); else { cleaning = false; ruin.visible = false; ruinGear(false); G.light = true; syncScene(); sfx.win(); storyNext(); } }
+const STORY = [
+  { who: 'sn_father', k: 's1a', black: true }, { who: 'sn_father', k: 's1b', black: true }, { k: 's1c', black: true },
+  { act: 'street' }, { who: 'sn_saleh', k: 's2a' }, { who: 'sn_me', k: 's2b' },
+  { act: 'enter' }, { k: 's2c' }, { who: 'sn_me', k: 's2d' }, { who: 'sn_saleh', k: 's2e' },
+  { k: 's3a' }, { who: 'sn_saleh', k: 's3b' }, { act: 'clean' },
+  { k: 's3c', act: 'xp' }, { who: 'sn_saleh', k: 's3d' }, { act: 'end' },
+];
+function faceTo(ch, x, z) { ch.g.rotation.y = Math.atan2(x - ch.g.position.x, z - ch.g.position.z); }
+function storyNext() {
+  SI++; const st = STORY[SI]; const box = $('story'); if (!st) return;
+  if (st.act === 'street') { enterZone('street', 0.6, -4.4, Math.PI); salehSt.g.position.set(SX - 0.9, 0, -6.2); faceTo(salehSt, G.px, G.pz); salehSt.g.visible = true; show('hud'); return storyNext(); }
+  if (st.act === 'enter') { salehSt.g.visible = false; ruin.visible = true; ruinGear(true); G.light = false; enterZone('studio', 5.2, 3.4, -Math.PI / 2); salehIn.g.position.set(6.0, 0, 2.2); faceTo(salehIn, G.px, G.pz); salehIn.g.visible = true; syncScene(); return storyNext(); }
+  if (st.act === 'clean') { box.hidden = true; cleaning = true; say(t('s3a'), '', true); return; }
+  if (st.act === 'end') { box.hidden = true; storyOn = false; salehIn.g.visible = false; store.set('story_done', true); store.set('tour_done', true); say(t('roam_hint'), '', true); return; }
+  if (st.act === 'xp') { const up = shop.addXp(10); showLevel(); if (up) say('⭐ ' + t('level_up'), '', true); }
+  box.hidden = false; box.classList.toggle('black', !!st.black);
+  $('sWho').textContent = st.who ? t(st.who) : ''; $('sText').textContent = t(st.k); $('sNext').textContent = t('tu_next');
+  speak(t(st.k), st.who ? t(st.who) : 'guest');
+}
+function startStory() { storyOn = true; SI = -1; G.on = false; G.zone = 'studio'; syncScene(); storyNext(); }
+$('sNext').onclick = () => { sfx.click(); storyNext(); };
+
 // first-time guided tour: the camera flies to each part of the studio and explains it
 const TOUR = [
   { p: [0.5, 3.4, 8.5], l: [0.5, 1.4, -1.5] }, { p: [DESK.x + 0.3, 2.2, DESK.z + 3.1], l: [DESK.x, 1.1, DESK.z] },
@@ -670,7 +710,6 @@ function buildSettings() {
   row('🗣️', t('s_voice'), t(cfg.voice ? 'on' : 'off'), () => { cfg.voice = !cfg.voice; store.set('voice', cfg.voice); if (!cfg.voice && window.speechSynthesis) speechSynthesis.cancel(); });
   row('📳', t('s_vibe'), t(cfg.vibe ? 'on' : 'off'), () => { cfg.vibe = !cfg.vibe; store.set('vibe', cfg.vibe); buzz(80); });
   row('🖥️', t('s_quality'), t(cfg.quality === 'low' ? 'q_low' : 'q_high'), () => { cfg.quality = cfg.quality === 'low' ? 'high' : 'low'; store.set('quality', cfg.quality); renderer.setPixelRatio(pixelRatio()); setupFX(); resize(); });
-  row('🎓', t('tu_replay'), '▶', () => { show('menu'); setTimeout(startTour, 50); });
   $('setVer').textContent = t('s_version') + ' ' + VERSION; const r = $('bReset'); r.classList.remove('armed'); r.textContent = t('s_reset');
 }
 $('bReset').onclick = () => {
@@ -740,10 +779,10 @@ function frame(now) {
 }
 
 // hook for automated checks only
-window.__onair = { sign, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { sign, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 setupFX(); applyLang(); syncScene(); show('menu'); resize();
-if (!store.get('tour_done', false)) setTimeout(startTour, 600);
+if (!store.get('story_done', false)) setTimeout(() => { afterCreator = true; G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }, 400);
 showDiag(IS_MOBILE ? 'mobile · ' + cfg.quality : cfg.quality); setTimeout(() => { const d = document.getElementById('diag'); if (d && !errShown) d.remove(); }, 6000);
 requestAnimationFrame(frame);
