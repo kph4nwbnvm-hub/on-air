@@ -1,6 +1,7 @@
 // App-token store catalog: 14 categories, ~150 families, 5 rarities each (~750 cards).
 // Every card has a use (effect) and a goal (category purpose). Three identical cards merge into the next rarity.
-// Prices are final (16 Nov 2026): 2 / 5 / 8 / 14 / 24 tokens, 1 token = 0.000001 Pi.
+// Prices come from pricing.js (1 Pi = 1,000 tokens; mining-days prices with automatic dollar-band repricing).
+import { tokenPrice } from './pricing.js';
 
 export const RARITY = [
   { id: 'r1', price: 2, mult: 1, color: '#9aa3b5' },
@@ -137,7 +138,7 @@ export const CARDS = [];
 FAMILIES.forEach((f) => RARITY.forEach((r, i) => CARDS.push({ id: `${f.cat}.${f.id}.${i + 1}`, fam: f, r: i + 1 })));
 export const card = (id) => { const [c, fid, r] = id.split('.'); const f = FAM[fid + '@' + c]; return f ? { id, fam: f, r: +r } : null; };
 export const value = (c) => { const e = EFFECTS[c.fam.effect]; const v = e.base * RARITY[c.r - 1].mult; return e.unit === '%' || e.base < 1 ? Math.round(v * 10) / 10 : Math.round(v); };
-export const priceOf = (c) => RARITY[c.r - 1].price;
+export const priceOf = (c) => tokenPrice(c.r);
 export const catOf = (id) => CATS.find((c) => c.id === id);
 
 // Collections: equipping every family of a set gives an extra bonus.

@@ -1,5 +1,6 @@
 // App-token store: buy, equip, use, merge cards; smart browsing (category, rarity, search, sort); collections.
 import { CATS, CARDS, RARITY, EFFECTS, COLLECTIONS, card, value, priceOf, catOf } from './catalog.js';
+import { fmtTok } from './pricing.js';
 
 export const TOKEN = '💠';
 
@@ -45,7 +46,7 @@ export function makeStore(deps) {
     const rr = $('stRar'); rr.innerHTML = '';
     [0, 1, 2, 3, 4, 5].forEach((r) => { const b = document.createElement('button'); b.textContent = r ? t('r' + r) : t('st_all'); if (r) b.style.borderColor = RARITY[r - 1].color; if (view.rarity === r) b.className = 'sel'; b.onclick = () => { view.rarity = r; view.limit = 60; sfx.click(); render(); }; rr.appendChild(b); });
     const so = $('stSort'); so.innerHTML = ''; [['cheap', t('st_cheap')], ['rare', t('st_rare')]].forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; so.appendChild(o); }); so.value = view.sort;
-    $('stSearch').placeholder = t('st_search');
+    $('stSearch').placeholder = t('st_search'); $('stTest').textContent = t('st_test').replace('+50', '+' + TEST_GRANT.toLocaleString('en-US'));
   }
   function list() {
     const q = view.q.trim().toLowerCase(); const lang = getLang();
@@ -64,7 +65,7 @@ export function makeStore(deps) {
     const el = document.createElement('button'); el.className = 'card r' + c.r; el.style.setProperty('--rc', RARITY[c.r - 1].color);
     el.innerHTML = '<span class="ic"></span><b></b><small></small><em></em>';
     el.children[0].textContent = c.fam.icon; el.children[1].textContent = nameOf(c); el.children[2].textContent = effText(c);
-    el.children[3].textContent = TOKEN + ' ' + priceOf(c);
+    el.children[3].textContent = TOKEN + ' ' + fmtTok(priceOf(c));
     const n = count(c.id); if (n) { const k = document.createElement('i'); k.className = 'cnt'; k.textContent = '×' + n; el.appendChild(k); }
     if (isEquipped(c.id)) el.classList.add('on');
     el.onclick = () => { sfx.click(); openSheet(c.id); };
@@ -89,7 +90,7 @@ export function makeStore(deps) {
     });
   }
   function render() {
-    chips(); $('stTok').textContent = TOKEN + ' ' + S.tokens; renderBonuses(); renderCollections();
+    chips(); $('stTok').textContent = TOKEN + ' ' + fmtTok(S.tokens); renderBonuses(); renderCollections();
     const g = $('stGrid'); g.innerHTML = ''; const L = list();
     if (!L.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = t('st_empty'); g.appendChild(p); }
     L.slice(0, view.limit).forEach((c) => g.appendChild(tile(c)));
@@ -105,9 +106,9 @@ export function makeStore(deps) {
     $('shGoal').textContent = t('st_goal_lbl') + ': ' + t('g_' + cat.id);
     const acts = $('shActs'); acts.innerHTML = '';
     const btn = (label, cls, fn) => { const b = document.createElement('button'); b.className = cls; b.textContent = label; b.onclick = fn; acts.appendChild(b); };
-    btn(t('st_buy') + '  ' + TOKEN + ' ' + priceOf(c), 'big' + (S.tokens < priceOf(c) ? ' poor' : ''), () => {
+    btn(t('st_buy') + '  ' + TOKEN + ' ' + fmtTok(priceOf(c)), 'big' + (S.tokens < priceOf(c) ? ' poor' : ''), () => {
       if (S.tokens < priceOf(c)) { sfx.bad(); toast(t('st_no_tokens')); return; }
-      S.tokens -= priceOf(c); add(id); save(); sfx.win(); toast('🎉 ' + t('st_bought')); render();
+      S.tokens = Math.round((S.tokens - priceOf(c)) * 1e7) / 1e7; add(id); save(); sfx.win(); toast('🎉 ' + t('st_bought')); render();
     });
     if (n && cat.kind === 'equip') {
       if (isEquipped(id)) btn(t('st_unequip'), 'ghost', () => { S.equip[cat.id] = (S.equip[cat.id] || []).filter((x) => x !== id); save(); sfx.click(); render(); });
@@ -132,7 +133,8 @@ export function makeStore(deps) {
   $('stMore').onclick = () => { view.limit += 60; render(); };
   $('shClose').onclick = () => { sfx.click(); closeSheet(); };
   $('stSheet').addEventListener('click', (e) => { if (e.target.id === 'stSheet') closeSheet(); });
-  $('stTest').onclick = () => { S.tokens += 50; save(); sfx.win(); render(); };
+  const TEST_GRANT = 5000;
+  $('stTest').onclick = () => { S.tokens += TEST_GRANT; save(); sfx.win(); render(); };
 
   return { S, bonuses, consumeBoosts, grantRandom, render, closeSheet, nameOf };
 }
