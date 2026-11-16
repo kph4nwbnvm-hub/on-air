@@ -33,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.11';
+const VERSION = '1.4.12';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -666,7 +666,7 @@ $('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syn
 function gToast(msg) { const el = $('gToast'); el.textContent = msg; el.hidden = false; clearTimeout(gToast.h); gToast.h = setTimeout(() => { el.hidden = true; }, 2200); }
 const cs = makeStore({ store, t, getLang: () => lang, sfx, toast: gToast, $ });
 $('bStore').onclick = () => { sfx.click(); storeFrom = 'menu'; cs.closeSheet(); cs.render(); show('storeS'); };
-$('stBack').onclick = () => { sfx.click(); cs.closeSheet(); if (cs.needsReady()) { pcFromStore(); return; } if (storeFrom === 'hud') { storeFrom = 'menu'; show('hud'); resize(); } else show('menu'); };
+$('stBack').onclick = () => { sfx.click(); cs.closeSheet(); if (cs.needsReady()) { pcFromStore(); return; } if (storeFrom === 'hud') { storeFrom = 'menu'; storePause = false; show('hud'); resize(); syncScene(); } else show('menu'); };
 
 // ───────── opening story (shown once per player, never repeated) ─────────
 // scenes 1–3: father's will → Uncle Saleh at the door → abandoned studio → cleaning. Later scenes hook in as their features land.
@@ -758,11 +758,13 @@ const PC_ALL = ['psu', 'board', 'ram', 'disk', 'fan'], PC_BAD = ['psu', 'ram', '
 const pcS = store.get('pc', { seen: false, checked: {}, installed: {}, gift: false, fixed: false });
 const pcSave = () => store.set('pc', pcS);
 // straight from the store to the PC once every needed part is bought
-function pcFromStore() { cs.closeSheet(); storeFrom = 'menu'; if (G.on) return; if (G.zone !== 'studio') enterZone('studio', PCX + 1.15, PCZ, -Math.PI / 2); else { G.px = PCX + 1.15; G.pz = PCZ; G.face = -Math.PI / 2; } show('hud'); resize(); syncScene(); snapCam = true; pcOpen(); }
+function pcFromStore() { cs.closeSheet(); storeFrom = 'menu'; storePause = false; if (G.on) return; if (G.zone !== 'studio') enterZone('studio', PCX + 1.15, PCZ, -Math.PI / 2); else { G.px = PCX + 1.15; G.pz = PCZ; G.face = -Math.PI / 2; } show('hud'); resize(); syncScene(); snapCam = true; pcOpen(); }
 cs.setNeeds(() => (pcS.gift && !pcS.fixed ? PC_BAD.filter((k) => !pcS.installed[k]) : []), () => { sfx.click(); pcFromStore(); });
 const pcLit = () => { pcScreenM.color.set(pcS.fixed ? 0x2f7bff : 0x0a0a10); };
 pcLit();
-let storeFrom = 'menu';
+let storeFrom = 'menu', storePause = false;
+// store button inside play: opens the store any time; a running broadcast is paused while shopping
+$('hudStore').onclick = () => { if (!UNLOCK.bStore()) { sfx.bad(); gToast(t('locked_hint')); return; } if (storyOn || ivOn || G.asking) return; sfx.click(); storeFrom = 'hud'; storePause = G.on; cs.closeSheet(); cs.render(); $('storeS').hidden = false; $('hud').hidden = true; };
 function pcOpen() { G.asking = true; pcBuild(); $('pc').hidden = false; }
 function pcClose() { $('pc').hidden = true; G.asking = false; }
 function pcBuild() {
@@ -803,7 +805,7 @@ interact('studio', PCX + 1.15, PCZ, 1.25, 'a_pc', '🖥️', () => roam() && !st
 const objKey = () => (!store.get('story_done', false) ? '' : !store.get('story4_done', false) ? 'obj_iv' : !pcS.fixed ? (cs.needsReady() ? 'obj_pc2' : 'obj_pc') : chDone === 0 ? 'obj_live' : '');
 const UNLOCK = { bStore: () => pcS.gift || pcS.fixed || cs.S.tokens > 0, bChar: () => shop.level >= 2, bProfile: () => store.get('story4_done', false) };
 function applyLocks() { Object.entries(UNLOCK).forEach(([id, ok]) => { $(id).classList.toggle('locked', !ok()); }); }
-setInterval(() => { const k = objKey(), el = $('objBar'); const on = !!k && !G.on && !storyOn && !ivOn && !$('hud').hidden && $('pc').hidden && $('story').hidden; el.hidden = !on; if (on) el.textContent = '🎯 ' + t(k); if (!$('menu').hidden) applyLocks(); }, 500);
+setInterval(() => { const k = objKey(), el = $('objBar'); const on = !!k && !G.on && !storyOn && !ivOn && !$('hud').hidden && $('pc').hidden && $('story').hidden; el.hidden = !on; if (on) el.textContent = '🎯 ' + t(k); if (!$('menu').hidden) applyLocks(); $('hudStore').classList.toggle('locked', !UNLOCK.bStore()); $('hudStore').hidden = storyOn || ivOn; }, 500);
 
 // first-time guided tour: the camera flies to each part of the studio and explains it
 const TOUR = [
@@ -871,7 +873,7 @@ function frameBody(now) {
   const playing = !$('hud').hidden, creating = !$('creator').hidden;
   if (playing) {
     if (G.on) {
-      const wasSeg = seg(); G.time += dt;
+      const wasSeg = seg(); if (!storePause) G.time += dt;
       if (wasSeg === 0 && seg() === 1) { G.grace = 8; G.next = Math.max(G.next, G.time + 9); sfx.seg(); say(t('sp_seg2')); syncScene(); }
       if (G.grace > 0) G.grace -= dt; if (G.askCd > 0) G.askCd -= dt;
       if (allGood()) G.good += dt;
