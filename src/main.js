@@ -405,7 +405,7 @@ function endRound() {
   addCoins(coins); (pass ? sfx.win : sfx.lose)(); buzz(pass ? [60, 40, 120] : 200);
   stats.rounds++; if (pass) stats.wins++; stats.best = Math.max(stats.best, Math.round(trust * 100)); store.set('stats', stats);
   const xp = Math.round(roundXp(trust, pass) * (1 + BN.xp / 100)), up = shop.addXp(xp); showLevel();
-  let drop = null; if (Math.random() * 100 < 4 + BN.luck) drop = cs.grantRandom(1); cs.consumeBoosts();
+  let drop = null; if (Math.random() * 100 < 4 + BN.luck) drop = cs.grantRandom(cs.dropLevel(trust)); cs.consumeBoosts();
   $('rXp').textContent = '+' + xp + ' ' + t('xp') + ' · ' + t('lvl') + ' ' + shop.level; $('rUp').hidden = !up && !drop; $('rUp').textContent = [up ? '⭐ ' + t('level_up') : '', drop ? '🎁 ' + t('st_drop') + ': ' + drop.fam.icon + ' ' + cs.nameOf(drop) : ''].filter(Boolean).join('  ·  ');
   $('rTitle').textContent = t(pass ? 'r_pass' : 'r_fail'); $('rTitle').className = pass ? 'pass' : 'fail';
   $('rTrust').textContent = Math.round(trust * 100) + '%'; $('rAir').textContent = fmt(G.good) + ' / ' + fmt(ROUND); $('rCoins').textContent = '+' + coins;
@@ -505,7 +505,7 @@ function setupFX() {
 }
 function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); } const r = $('pip').getBoundingClientRect(); pip = { x: r.left, y: h - r.bottom, w: r.width, h: r.height }; }
 window.addEventListener('resize', resize);
-function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator', 'profile', 'settings', 'storeS'].forEach((s) => { $(s).hidden = s !== id; }); if (id === 'menu') checkDaily(); }
+function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator', 'profile', 'settings', 'storeS', 'tour'].forEach((s) => { $(s).hidden = s !== id; }); if (id === 'menu') checkDaily(); }
 function buildLangs() { const g = $('langGrid'); g.innerHTML = ''; LANGS.forEach((l) => { const b = document.createElement('button'); b.textContent = l.name; b.dir = l.rtl ? 'rtl' : 'ltr'; if (l.code === lang) b.className = 'sel'; b.onclick = () => { lang = l.code; store.set('lang', lang); applyLang(); show('settings'); buildSettings(); }; g.appendChild(b); }); }
 function enterRoam() { lastAct = 0; G.on = false; G.zone = 'studio'; G.px = 0; G.pz = 3.3; G.face = Math.PI; player.armR.rotation.set(0, 0, 0); show('hud'); resize(); syncScene(); snapCam = true; say(t('roam_hint'), '', true); }
 // character creator
@@ -550,6 +550,7 @@ function buildCreator() {
 // daily login reward
 let dailyState = store.get('daily', { last: null, day: 0, cycle: 0, graceUsed: false });
 function checkDaily() {
+  if (tourI >= 0 || !store.get('tour_done', false)) return;
   const p = dailyPreview(dailyState); if (!p.due) return;
   $('dDay').textContent = t('d_day').replace('{n}', p.day);
   const g = $('dGrid'); g.innerHTML = '';
@@ -578,6 +579,25 @@ function gToast(msg) { const el = $('gToast'); el.textContent = msg; el.hidden =
 const cs = makeStore({ store, t, getLang: () => lang, sfx, toast: gToast, $ });
 $('bStore').onclick = () => { sfx.click(); cs.closeSheet(); cs.render(); show('storeS'); };
 $('stBack').onclick = () => { sfx.click(); cs.closeSheet(); show('menu'); };
+// first-time guided tour: the camera flies to each part of the studio and explains it
+const TOUR = [
+  { p: [0.5, 3.4, 8.5], l: [0.5, 1.4, -1.5] }, { p: [DESK.x + 0.3, 2.2, DESK.z + 3.1], l: [DESK.x, 1.1, DESK.z] },
+  { p: [1.5, 2.4, 4.4], l: [SHOTS[1].p[0], 1.4, SHOTS[1].p[2] + 0.5] }, { p: [CON.x + 0.6, 2.1, CON.z + 2.0], l: [CON.x, 1.1, CON.z] },
+  { p: [IV.x - 0.5, 2.0, IV.z + 3.2], l: [IV.x, 1.0, IV.z] }, { p: [3.6, 2.2, 0.6], l: [5.5, 1.2, -2.9] },
+  { p: [-4.3, 2.0, 2.2], l: [-6.98, 1.5, BRK.z] }, { p: [4.4, 2.0, 3.6], l: [7.1, 1.4, 3.4] },
+  { p: [0, 3.0, 7.2], l: [0, 2.6, -2] }, { p: [5.0, 2.4, 1.6], l: [6.4, 0.9, -2.8] }, { p: [-1.5, 2.6, 6.5], l: [0, 1.4, 3.3] }, { p: [0.5, 3.4, 8.5], l: [0.5, 1.4, -1.5] },
+];
+let tourI = -1; const tourCam = { p: new THREE.Vector3(), l: new THREE.Vector3(), lt: new THREE.Vector3() };
+function tourStep() {
+  const st = TOUR[tourI]; $('tText').textContent = t('tu_' + (tourI + 1));
+  $('tNext').textContent = tourI === TOUR.length - 1 ? t('tu_done') : t('tu_next');
+  const d = $('tDots'); d.innerHTML = ''; TOUR.forEach((_, i) => { const e = document.createElement('i'); if (i === tourI) e.className = 'on'; d.appendChild(e); });
+  tourCam.p.set(...st.p); tourCam.lt.set(...st.l); sfx.click(); speak && speak(t('tu_' + (tourI + 1)), 'host');
+}
+function startTour() { if (!G.light) { G.light = true; syncScene(); } tourI = 0; cam.position.set(...TOUR[0].p); tourCam.l.set(...TOUR[0].l); show('tour'); tourStep(); }
+function endTour() { tourI = -1; store.set('tour_done', true); show('menu'); }
+$('tNext').onclick = () => { if (tourI >= TOUR.length - 1) endTour(); else { tourI++; tourStep(); } };
+$('tSkip').onclick = () => endTour();
 // profile & settings
 function buildProfile() {
   const n = $('pName'); n.value = store.get('name', '') || PiState.user || ''; n.placeholder = PiState.user || t('p_guest');
@@ -598,6 +618,7 @@ function buildSettings() {
   row('🗣️', t('s_voice'), t(cfg.voice ? 'on' : 'off'), () => { cfg.voice = !cfg.voice; store.set('voice', cfg.voice); if (!cfg.voice && window.speechSynthesis) speechSynthesis.cancel(); });
   row('📳', t('s_vibe'), t(cfg.vibe ? 'on' : 'off'), () => { cfg.vibe = !cfg.vibe; store.set('vibe', cfg.vibe); buzz(80); });
   row('🖥️', t('s_quality'), t(cfg.quality === 'low' ? 'q_low' : 'q_high'), () => { cfg.quality = cfg.quality === 'low' ? 'high' : 'low'; store.set('quality', cfg.quality); renderer.setPixelRatio(pixelRatio()); setupFX(); resize(); });
+  row('🎓', t('tu_replay'), '▶', () => { show('menu'); setTimeout(startTour, 50); });
   $('setVer').textContent = t('s_version') + ' ' + VERSION; const r = $('bReset'); r.classList.remove('armed'); r.textContent = t('s_reset');
 }
 $('bReset').onclick = () => {
@@ -644,7 +665,8 @@ function frame(now) {
     player.g.position.set(0, 0, 3.3); player.g.rotation.y = Math.sin(tt * 0.7) * 0.9; player.legL.rotation.x = player.legR.rotation.x = player.armL.rotation.x = 0; player.armR.rotation.set(0, 0, 0);
     cam.position.set(0, 1.45, 6.9); cam.lookAt(0, 1.0, 3.3);
   } else {
-    cam.position.set(Math.sin(tt * 0.2) * 3.5, 4.4, 10.5); cam.lookAt(0.3, 1.2, -1.2); if (window.__shot) { cam.position.set(...window.__shot.p); cam.lookAt(...window.__shot.l); }
+    if (tourI >= 0) { cam.position.lerp(tourCam.p, Math.min(1, dt * 2.2)); tourCam.l.lerp(tourCam.lt, Math.min(1, dt * 2.6)); cam.lookAt(tourCam.l); } else {
+    cam.position.set(Math.sin(tt * 0.2) * 3.5, 4.4, 10.5); cam.lookAt(0.3, 1.2, -1.2); if (window.__shot) { cam.position.set(...window.__shot.p); cam.lookAt(...window.__shot.l); } }
     player.g.position.set(0, 0, 3.3); player.g.rotation.y = Math.sin(tt * 0.6) * 0.5; player.armR.rotation.x = -2.6 + Math.sin(tt * 5) * 0.3; player.legL.rotation.x = player.legR.rotation.x = player.armL.rotation.x = 0;
   }
   // render: the creator shows the character in the top half only
@@ -664,4 +686,5 @@ window.__onair = { PiState, G, IT, NPCS, act, startRound, endRound, firePrank, e
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 setupFX(); applyLang(); syncScene(); show('menu'); resize();
+if (!store.get('tour_done', false)) setTimeout(startTour, 600);
 requestAnimationFrame(frame);

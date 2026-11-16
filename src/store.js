@@ -1,5 +1,6 @@
 // App-token store: buy, equip, use, merge cards; smart browsing (category, rarity, search, sort); collections.
-import { CATS, CARDS, RARITY, EFFECTS, COLLECTIONS, card, value, priceOf, catOf } from './catalog.js';
+import { CATS, CARDS, RARITY, EFFECTS, COLLECTIONS, card, value, priceOf, catOf, tierOf, isGear, buyable, info, note, MAX_LV, BUY_MAX } from './catalog.js';
+import { HUB_OF, supports, signalOf } from './levels.js';
 import { fmtTok } from './pricing.js';
 
 export const TOKEN = '💠';
@@ -17,18 +18,41 @@ export function makeStore(deps) {
   const add = (id, n = 1) => { S.cards[id] = count(id) + n; if (S.cards[id] <= 0) delete S.cards[id]; };
   const equipped = () => Object.values(S.equip).flat();
   const isEquipped = (id) => equipped().includes(id);
-  const nameOf = (c) => c.fam.name[getLang()] || c.fam.name.en;
-  const effText = (c) => t('e_' + c.fam.effect).replace('{v}', value(c));
+  const fmtEff = (k, v) => { const s = t('e_' + k); return v < 0 ? s.replace('+{v}', String(v)).replace('{v}', String(v)) : s.replace('{v}', v); };
+  const famName = (c) => c.fam.name[getLang()] || c.fam.name.en;
+  const nameOf = (c) => { const i = info(c); const st = getLang() === 'ar' ? i.ar : i.en; return i.full ? st : famName(c) + ' · ' + st; };
+  const color = (c) => RARITY[tierOf(c.r) - 1].color;
+  // starter gear: level-1 broadcast kit with its flaws, so players feel every upgrade
+  if (!store.get('starter', false)) {
+    ['equip.cam.1', 'equip.mic.1', 'equip.light.1', 'equip.mixer.1', 'equip.switcher.1', 'equip.lightdesk.1', 'cables.rca.1', 'cables.trs.1'].forEach((id) => { S.cards[id] = (S.cards[id] || 0) + 1; });
+    S.equip.equip = [...new Set([...(S.equip.equip || []), 'equip.cam.1', 'equip.mic.1', 'equip.light.1', 'equip.mixer.1', 'equip.switcher.1', 'equip.lightdesk.1'])].slice(0, 8);
+    store.set('starter', true); store.set('cards', S.cards); store.set('equip', S.equip);
+  }
+  const ownsCable = (conn) => Object.keys(S.cards).some((id) => id.startsWith('cables.' + conn + '.') && S.cards[id] > 0);
+  const hubLevel = (hub) => Math.max(0, ...equipped().filter((id) => id.startsWith('equip.' + hub + '.')).map((id) => +id.split('.')[2]));
+  // what a device needs to work: a hub supporting its connector, and the matching cable
+  function compat(c) {
+    const sig = signalOf(c.fam.cat, c.fam.id); const conn = info(c).conn; if (!sig || !conn) return { ok: true, need: [] };
+    const hub = HUB_OF[sig]; const hl = hubLevel(hub); const need = [];
+    if (!hl || !supports(hub, hl, conn)) need.push({ kind: 'hub', hub, conn });
+    if (!ownsCable(conn)) need.push({ kind: 'cable', conn });
+    return { ok: !need.length, need };
+  }
+  const CONN_NAME = { rca: 'RCA', trs: 'TRS', xlr: 'XLR', sdi: 'SDI', hdmi: 'HDMI', dmx: 'DMX', usbc: 'USB-C', ethernet: 'Ethernet', fiber: 'Fiber', wireless: 'Wireless' };
+  const needText = (n) => n.kind === 'hub' ? t('st_needs_hub').replace('{hub}', famName(card('equip.' + n.hub + '.1'))).replace('{c}', CONN_NAME[n.conn]) : t('st_needs_cable').replace('{c}', CONN_NAME[n.conn]);
+  const effText = (c) => fmtEff(c.fam.effect, value(c));
 
   function bonuses() {
     const b = Object.fromEntries(Object.keys(EFFECTS).map((k) => [k, 0]));
-    [...equipped(), ...S.boosts].forEach((id) => { const c = card(id); if (c && catOf(c.fam.cat).kind !== 'future') b[c.fam.effect] += value(c); });
+    [...equipped(), ...S.boosts].forEach((id) => { const c = card(id); if (!c || catOf(c.fam.cat).kind === 'future') return; const v = value(c); if (v > 0 && !compat(c).ok) return; b[c.fam.effect] += v; });
     const fams = new Set(equipped().map((id) => { const [c, f] = id.split('.'); return c + '.' + f; }));
     COLLECTIONS.forEach((col) => { if (col.fams.every((f) => fams.has(f))) Object.entries(col.bonus).forEach(([k, v]) => { b[k] += v; }); });
-    Object.keys(b).forEach((k) => { b[k] = Math.min(b[k], EFFECTS[k].cap); });
+    Object.keys(b).forEach((k) => { b[k] = Math.max(-EFFECTS[k].cap / 3, Math.min(b[k], EFFECTS[k].cap)); });
     return b;
   }
   function consumeBoosts() { const had = S.boosts.length; S.boosts = []; save(); return had; }
+  // drop level: better rounds can drop better cards; high levels stay rare
+  function dropLevel(trust = 0.5, cap = 12) { const top = Math.min(cap, 2 + Math.floor(trust * 10)); let lv = 1; while (lv < top && Math.random() < 0.55) lv++; return lv; }
   function grantRandom(rarity = 1) {
     const pool = CARDS.filter((c) => c.r === rarity && catOf(c.fam.cat).kind !== 'future');
     const c = pool[Math.floor(Math.random() * pool.length)]; add(c.id); save(); return c;
@@ -44,7 +68,7 @@ export function makeStore(deps) {
     mk('all', '🗂️ ' + t('st_all')); mk('owned', '🎒 ' + t('st_owned')); mk('equipped', '✅ ' + t('st_equipped'));
     CATS.forEach((c) => mk(c.id, c.icon + ' ' + t('c_' + c.id)));
     const rr = $('stRar'); rr.innerHTML = '';
-    [0, 1, 2, 3, 4, 5].forEach((r) => { const b = document.createElement('button'); b.textContent = r ? t('r' + r) : t('st_all'); if (r) b.style.borderColor = RARITY[r - 1].color; if (view.rarity === r) b.className = 'sel'; b.onclick = () => { view.rarity = r; view.limit = 60; sfx.click(); render(); }; rr.appendChild(b); });
+    [0, 1, 2, 3, 4, 5].forEach((r) => { const b = document.createElement('button'); b.textContent = r ? t('r' + r) + ' ' + ((r - 1) * 3 + 1) + '–' + r * 3 : t('st_all'); if (r) b.style.borderColor = RARITY[r - 1].color; if (view.rarity === r) b.className = 'sel'; b.onclick = () => { view.rarity = r; view.limit = 60; sfx.click(); render(); }; rr.appendChild(b); });
     const so = $('stSort'); so.innerHTML = ''; [['cheap', t('st_cheap')], ['rare', t('st_rare')]].forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; so.appendChild(o); }); so.value = view.sort;
     $('stSearch').placeholder = t('st_search'); $('stTest').textContent = t('st_test').replace('+50', '+' + TEST_GRANT.toLocaleString('en-US'));
   }
@@ -54,18 +78,19 @@ export function makeStore(deps) {
       if (view.cat === 'owned' && !count(c.id)) return false;
       if (view.cat === 'equipped' && !isEquipped(c.id)) return false;
       if (!['all', 'owned', 'equipped'].includes(view.cat) && c.fam.cat !== view.cat) return false;
-      if (view.rarity && c.r !== view.rarity) return false;
-      if (q) { const hay = [c.fam.name.ar, c.fam.name.en, c.fam.name[lang] || '', t('c_' + c.fam.cat), t('r' + c.r), effText(c)].join(' ').toLowerCase(); if (!hay.includes(q)) return false; }
+      if (view.rarity && tierOf(c.r) !== view.rarity) return false;
+      if (q) { const i = info(c); const hay = [c.fam.name.ar, c.fam.name.en, c.fam.name[lang] || '', i.ar, i.en, i.era, i.conn || '', t('c_' + c.fam.cat), t('r' + tierOf(c.r)), effText(c)].join(' ').toLowerCase(); if (!hay.includes(q)) return false; }
       return true;
     });
     const ci = (c) => CATS.findIndex((x) => x.id === c.fam.cat); L = L.sort((a, b) => (view.sort === 'cheap' ? a.r - b.r : b.r - a.r) || ci(a) - ci(b));
     return L;
   }
   function tile(c) {
-    const el = document.createElement('button'); el.className = 'card r' + c.r; el.style.setProperty('--rc', RARITY[c.r - 1].color);
-    el.innerHTML = '<span class="ic"></span><b></b><small></small><em></em>';
-    el.children[0].textContent = c.fam.icon; el.children[1].textContent = nameOf(c); el.children[2].textContent = effText(c);
-    el.children[3].textContent = TOKEN + ' ' + fmtTok(priceOf(c));
+    const el = document.createElement('button'); el.className = 'card r' + tierOf(c.r); el.style.setProperty('--rc', color(c));
+    el.innerHTML = '<span class="ic"></span><i class="lv"></i><b></b><small></small><em></em>';
+    el.children[0].textContent = c.fam.icon; el.children[1].textContent = 'Lv ' + c.r; el.children[2].textContent = nameOf(c); el.children[3].textContent = effText(c);
+    el.children[4].textContent = buyable(c) ? TOKEN + ' ' + fmtTok(priceOf(c)) : '🏆';
+    if (count(c.id) && !compat(c).ok) el.classList.add('bad');
     const n = count(c.id); if (n) { const k = document.createElement('i'); k.className = 'cnt'; k.textContent = '×' + n; el.appendChild(k); }
     if (isEquipped(c.id)) el.classList.add('on');
     el.onclick = () => { sfx.click(); openSheet(c.id); };
@@ -73,7 +98,7 @@ export function makeStore(deps) {
   }
   function renderBonuses() {
     const b = bonuses(); const box = $('stBonus');
-    const parts = Object.entries(b).filter(([, v]) => v).map(([k, v]) => t('e_' + k).replace('{v}', Math.round(v * 10) / 10));
+    const parts = Object.entries(b).filter(([, v]) => v).map(([k, v]) => fmtEff(k, Math.round(v * 10) / 10));
     box.hidden = !parts.length; box.textContent = parts.length ? t('st_bonus') + ': ' + parts.join(' · ') : '';
   }
   function renderCollections() {
@@ -98,15 +123,18 @@ export function makeStore(deps) {
     if (sheetId) openSheet(sheetId);
   }
   function openSheet(id) {
-    sheetId = id; const c = card(id); const cat = catOf(c.fam.cat); const n = count(id); const sh = $('stSheet');
-    sh.hidden = false; sh.style.setProperty('--rc', RARITY[c.r - 1].color);
+    sheetId = id; const c = card(id); const cat = catOf(c.fam.cat); const n = count(id); const sh = $('stSheet'); const inf = info(c); const nt = note(c); const cp = compat(c);
+    sh.hidden = false; sh.style.setProperty('--rc', color(c));
     $('shIc').textContent = c.fam.icon; $('shName').textContent = nameOf(c);
-    $('shMeta').textContent = t('r' + c.r) + ' · ' + cat.icon + ' ' + t('c_' + cat.id) + (n ? ' · ' + t('st_have').replace('{n}', n) : '');
-    $('shUse').textContent = t('st_use_lbl') + ': ' + effText(c) + (cat.kind === 'future' ? ' (' + t('st_future') + ')' : '');
+    $('shMeta').textContent = t('st_lv') + ' ' + c.r + '/' + MAX_LV + ' · ' + t('r' + tierOf(c.r)) + ' · ' + cat.icon + ' ' + t('c_' + cat.id) + (inf.era ? ' · ' + (inf.era === 'future' ? t('st_future_era') : inf.era) : '') + (n ? ' · ' + t('st_have').replace('{n}', n) : '');
+    $('shUse').textContent = t('st_use_lbl') + ': ' + effText(c) + (cat.kind === 'future' ? ' (' + t('st_future') + ')' : '') + (nt ? ' · ' + (nt.kind === 'flaw' ? '⚠️ ' : '🤖 ') + t(nt.key) : '');
     $('shGoal').textContent = t('st_goal_lbl') + ': ' + t('g_' + cat.id);
+    const cpx = $('shCompat'); const conn = inf.conn;
+    cpx.hidden = !conn; if (conn) { cpx.className = cp.ok ? 'ok' : 'no'; cpx.textContent = t('st_conn') + ': ' + CONN_NAME[conn] + ' · ' + (cp.ok ? '✅ ' + t('st_compat_ok') : '⛔ ' + t('st_compat_no') + ' — ' + cp.need.map(needText).join(' + ')); }
     const acts = $('shActs'); acts.innerHTML = '';
     const btn = (label, cls, fn) => { const b = document.createElement('button'); b.className = cls; b.textContent = label; b.onclick = fn; acts.appendChild(b); };
-    btn(t('st_buy') + '  ' + TOKEN + ' ' + fmtTok(priceOf(c)), 'big' + (S.tokens < priceOf(c) ? ' poor' : ''), () => {
+    if (!buyable(c)) { const p = document.createElement('p'); p.className = 'earn'; p.textContent = '🏆 ' + t('st_earn_only'); acts.appendChild(p); }
+    else btn(t('st_buy') + '  ' + TOKEN + ' ' + fmtTok(priceOf(c)), 'big' + (S.tokens < priceOf(c) ? ' poor' : ''), () => {
       if (S.tokens < priceOf(c)) { sfx.bad(); toast(t('st_no_tokens')); return; }
       S.tokens = Math.round((S.tokens - priceOf(c)) * 1e7) / 1e7; add(id); save(); sfx.win(); toast('🎉 ' + t('st_bought')); render();
     });
@@ -120,7 +148,7 @@ export function makeStore(deps) {
     if (n && cat.kind === 'use') btn(t('st_use'), 'ghost', () => {
       if (isEquippedBoost(id)) return; add(id, -1); S.boosts.push(id); save(); sfx.win(); toast('⚡ ' + t('st_active')); render();
     });
-    if (n >= 3 && c.r < 5) btn(t('st_merge'), 'ghost merge', () => {
+    if (n >= 3 && c.r < MAX_LV) btn(t('st_merge'), 'ghost merge', () => {
       add(id, -3); if (!count(id)) S.equip[cat.id] = (S.equip[cat.id] || []).filter((x) => x !== id);
       add(`${c.fam.cat}.${c.fam.id}.${c.r + 1}`); save(); sfx.win(); toast('✨ ' + t('st_merged')); openSheet(`${c.fam.cat}.${c.fam.id}.${c.r + 1}`); render();
     });
@@ -136,5 +164,5 @@ export function makeStore(deps) {
   const TEST_GRANT = 5000;
   $('stTest').onclick = () => { S.tokens += TEST_GRANT; save(); sfx.win(); render(); };
 
-  return { S, bonuses, consumeBoosts, grantRandom, render, closeSheet, nameOf };
+  return { S, bonuses, consumeBoosts, grantRandom, dropLevel, render, closeSheet, nameOf };
 }

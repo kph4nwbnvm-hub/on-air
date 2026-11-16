@@ -189,6 +189,18 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
 #shActs .merge{background:linear-gradient(90deg,#a463ff,#ffb020)!important;color:#1a1030;font-weight:800}
 #gToast{position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:60;background:rgba(10,8,25,.95);border:1px solid rgba(255,207,63,.6);padding:10px 16px;border-radius:14px;font-weight:700;font-size:14px;max-width:86%;text-align:center}
 #vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(5,2,20,.45) 100%)}
+.card .lv{position:absolute;top:4px;inset-inline-start:6px;font-style:normal;font-size:10px;font-weight:800;color:var(--rc)}
+.card.bad{opacity:.55;outline:2px dashed #ff5a5a;outline-offset:1px}
+#shCompat{font-size:13px;text-align:start;border-radius:12px;padding:9px 12px;margin:6px 0}
+#shCompat.ok{background:rgba(63,191,111,.16);border:1px solid #3fbf6f}
+#shCompat.no{background:rgba(255,90,90,.14);border:1px solid #ff5a5a}
+.earn{font-size:13px;color:#ffcf3f;margin:4px 0}
+#tour{position:fixed;inset:auto 0 0 0;z-index:40;display:flex;justify-content:center;padding:14px;pointer-events:none}
+.tcard{pointer-events:auto;width:min(520px,100%);background:rgba(12,8,30,.92);border:1px solid rgba(127,233,255,.5);border-radius:20px;padding:14px 16px;box-shadow:0 10px 40px rgba(0,0,0,.5);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#tText{font-size:17px;line-height:1.55;margin:8px 0 12px;text-align:start;min-height:52px}
+#tDots{display:flex;gap:5px;justify-content:center}
+#tDots i{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.25)}
+#tDots i.on{background:#ffcf3f;width:18px;border-radius:9px}
 </style>
 </head>
 <body>
@@ -273,9 +285,13 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
     <div id="stGrid"></div>
     <button id="stMore" class="ghost" hidden></button>
   </div>
-  <div id="stSheet" hidden><div class="sh"><button id="shClose">✕</button><div id="shIc"></div><h3 id="shName"></h3><p id="shMeta"></p><p id="shUse"></p><p id="shGoal"></p><div id="shActs"></div></div></div>
+  <div id="stSheet" hidden><div class="sh"><button id="shClose">✕</button><div id="shIc"></div><h3 id="shName"></h3><p id="shMeta"></p><p id="shUse"></p><p id="shGoal"></p><p id="shCompat" hidden></p><div id="shActs"></div></div></div>
 </section>
 <div id="gToast" hidden></div>
+<section id="tour" hidden>
+  <div class="tcard"><div id="tDots"></div><p id="tText"></p>
+    <div class="two"><button id="tSkip" class="ghost" data-t="tu_skip"></button><button id="tNext" class="big" data-t="tu_next"></button></div></div>
+</section>
 <div id="daily" hidden>
   <div class="panel">
     <h3 data-t="d_title"></h3>

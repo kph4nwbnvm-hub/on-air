@@ -2,14 +2,17 @@
 // Every card has a use (effect) and a goal (category purpose). Three identical cards merge into the next rarity.
 // Prices come from pricing.js (1 Pi = 1,000 tokens; mining-days prices with automatic dollar-band repricing).
 import { tokenPrice } from './pricing.js';
+import { MAX_LV, levelInfo, signalOf, qualityNote } from './levels.js';
+export { MAX_LV };
 
 export const RARITY = [
-  { id: 'r1', price: 2, mult: 1, color: '#9aa3b5' },
-  { id: 'r2', price: 5, mult: 2, color: '#3fbf6f' },
-  { id: 'r3', price: 8, mult: 3.5, color: '#3a8bff' },
-  { id: 'r4', price: 14, mult: 5.5, color: '#a463ff' },
-  { id: 'r5', price: 24, mult: 8, color: '#ffb020' },
+  { id: 'r1', color: '#9aa3b5' }, { id: 'r2', color: '#3fbf6f' }, { id: 'r3', color: '#3a8bff' }, { id: 'r4', color: '#a463ff' }, { id: 'r5', color: '#ffb020' },
 ];
+export const tierOf = (lv) => Math.min(5, Math.ceil(lv / 3));
+// level multipliers: broadcast gear starts with flaws (negative at levels 1-2); everything grows to x10 at level 15
+const GEAR_MULT = [-0.6, -0.3, 0.2, 1, 1.5, 2, 2.6, 3.2, 3.9, 4.6, 5.4, 6.2, 7.2, 8.4, 10];
+const BASE_MULT = [0.4, 0.6, 0.8, 1, 1.5, 2, 2.6, 3.2, 3.9, 4.6, 5.4, 6.2, 7.2, 8.4, 10];
+export const BUY_MAX = 12;   // levels 13-15 are earned only (competitions, merging)
 
 // effect types: what a card does in the game. base value at rarity 1; multiplied by RARITY.mult.
 export const EFFECTS = {
@@ -24,7 +27,8 @@ export const EFFECTS = {
 
 // kind: equip (uses a slot), use (consumable: lasts one round), future (activates with buildings)
 export const CATS = [
-  { id: 'equip', icon: '🎥', kind: 'equip', slots: 3 },
+  { id: 'equip', icon: '🎥', kind: 'equip', slots: 8 },
+  { id: 'cables', icon: '🔌', kind: 'own' },
   { id: 'gifts', icon: '🎁', kind: 'use' },
   { id: 'skins', icon: '👔', kind: 'equip', slots: 1 },
   { id: 'machines', icon: '⚙️', kind: 'equip', slots: 2 },
@@ -49,6 +53,13 @@ const F = [
   ['equip', 'headset', '🎧', 'fix', 'سماعة المخرج', "Director's headset"], ['equip', 'pc', '💻', 'xp', 'جهاز بث احترافي', 'Streaming PC'],
   ['equip', 'ring', '⭕', 'style', 'إضاءة دائرية', 'Ring light'], ['equip', 'green', '🟩', 'xp', 'شاشة خضراء', 'Green screen'],
   ['equip', 'switcher', '🔀', 'coins', 'مبدّل الكاميرات', 'Video switcher'], ['equip', 'radio', '📻', 'fix', 'لاسلكي الطاقم', 'Crew radio'],
+  ['equip', 'lightdesk', '🎚️', 'style', 'طاولة الإضاءة', 'Lighting console'],
+  // cables and connectors (owned, not equipped): a device works only with a hub that supports its connector and the matching cable
+  ['cables', 'rca', '🔴', 'fix', 'كيبل RCA (صورة تناظرية)', 'RCA cable (analogue video)'], ['cables', 'trs', '🎧', 'fix', 'كيبل TRS (صوت تناظري)', 'TRS cable (analogue audio)'],
+  ['cables', 'xlr', '🎤', 'fix', 'كيبل XLR (صوت احترافي)', 'XLR cable (pro audio)'], ['cables', 'sdi', '📡', 'fix', 'كيبل SDI (فيديو بث)', 'SDI cable (broadcast video)'],
+  ['cables', 'hdmi', '📺', 'fix', 'كيبل HDMI', 'HDMI cable'], ['cables', 'dmx', '💡', 'fix', 'كيبل DMX (تحكم إضاءة)', 'DMX cable (lighting control)'],
+  ['cables', 'usbc', '🔋', 'fix', 'كيبل USB-C', 'USB-C cable'], ['cables', 'ethernet', '🌐', 'fix', 'كيبل شبكة (IP / Dante / NDI)', 'Network cable (IP / Dante / NDI)'],
+  ['cables', 'fiber', '✴️', 'fix', 'كيبل ألياف ضوئية', 'Fibre-optic cable'], ['cables', 'wireless', '📶', 'fix', 'مرسل ومستقبل لاسلكي', 'Wireless transmitter kit'],
   // live-stream gifts (one round)
   ['gifts', 'rose', '🌹', 'trust', 'وردة', 'Rose'], ['gifts', 'cake', '🎂', 'fans', 'كيكة احتفال', 'Party cake'],
   ['gifts', 'fireworks', '🎆', 'fans', 'ألعاب نارية', 'Fireworks'], ['gifts', 'confetti', '🎊', 'style', 'مدفع قصاصات', 'Confetti cannon'],
@@ -133,12 +144,16 @@ const F = [
 export const FAMILIES = F.map(([cat, id, icon, effect, ar, en]) => ({ cat, id, icon, effect, name: { ar, en } }));
 const FAM = Object.fromEntries(FAMILIES.map((f) => [f.id + '@' + f.cat, f]));
 
-// card id: "<cat>.<family>.<rarity 1-5>"
+// card id: "<cat>.<family>.<level 1-15>"
 export const CARDS = [];
-FAMILIES.forEach((f) => RARITY.forEach((r, i) => CARDS.push({ id: `${f.cat}.${f.id}.${i + 1}`, fam: f, r: i + 1 })));
-export const card = (id) => { const [c, fid, r] = id.split('.'); const f = FAM[fid + '@' + c]; return f ? { id, fam: f, r: +r } : null; };
-export const value = (c) => { const e = EFFECTS[c.fam.effect]; const v = e.base * RARITY[c.r - 1].mult; return e.unit === '%' || e.base < 1 ? Math.round(v * 10) / 10 : Math.round(v); };
+FAMILIES.forEach((f) => { for (let lv = 1; lv <= MAX_LV; lv++) CARDS.push({ id: `${f.cat}.${f.id}.${lv}`, fam: f, r: lv }); });
+export const card = (id) => { const [c, fid, r] = id.split('.'); const f = FAM[fid + '@' + c]; return f && +r >= 1 && +r <= MAX_LV ? { id, fam: f, r: +r } : null; };
+export const isGear = (c) => !!signalOf(c.fam.cat, c.fam.id);
+export const value = (c) => { const e = EFFECTS[c.fam.effect]; const mult = (isGear(c) ? GEAR_MULT : BASE_MULT)[c.r - 1]; const v = e.base * mult; return e.unit === '%' || e.base < 1 ? Math.round(v * 10) / 10 : Math.round(v); };
 export const priceOf = (c) => tokenPrice(c.r);
+export const buyable = (c) => c.r <= BUY_MAX;
+export const info = (c) => levelInfo(c.fam.cat, c.fam.id, c.r);
+export const note = (c) => qualityNote(c.fam.cat, c.fam.id, c.r);
 export const catOf = (id) => CATS.find((c) => c.id === id);
 
 // Collections: equipping every family of a set gives an extra bonus.

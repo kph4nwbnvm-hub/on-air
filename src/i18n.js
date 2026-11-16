@@ -4,6 +4,8 @@ import TR_DAILY from './tr_daily.js';
 import TR_PROFILE from './tr_profile.js';
 import ST1, { KEYS as ST_KEYS } from './tr_store1.js';
 import ST2 from './tr_store2.js';
+import ST3, { KEYS3 } from './tr_store3.js';
+import TT, { KEYS_T } from './tr_tour.js';
 // The 53 languages of the Pi system, in the order the project owner supplied them.
 export const LANGS = [
   { code: 'ar', name: 'العربية', rtl: true }, { code: 'en', name: 'English' }, { code: 'af', name: 'Afrikaans' },
@@ -143,3 +145,5 @@ Object.entries(TR_SHOP).forEach(([k, v]) => { STR[k] = { ...(STR[k] || {}), ...v
 Object.entries(TR_DAILY).forEach(([k, v]) => { STR[k] = { ...(STR[k] || {}), ...v }; });
 Object.entries(TR_PROFILE).forEach(([k, v]) => { STR[k] = { ...(STR[k] || {}), ...v }; });
 Object.entries({ ...ST1, ...ST2 }).forEach(([k, arr]) => { const o = {}; ST_KEYS.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
+Object.entries(ST3).forEach(([k, arr]) => { const o = {}; KEYS3.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
+Object.entries(TT).forEach(([k, arr]) => { const o = {}; KEYS_T.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });

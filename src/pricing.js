@@ -8,8 +8,9 @@
 export const TOKENS_PER_PI = 1000;
 export const PI_USD = 0.0634;          // Pi market price used for repricing (theblock, 15 Nov 2026). Update when it moves.
 export const MODE = 'auto';            // 'auto' | 'mining' | 'usd'
-export const MINING_PI = [0.1, 0.2, 0.4, 1, 2.5];
-export const USD_BAND = [0.5, 1.5, 2.5, 4.5, 7.5];
+// 15 levels on a geometric curve between the approved ends: 0.1 Pi (level 1) to 2.5 Pi (level 15); dollar band 0.5 to 7.5 USD.
+export const MINING_PI = Array.from({ length: 15 }, (_, i) => Math.round(0.1 * Math.pow(25, i / 14) * 1000) / 1000);
+export const USD_BAND = Array.from({ length: 15 }, (_, i) => Math.round(0.5 * Math.pow(15, i / 14) * 100) / 100);
 
 const round7 = (x) => Math.round(x * 1e7) / 1e7;   // token amounts carry at most 7 decimals
 export function tokenPrice(rarity) {
