@@ -34,7 +34,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.14';
+const VERSION = '1.4.15';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -782,6 +782,7 @@ $('hudStore').onclick = () => { if (!UNLOCK.bStore()) { sfx.bad(); gToast(t('loc
 function pcOpen() { G.asking = true; pcBuild(); $('pc').hidden = false; }
 function pcClose() { $('pc').hidden = true; G.asking = false; }
 function pcBuild() {
+  if (pcS.fixed) return pubBuild();
   $('pcTitle').textContent = '🖥️ ' + t('pc_title'); const L = $('pcList'); L.innerHTML = '';
   PC_ALL.forEach((k) => {
     const row = document.createElement('div'); row.className = 'pcrow'; const bad = PC_BAD.includes(k), chk = pcS.checked[k], inst = pcS.installed[k];
@@ -797,6 +798,26 @@ function pcBuild() {
   });
   $('pcStore').hidden = !PC_ALL.every((k) => pcS.checked[k]) || pcS.fixed || cs.needsReady(); $('pcStore').textContent = '🛍️ ' + t('pc_store');
 }
+// ───────── publishing: once the computer works, interviews are posted to the in-game platforms for followers and coins ─────────
+const PLAT = { shoofni: { ic: '📺', fans: 1, coin: 0.25 }, laqta: { ic: '🎬', fans: 1.5, coin: 0.12 }, sada: { ic: '💬', fans: 0.6, coin: 0.08 } };
+const fans = store.get('fans', { shoofni: 0, laqta: 0, sada: 0 });
+const platName = (k) => ADS.WORLD[k][lang === 'ar' ? 'ar' : 'en'];
+function pubBuild() {
+  $('pcTitle').textContent = '🖥️ ' + t('pub_title'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = '';
+  const head = document.createElement('div'); head.className = 'pubhead';
+  Object.keys(PLAT).forEach((k) => { const c = document.createElement('div'); c.innerHTML = '<i>' + PLAT[k].ic + '</i><b></b><span></span>'; c.querySelector('b').textContent = platName(k); c.querySelector('span').textContent = '👥 ' + fans[k] + ' ' + t('pub_fans'); head.appendChild(c); });
+  L.appendChild(head);
+  const list = store.get('interviews', []);
+  if (!list.length) { const e = document.createElement('p'); e.className = 'pubempty'; e.textContent = '🎤 ' + t('pub_empty'); L.appendChild(e); return; }
+  list.slice().reverse().forEach((iv) => {
+    const row = document.createElement('div'); row.className = 'pcrow'; const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = '🎤 ' + (iv.who || '') + ' · ' + t('pub_q') + ' ' + Math.round(iv.q) + '%'; row.appendChild(nm);
+    Object.keys(PLAT).forEach((k) => { const b = document.createElement('button'); const done = iv.pub && iv.pub[k]; b.className = done ? 'ghost' : 'big'; b.textContent = done ? '✅' : PLAT[k].ic; b.disabled = !!done;
+      b.onclick = () => { const f = Math.max(1, Math.round((iv.q / 10) * PLAT[k].fans)), c = Math.max(1, Math.round(iv.q * PLAT[k].coin)); iv.pub = { ...(iv.pub || {}), [k]: true }; store.set('interviews', list);
+        fans[k] += f; store.set('fans', fans); addCoins(c); const up = shop.addXp(2); showLevel(); sfx.good(); gToast(PLAT[k].ic + ' ' + platName(k) + ' · 👥 +' + f + ' · 🪙 +' + c); if (up) say('⭐ ' + t('level_up'), 'ok', true); pubBuild(); };
+      row.appendChild(b); });
+    L.appendChild(row);
+  });
+}
 // once everything is diagnosed, Uncle Saleh hands over exactly the price of the broken parts (level 1 each)
 function pcAfterCheck() {
   if (pcS.gift || !PC_ALL.every((k) => pcS.checked[k])) return;
@@ -811,7 +832,7 @@ function pcAfterInstall() {
 $('pcClose').onclick = () => { sfx.click(); pcClose(); };
 $('pcStore').onclick = () => { sfx.click(); $('pc').hidden = true; G.asking = false; storeFrom = 'hud'; cs.setCat('parts'); cs.closeSheet(); cs.render(); show('storeS'); };
 interact('studio', PCX + 1.15, PCZ, 1.25, 'a_pc', '🖥️', () => roam() && !storyOn && !ivOn, () => {
-  if (pcS.fixed) { say('🖥️ ' + t('pc_boot'), 'ok'); return; }
+  if (pcS.fixed) { sfx.click(); pcOpen(); return; }
   if (!pcS.seen) { pcS.seen = true; pcSave(); G.asking = true; dlg([{ who: 'sn_me', k: 's5a' }, { who: 'sn_saleh', k: 's5b' }], pcOpen); } else pcOpen();
 });
 
