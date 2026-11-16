@@ -33,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.6';
+const VERSION = '1.4.7';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -753,6 +753,7 @@ const pcScreenM = new THREE.MeshBasicMaterial({ color: 0x0a0a10, toneMapped: fal
 const PC_ALL = ['psu', 'board', 'ram', 'disk', 'fan'], PC_BAD = ['psu', 'ram', 'fan'], PC_ICON = { psu: '🔌', board: '🟩', ram: '🧠', disk: '💽', fan: '🌀' };
 const pcS = store.get('pc', { seen: false, checked: {}, installed: {}, gift: false, fixed: false });
 const pcSave = () => store.set('pc', pcS);
+cs.setNeeds(() => (pcS.gift && !pcS.fixed ? PC_BAD.filter((k) => !pcS.installed[k]) : []));
 const pcLit = () => { pcScreenM.color.set(pcS.fixed ? 0x2f7bff : 0x0a0a10); };
 pcLit();
 let storeFrom = 'menu';
