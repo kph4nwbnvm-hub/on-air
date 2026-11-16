@@ -33,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.9';
+const VERSION = '1.4.10';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -732,11 +732,15 @@ $('ivGo').onclick = () => {
 };
 function finishIv() {
   $('ivGo').disabled = false; $('iv').hidden = true; const mic = Math.max(1, gearLv('mic'));
-  const q = Math.round(Math.min(100, (ivHits / 3) * 70 + Math.min(30, (gearLv('cam') + mic) * 1.0)));
-  const list = store.get('interviews', []); list.push({ q, at: Date.now(), who: ivNpc.name }); store.set('interviews', list.slice(-30));
-  const first = !store.get('story4_done', false); const xp = first ? 15 : 3 + Math.round(q / 20); const up = shop.addXp(xp); showLevel();
-  const end = () => { ivOn = false; G.asking = false; say(t('iv_saved').replace('{q}', q) + (up ? '  ⭐ ' + t('level_up') : ''), 'ok', true); };
-  if (first) { store.set('story4_done', true); dlg([{ who: 'sn_me', k: 's4d' }, { who: 'sn_saleh', k: 's4e' }, { k: 's4f' }], end); } else end();
+  const q = Math.round(Math.min(100, (ivHits / 3) * 70 + (ivHits ? Math.min(30, (gearLv('cam') + mic) * 1.0) : 0)));
+  // XP follows performance: nothing for a fully missed shoot, and the story only moves on after a usable first interview (2+ good answers)
+  const first = !store.get('story4_done', false), okFirst = first && ivHits >= 2;
+  const xp = ivHits === 0 ? 0 : first ? ivHits * 5 : ivHits + Math.round(q / 25);
+  if (ivHits > 0) { const list = store.get('interviews', []); list.push({ q, at: Date.now(), who: ivNpc.name }); store.set('interviews', list.slice(-30)); }
+  const up = xp > 0 && shop.addXp(xp); showLevel();
+  const end = () => { ivOn = false; G.asking = false; const fail = ivHits === 0 || (first && !okFirst);
+    say((fail ? '📉 ' + t('iv_keep') + ' · ' : '') + (ivHits ? t('iv_saved').replace('{q}', q) + ' · ' : '') + '+' + xp + ' ' + t('xp') + (up ? '  ⭐ ' + t('level_up') : ''), fail ? 'warn' : 'ok', true); };
+  if (okFirst) { store.set('story4_done', true); dlg([{ who: 'sn_me', k: 's4d' }, { who: 'sn_saleh', k: 's4e' }].concat(xp === 15 ? [{ k: 's4f' }] : []), end); } else end();
 }
 
 // ───────── father's broken office PC: the player diagnoses it, buys the parts in the store and installs them ─────────
