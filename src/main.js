@@ -33,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.7';
+const VERSION = '1.4.8';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -666,7 +666,7 @@ $('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syn
 function gToast(msg) { const el = $('gToast'); el.textContent = msg; el.hidden = false; clearTimeout(gToast.h); gToast.h = setTimeout(() => { el.hidden = true; }, 2200); }
 const cs = makeStore({ store, t, getLang: () => lang, sfx, toast: gToast, $ });
 $('bStore').onclick = () => { sfx.click(); storeFrom = 'menu'; cs.closeSheet(); cs.render(); show('storeS'); };
-$('stBack').onclick = () => { sfx.click(); cs.closeSheet(); if (storeFrom === 'hud') { storeFrom = 'menu'; show('hud'); resize(); } else show('menu'); };
+$('stBack').onclick = () => { sfx.click(); cs.closeSheet(); if (cs.needsReady()) { pcFromStore(); return; } if (storeFrom === 'hud') { storeFrom = 'menu'; show('hud'); resize(); } else show('menu'); };
 
 // ───────── opening story (shown once per player, never repeated) ─────────
 // scenes 1–3: father's will → Uncle Saleh at the door → abandoned studio → cleaning. Later scenes hook in as their features land.
@@ -753,7 +753,9 @@ const pcScreenM = new THREE.MeshBasicMaterial({ color: 0x0a0a10, toneMapped: fal
 const PC_ALL = ['psu', 'board', 'ram', 'disk', 'fan'], PC_BAD = ['psu', 'ram', 'fan'], PC_ICON = { psu: '🔌', board: '🟩', ram: '🧠', disk: '💽', fan: '🌀' };
 const pcS = store.get('pc', { seen: false, checked: {}, installed: {}, gift: false, fixed: false });
 const pcSave = () => store.set('pc', pcS);
-cs.setNeeds(() => (pcS.gift && !pcS.fixed ? PC_BAD.filter((k) => !pcS.installed[k]) : []));
+// straight from the store to the PC once every needed part is bought
+function pcFromStore() { cs.closeSheet(); storeFrom = 'menu'; if (G.on) return; if (G.zone !== 'studio') enterZone('studio', PCX + 1.15, PCZ, -Math.PI / 2); else { G.px = PCX + 1.15; G.pz = PCZ; G.face = -Math.PI / 2; } show('hud'); resize(); syncScene(); snapCam = true; pcOpen(); }
+cs.setNeeds(() => (pcS.gift && !pcS.fixed ? PC_BAD.filter((k) => !pcS.installed[k]) : []), () => { sfx.click(); pcFromStore(); });
 const pcLit = () => { pcScreenM.color.set(pcS.fixed ? 0x2f7bff : 0x0a0a10); };
 pcLit();
 let storeFrom = 'menu';
@@ -773,7 +775,7 @@ function pcBuild() {
     else mk('st bad', '❌ ' + t('pc_bad') + ' · ' + t('pc_need'));
     L.appendChild(row);
   });
-  $('pcStore').hidden = !PC_ALL.every((k) => pcS.checked[k]) || pcS.fixed; $('pcStore').textContent = '🛍️ ' + t('pc_store');
+  $('pcStore').hidden = !PC_ALL.every((k) => pcS.checked[k]) || pcS.fixed || cs.needsReady(); $('pcStore').textContent = '🛍️ ' + t('pc_store');
 }
 // once everything is diagnosed, Uncle Saleh hands over exactly the price of the broken parts (level 1 each)
 function pcAfterCheck() {
@@ -794,7 +796,7 @@ interact('studio', PCX + 1.15, PCZ, 1.25, 'a_pc', '🖥️', () => roam() && !st
 });
 
 // ───────── simple start: features unlock step by step, with one clear objective on screen ─────────
-const objKey = () => (!store.get('story_done', false) ? '' : !store.get('story4_done', false) ? 'obj_iv' : !pcS.fixed ? 'obj_pc' : chDone === 0 ? 'obj_live' : '');
+const objKey = () => (!store.get('story_done', false) ? '' : !store.get('story4_done', false) ? 'obj_iv' : !pcS.fixed ? (cs.needsReady() ? 'obj_pc2' : 'obj_pc') : chDone === 0 ? 'obj_live' : '');
 const UNLOCK = { bStore: () => pcS.gift || pcS.fixed || cs.S.tokens > 0, bChar: () => shop.level >= 2, bProfile: () => store.get('story4_done', false) };
 function applyLocks() { Object.entries(UNLOCK).forEach(([id, ok]) => { $(id).classList.toggle('locked', !ok()); }); }
 setInterval(() => { const k = objKey(), el = $('objBar'); const on = !!k && !G.on && !storyOn && !ivOn && !$('hud').hidden && $('pc').hidden && $('story').hidden; el.hidden = !on; if (on) el.textContent = '🎯 ' + t(k); if (!$('menu').hidden) applyLocks(); }, 500);

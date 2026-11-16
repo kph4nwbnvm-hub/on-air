@@ -86,7 +86,7 @@ export function makeStore(deps) {
     return L;
   }
   // shopping list set by the game (e.g. the broken PC parts): shown on top of the store and pinned first
-  let needsFn = () => []; const ownsPart = (fam) => Object.keys(S.cards).some((id) => id.startsWith('parts.' + fam + '.') && S.cards[id] > 0);
+  let needsFn = () => [], needsGo = null; const ownsPart = (fam) => Object.keys(S.cards).some((id) => id.startsWith('parts.' + fam + '.') && S.cards[id] > 0);
   const isNeed = (c) => c.fam.cat === 'parts' && c.r === 1 && needsFn().includes(c.fam.id) && !ownsPart(c.fam.id);
   function tile(c) {
     const el = document.createElement('button'); el.className = 'card r' + tierOf(c.r); el.style.setProperty('--rc', color(c));
@@ -120,7 +120,8 @@ export function makeStore(deps) {
   }
   function render() {
     chips(); $('stTok').textContent = TOKEN + ' ' + fmtTok(S.tokens); renderBonuses(); renderCollections();
-    const nd = needsFn(), nb = $('stNeed'); nb.hidden = !nd.length; if (nd.length) nb.textContent = '🖥️ ' + t('pc_title') + ' — ' + t('pc_need') + ':  ' + nd.map((f) => (ownsPart(f) ? '✅ ' : '❌ ') + t('p_' + f)).join('  ·  ');
+    const nd = needsFn(), nb = $('stNeed'); nb.hidden = !nd.length; const ready = nd.length && nd.every(ownsPart); nb.classList.toggle('go', !!ready); nb.onclick = ready && needsGo ? () => needsGo() : null;
+    if (nd.length) nb.textContent = ready ? '✅ ' + t('obj_pc2') + '  ▶' : '🖥️ ' + t('pc_title') + ' — ' + t('pc_need') + ':  ' + nd.map((f) => (ownsPart(f) ? '✅ ' : '❌ ') + t('p_' + f)).join('  ·  ');
     const g = $('stGrid'); g.innerHTML = ''; const L = list();
     if (!L.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = t('st_empty'); g.appendChild(p); }
     L.slice(0, view.limit).forEach((c) => g.appendChild(tile(c)));
@@ -173,7 +174,8 @@ export function makeStore(deps) {
   const give = (n) => { S.tokens = Math.round((S.tokens + n) * 1e7) / 1e7; save(); };
   const partId = (fam) => Object.keys(S.cards).filter((id) => id.startsWith('parts.' + fam + '.') && S.cards[id] > 0).sort((a, b) => +b.split('.')[2] - +a.split('.')[2])[0];
   const usePart = (fam) => { const id = partId(fam); if (!id) return 0; add(id, -1); save(); return +id.split('.')[2]; };
-  const setNeeds = (fn) => { needsFn = fn; };
+  const setNeeds = (fn, go) => { needsFn = fn; needsGo = go; };
+  const needsReady = () => { const nd = needsFn(); return nd.length > 0 && nd.every(ownsPart); };
   const setCat = (c) => { view.cat = c; view.rarity = 0; view.q = ''; view.limit = 60; };
-  return { S, bonuses, consumeBoosts, grantRandom, dropLevel, render, closeSheet, nameOf, give, partId, usePart, setCat, setNeeds };
+  return { S, bonuses, consumeBoosts, grantRandom, dropLevel, render, closeSheet, nameOf, give, partId, usePart, setCat, setNeeds, needsReady };
 }
