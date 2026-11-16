@@ -17,7 +17,9 @@ import { preview as dailyPreview, claim as dailyClaim, rewardFor, isBig, CYCLE }
 const store = { get(k, d) { try { const v = localStorage.getItem('onair_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('onair_' + k, JSON.stringify(v)); } catch (e) {} } };
 let lang = store.get('lang', 'ar');
 let soundOn = store.get('sound', true);
-const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('quality', 'high') };
+const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
+// phones default to the light pipeline; a previous GPU crash forces it
+const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 const VERSION = '1.3.0';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
@@ -92,9 +94,14 @@ function speak(text, who) {
 /* ---------- renderer ---------- */
 const canvas = $('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-const pixelRatio = () => (cfg.quality === 'low' ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+const pixelRatio = () => (cfg.quality === 'low' ? Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.25 : 1) : Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.5 : 2));
 renderer.setPixelRatio(pixelRatio());
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = IS_MOBILE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+// if the phone's GPU drops the WebGL context (black screen), fall back to the light pipeline and reload once
+canvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault(); store.set('gpu_lost', true); store.set('quality', 'low');
+  const last = store.get('gpu_reload', 0); if (Date.now() - last > 60000) { store.set('gpu_reload', Date.now()); setTimeout(() => location.reload(), 400); }
+}, false);
 renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
 { const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.55; }
@@ -321,7 +328,7 @@ const amb = new THREE.HemisphereLight(0xdfe6ff, 0x3a3060, 0.9); scene.add(amb);
 const stageA = new THREE.PointLight(0xa463ff, 6, 12, 1.6); stageA.position.set(-5.5, 3.2, -2.5); scene.add(stageA);
 const stageB = new THREE.PointLight(0x3ad4ff, 6, 12, 1.6); stageB.position.set(5.5, 3.2, -2.5); scene.add(stageB);
 const key = new THREE.SpotLight(0xfff2d6, 220, 24, 0.8, 0.6, 1.3); key.position.set(0.5, 8.5, 5.5); key.target.position.set(0.3, 0.5, -1.6); key.castShadow = true;
-key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0008; key.shadow.radius = 4; key.shadow.camera.near = 2; key.shadow.camera.far = 24; scene.add(key); scene.add(key.target);
+key.shadow.mapSize.set(IS_MOBILE ? 1024 : 2048, IS_MOBILE ? 1024 : 2048); key.shadow.bias = -0.0008; key.shadow.radius = 4; key.shadow.camera.near = 2; key.shadow.camera.far = 24; scene.add(key); scene.add(key.target);
 const rim = new THREE.DirectionalLight(0x9db4ff, 0.7); rim.position.set(-5, 6, -2); scene.add(rim);
 const sun = new THREE.DirectionalLight(0xffffff, 0); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.002;
 Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: 1, far: 60 }); scene.add(sun); scene.add(sun.target);
@@ -501,7 +508,7 @@ let pip = { x: 0, y: 0, w: 0, h: 0 };
 let composer = null, bloom = null;
 function setupFX() {
   if (cfg.quality === 'low') { composer = null; return; }
-  const rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: 4 });
+  const rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: IS_MOBILE ? 0 : 4 });
   composer = new EffectComposer(renderer, rt); composer.addPass(new RenderPass(scene, cam));
   bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 2.6); composer.addPass(bloom); composer.addPass(new OutputPass());
 }

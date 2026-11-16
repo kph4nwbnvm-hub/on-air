@@ -97,11 +97,11 @@ export function boxTex(id) {
 // ELVA bottle: clear PET body, label band, white cap
 export function bottle(id = 'elva', h = 0.28) {
   const g = new THREE.Group(); const r = h * 0.2;
-  const glass = new THREE.MeshPhysicalMaterial({ color: 0xeaf4ff, roughness: 0.05, metalness: 0, transmission: 0.85, thickness: 0.02, transparent: true, opacity: 0.55, clearcoat: 1 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0xeaf4ff, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.45 });
   const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h * 0.72, 24), glass); body.position.y = h * 0.36; g.add(body);
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.38, r, h * 0.18, 24), glass); neck.position.y = h * 0.81; g.add(neck);
   const cap = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.42, r * 0.42, h * 0.07, 20), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })); cap.position.y = h * 0.93; g.add(cap);
-  const water = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.92, r * 0.92, h * 0.62, 24), new THREE.MeshPhysicalMaterial({ color: 0xcfe6ff, transmission: 0.9, roughness: 0.02, transparent: true, opacity: 0.35 })); water.position.y = h * 0.32; g.add(water);
+  const water = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.92, r * 0.92, h * 0.62, 24), new THREE.MeshStandardMaterial({ color: 0xcfe6ff, roughness: 0.05, transparent: true, opacity: 0.3 })); water.position.y = h * 0.32; g.add(water);
   const label = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.01, r * 1.01, h * 0.3, 32, 1, true), new THREE.MeshStandardMaterial({ map: labelTex(id), roughness: 0.5, side: THREE.DoubleSide })); label.position.y = h * 0.38; g.add(label);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   return g;
