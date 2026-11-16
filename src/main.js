@@ -33,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.3';
+const VERSION = '1.4.4';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -420,7 +420,15 @@ const ZONES = {
   street: { ox: SX, bx: [-13.6, 12.7], bz: [-6.9, 5.8], cx: [-22, 22], cz: [-7.6, 14], bg: 0x8fd3ff, fog: [45, 100] },
   event: { ox: EX, bx: [-13.6, 6.1], bz: [-1.5, 1.5], cx: [-22, 12], cz: [-9, 9], bg: 0x1d1440, fog: [30, 80] },
 };
-const ROUND = 180, SEG = 90, PASS = 0.7;
+const ROUND = 180, SEG = 90; let PASS = 0.7;
+// challenge ladder: each passed challenge unlocks the next one — one new prank type at a time, then faster pace and a higher bar
+const CH = [
+  { k: ['product'], pace: 1.9, pass: 0.5 }, { k: ['product', 'camera'], pace: 1.6, pass: 0.55 }, { k: ['product', 'camera', 'light'], pace: 1.4, pass: 0.6 },
+  { k: ['product', 'camera', 'light', 'confetti'], pace: 1.25, pass: 0.6 }, { pace: 1.1, pass: 0.65 }, { pace: 1.0, pass: 0.7 }, { pace: 0.9, pass: 0.7 },
+  { pace: 0.8, pass: 0.75 }, { pace: 0.7, pass: 0.75 }, { pace: 0.6, pass: 0.8 },
+];
+let chDone = Math.min(CH.length, store.get('ch', 0));
+const chNow = () => CH[Math.min(chDone, CH.length - 1)];
 const QSETS = [0, 1, 2].map((r) => [0, 1, 2].map((i) => ({ q: 'q' + r + i, a: 'a' + r + i, v: 1 - i })));
 const G = { on: false, zone: 'studio', coins: store.get('coins', 0), time: 0, good: 0, bonus: 0, product: true, feed: 0, light: true, mess: 0, pranks: [], next: 0, asked: [], askCd: 0, asking: false, grace: 0, px: 0, pz: 3.3, face: Math.PI, walk: 0, moving: false };
 const seg = () => (G.time < SEG ? 0 : 1);
@@ -455,7 +463,7 @@ function enterZone(z, x, zz, face) { G.zone = z; G.px = ZONES[z].ox + x; G.pz = 
 
 /* ---------- round ---------- */
 function firePrank() {
-  const pool = (seg() === 0 ? ['product', 'camera', 'light', 'confetti'] : ['camera', 'light', 'confetti']).filter((k) => !isActive(k)); if (!pool.length) return;
+  const allow = chNow().k; const pool = (seg() === 0 ? ['product', 'camera', 'light', 'confetti'] : ['camera', 'light', 'confetti']).filter((k) => !isActive(k) && (!allow || allow.includes(k))); if (!pool.length) return;
   const k = pool[Math.floor(Math.random() * pool.length)];
   if (k === 'product') G.product = false; if (k === 'camera') { G.feed = (G.feed + 1 + Math.floor(Math.random() * 2)) % 3; G.grace = 0; flashPip(); }
   if (k === 'light') G.light = false; if (k === 'confetti') { G.mess = 3; const c = seg() === 0 ? DESK : IV; dropConfetti(c.x, c.z); }
@@ -465,20 +473,24 @@ function markFixed(k) { const p = G.pranks.slice().reverse().find((x) => x.k ===
 const selfPrank = (k) => G.pranks.push({ k, at: G.time, fixed: null, told: true, self: true });
 function startRound() {
   lastAct = 0; Object.assign(G, { on: true, zone: 'studio', time: 0, good: 0, bonus: 0, product: true, feed: 0, light: true, mess: 0, pranks: [], next: 9, asked: [], askCd: 0, asking: false, grace: 0, px: 0, pz: 3.3, face: Math.PI });
-  confetti.forEach((c) => { c.m.visible = false; }); $('qSheet').hidden = true; show('hud'); syncScene(); resize(); snapCam = true; sfx.seg(); say(t('sp_start'));
+  confetti.forEach((c) => { c.m.visible = false; }); $('qSheet').hidden = true; show('hud'); syncScene(); resize(); snapCam = true; sfx.seg();
+  const c = chNow(); PASS = c.pass; const prev = chDone > 0 && chDone < CH.length ? CH[chDone - 1].k : null; const fresh = chDone < 4 ? c.k.filter((k) => !prev || !prev.includes(k)) : [];
+  say((chDone < CH.length ? '🎯 ' + t('ch_title').replace('{n}', chDone + 1) + ' · ' : '') + t('ch_goal').replace('{p}', Math.round(PASS * 100)) + (fresh.length ? ' · ' + t('ch_new') + ': ' + fresh.map((k) => t('p_' + k)).join(' + ') : ''), '', true);
   G.bonus += cs.bonuses().trust;
 }
 function endRound() {
   G.on = false; G.asking = false; $('qSheet').hidden = true; const missed = 3 - G.asked.length; G.bonus -= missed * 6;
   const BN = cs.bonuses();
   const trust = Math.max(0, Math.min(100, (G.good / ROUND) * 100 + G.bonus)) / 100; const pass = trust >= PASS; const coins = Math.round((pass ? 100 + trust * 150 : trust * 60) * (1 + BN.coins / 100));
-  addCoins(coins); (pass ? sfx.win : sfx.lose)(); buzz(pass ? [60, 40, 120] : 200);
+  let chMsg = ''; const coinsX = 1 + Math.min(chDone, CH.length - 1) * 0.1;
+  if (pass && chDone < CH.length) { chDone++; store.set('ch', chDone); chMsg = chDone < CH.length ? '🎯 ' + t('ch_next').replace('{n}', chDone + 1) : '🏆 ' + t('ch_done'); }
+  addCoins(Math.round(coins * coinsX)); (pass ? sfx.win : sfx.lose)(); buzz(pass ? [60, 40, 120] : 200);
   stats.rounds++; if (pass) stats.wins++; stats.best = Math.max(stats.best, Math.round(trust * 100)); store.set('stats', stats);
   const xp = Math.round(roundXp(trust, pass) * (1 + BN.xp / 100)), up = shop.addXp(xp); showLevel();
   let drop = null; if (Math.random() * 100 < 4 + BN.luck) drop = cs.grantRandom(cs.dropLevel(trust)); cs.consumeBoosts();
-  $('rXp').textContent = '+' + xp + ' ' + t('xp') + ' · ' + t('lvl') + ' ' + shop.level; $('rUp').hidden = !up && !drop; $('rUp').textContent = [up ? '⭐ ' + t('level_up') : '', drop ? '🎁 ' + t('st_drop') + ': ' + drop.fam.icon + ' ' + cs.nameOf(drop) : ''].filter(Boolean).join('  ·  ');
+  $('rXp').textContent = '+' + xp + ' ' + t('xp') + ' · ' + t('lvl') + ' ' + shop.level; $('rUp').hidden = !up && !drop && !chMsg; $('rUp').textContent = [chMsg, up ? '⭐ ' + t('level_up') : '', drop ? '🎁 ' + t('st_drop') + ': ' + drop.fam.icon + ' ' + cs.nameOf(drop) : ''].filter(Boolean).join('  ·  ');
   $('rTitle').textContent = t(pass ? 'r_pass' : 'r_fail'); $('rTitle').className = pass ? 'pass' : 'fail';
-  $('rTrust').textContent = Math.round(trust * 100) + '%'; $('rAir').textContent = fmt(G.good) + ' / ' + fmt(ROUND); $('rCoins').textContent = '+' + coins;
+  $('rTrust').textContent = Math.round(trust * 100) + '%'; $('rAir').textContent = fmt(G.good) + ' / ' + fmt(ROUND); $('rCoins').textContent = '+' + Math.round(coins * coinsX);
   const line = t(trust >= 0.85 ? 'sp_end_great' : pass ? 'sp_end_ok' : 'sp_end_bad'); $('rSponsor').textContent = line; speak(line);
   const row = (ul, a, b, c, bad) => { const li = document.createElement('li'); li.innerHTML = '<b></b><span></span><i></i>'; li.children[0].textContent = a; li.children[1].textContent = b; li.children[2].textContent = c; if (bad) li.className = 'bad'; ul.appendChild(li); };
   const ul = $('rList'); ul.innerHTML = ''; if (!G.pranks.length) row(ul, '', t('r_none'), '');
@@ -845,7 +857,7 @@ function frameBody(now) {
       if (wasSeg === 0 && seg() === 1) { G.grace = 8; G.next = Math.max(G.next, G.time + 9); sfx.seg(); say(t('sp_seg2')); syncScene(); }
       if (G.grace > 0) G.grace -= dt; if (G.askCd > 0) G.askCd -= dt;
       if (allGood()) G.good += dt;
-      if (G.time >= G.next && G.time < ROUND - 7 && !(G.time > SEG - 7 && G.time < SEG)) { firePrank(); const pace = G.time < 60 ? 15 : G.time < 120 ? 12 : 9.5; G.next = G.time + pace * (0.75 + Math.random() * 0.5); }
+      if (G.time >= G.next && G.time < ROUND - 7 && !(G.time > SEG - 7 && G.time < SEG)) { firePrank(); const pace = (G.time < 60 ? 15 : G.time < 120 ? 12 : 9.5) * chNow().pace; G.next = G.time + pace * (0.75 + Math.random() * 0.5); }
       const late = G.pranks.find((p) => p.fixed === null && !p.told && G.time - p.at > 6 && isActive(p.k)); if (late) { late.told = true; say(t('sp_' + late.k), 'warn'); }
       const tr = trustNow(); $('timer').textContent = fmt(ROUND - G.time + 0.99); $('trustFill').style.width = Math.round(tr) + '%'; $('trustFill').className = tr >= PASS * 100 ? '' : 'low';
       $('trustPct').textContent = Math.round(tr) + '%'; $('live').className = allGood() ? 'live' : 'live off';

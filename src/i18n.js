@@ -10,6 +10,7 @@ import TA, { KEYS_AD } from './tr_ads.js';
 import TS, { KEYS_S } from './tr_story.js';
 import TI, { KEYS_IV } from './tr_street.js';
 import TP, { KEYS_PC } from './tr_pc.js';
+import TC, { KEYS_CH } from './tr_ch.js';
 // The 53 languages of the Pi system, in the order the project owner supplied them.
 export const LANGS = [
   { code: 'ar', name: 'العربية', rtl: true }, { code: 'en', name: 'English' }, { code: 'af', name: 'Afrikaans' },
@@ -155,3 +156,4 @@ Object.entries(TA).forEach(([k, arr]) => { const o = {}; KEYS_AD.forEach((key, i
 Object.entries(TS).forEach(([k, arr]) => { const o = {}; KEYS_S.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TI).forEach(([k, arr]) => { const o = {}; KEYS_IV.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TP).forEach(([k, arr]) => { const o = {}; KEYS_PC.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
+Object.entries(TC).forEach(([k, arr]) => { const o = {}; KEYS_CH.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
