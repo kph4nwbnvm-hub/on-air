@@ -59,14 +59,14 @@ function wordmark(x, s, cx, cy, size) { x.fillStyle = s.ink; x.font = `900 ${siz
 export function adCardTex(id) { return cached('adCardTex' + id, () => _adCardTex(id)); }
 function _adCardTex(id) {
   const s = SPONSORS[id];
-  return live(MOB ? 768 : 1280, MOB ? 432 : 720, (x, W, H) => { x.save(); x.scale(W / 1280, H / 720); W = 1280; H = 720;
+  return live(MOB ? 1024 : 1280, MOB ? 576 : 720, (x, W, H) => { x.save(); x.scale(W / 1280, H / 720); W = 1280; H = 720;
     const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, s.bg); g.addColorStop(1, '#ffffff'); x.fillStyle = g; x.fillRect(0, 0, W, H);
     x.fillStyle = s.accent; x.globalAlpha = 0.12; x.beginPath(); x.arc(W * 0.85, H * 0.2, 340, 0, 7); x.fill(); x.beginPath(); x.arc(W * 0.1, H * 0.95, 260, 0, 7); x.fill(); x.globalAlpha = 1;
-    if (s.logo) logo(x, s.logo, W / 2, H * 0.38, W * 0.5, H * 0.42); else wordmark(x, s, W / 2, H * 0.38, 150);
+    if (s.logo) logo(x, s.logo, W / 2, H * 0.34, W * 0.62, H * 0.5); else wordmark(x, s, W / 2, H * 0.34, 210);
     x.direction = 'inherit'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.fillStyle = s.ink; fit(x, tx(s.tag), 800, 64, W * 0.9); x.fillText(tx(s.tag), W / 2, H * 0.72);
-    x.fillStyle = s.accent; fit(x, tx(s.sub), 600, 36, W * 0.9); x.fillText(tx(s.sub), W / 2, H * 0.84);
-    x.fillStyle = s.accent; x.fillRect(W / 2 - 60, H * 0.62, 120, 6); x.restore();
+    x.fillStyle = s.ink; fit(x, tx(s.tag), 900, 92, W * 0.94); x.fillText(tx(s.tag), W / 2, H * 0.74);
+    x.fillStyle = s.accent; fit(x, tx(s.sub), 700, 54, W * 0.9); x.fillText(tx(s.sub), W / 2, H * 0.89);
+    x.fillStyle = s.accent; x.fillRect(W / 2 - 80, H * 0.635, 160, 8); x.restore();
   }, s.logo);
 }
 // "برعاية" plaque for the sponsor desk front (4:3)
@@ -84,10 +84,10 @@ function _plaqueTex(id) {
 export function labelTex(id) { return cached('labelTex' + id, () => _labelTex(id)); }
 function _labelTex(id) {
   const s = SPONSORS[id];
-  return live(1024, 256, (x, W, H) => {
-    x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H); x.fillStyle = s.bg; x.fillRect(0, 0, W, H);
-    x.strokeStyle = s.accent; x.lineWidth = 6; x.beginPath(); x.moveTo(0, 18); x.lineTo(W, 18); x.moveTo(0, H - 18); x.lineTo(W, H - 18); x.stroke();
-    for (const cx of [W * 0.25, W * 0.75]) if (s.logo) logo(x, s.logo, cx, H / 2, 300, 170); else wordmark(x, s, cx, H / 2, 60);
+  return live(1024, 360, (x, W, H) => {
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H);
+    x.fillStyle = s.accent; x.fillRect(0, 0, W, 14); x.fillRect(0, H - 14, W, 14);
+    for (const cx of [W * 0.25, W * 0.75]) if (s.logo) logo(x, s.logo, cx, H / 2, 470, 300); else wordmark(x, s, cx, H / 2, 110);
   }, s.logo);
 }
 // shipping label for cardboard boxes
@@ -105,15 +105,28 @@ function _boxTex(id) {
   }, s.logo);
 }
 
+// small standing ad card for a table (logo + slogan)
+export function standTex(id) { return cached('standTex' + id, () => _standTex(id)); }
+function _standTex(id) {
+  const s = SPONSORS[id];
+  return live(640, 400, (x, W, H) => {
+    x.fillStyle = '#ffffff'; rr(x, 0, 0, W, H, 28); x.fill(); x.strokeStyle = s.accent; x.lineWidth = 12; rr(x, 6, 6, W - 12, H - 12, 24); x.stroke();
+    if (s.logo) logo(x, s.logo, W / 2, H * 0.4, W * 0.8, H * 0.56); else wordmark(x, s, W / 2, H * 0.4, 150);
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillStyle = s.ink; fit(x, tx(s.tag), 800, 52, W * 0.9); x.fillText(tx(s.tag), W / 2, H * 0.82);
+  }, s.logo);
+}
+export function stand(id, w = 0.5) { const g = new THREE.Group(); const h = w * 0.625; const m = new THREE.MeshBasicMaterial({ map: standTex(id), toneMapped: false });
+  const f = new THREE.Mesh(new THREE.PlaneGeometry(w, h), m); f.position.y = h / 2 + 0.01; f.rotation.x = -0.18; g.add(f);
+  const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.012), new THREE.MeshStandardMaterial({ color: 0xffffff })); b.position.set(0, h / 2 + 0.01, -0.012); b.rotation.x = -0.18; g.add(b); return g; }
 // ELVA bottle: clear PET body, label band, white cap
 export function bottle(id = 'elva', h = 0.28) {
-  const g = new THREE.Group(); const r = h * 0.2;
+  const g = new THREE.Group(); const r = h * 0.24;
   const glass = new THREE.MeshStandardMaterial({ color: 0xeaf4ff, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.45 });
   const body = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h * 0.72, 24), glass); body.position.y = h * 0.36; g.add(body);
   const neck = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.38, r, h * 0.18, 24), glass); neck.position.y = h * 0.81; g.add(neck);
   const cap = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.42, r * 0.42, h * 0.07, 20), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 })); cap.position.y = h * 0.93; g.add(cap);
   const water = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.92, r * 0.92, h * 0.62, 24), new THREE.MeshStandardMaterial({ color: 0xcfe6ff, roughness: 0.05, transparent: true, opacity: 0.3 })); water.position.y = h * 0.32; g.add(water);
-  const label = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.01, r * 1.01, h * 0.3, 32, 1, true), new THREE.MeshStandardMaterial({ map: labelTex(id), roughness: 0.5, side: THREE.DoubleSide })); label.position.y = h * 0.38; g.add(label);
+  const label = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.03, r * 1.03, h * 0.44, 32, 1, true), new THREE.MeshBasicMaterial({ map: labelTex(id), toneMapped: false })); label.position.y = h * 0.38; g.add(label);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   return g;
 }

@@ -33,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.4';
+const VERSION = '1.4.5';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -107,7 +107,7 @@ function speak(text, who) {
 /* ---------- renderer ---------- */
 const canvas = $('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-const pixelRatio = () => (cfg.quality === 'low' ? Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.25 : 1) : Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.5 : 2));
+const pixelRatio = () => (cfg.quality === 'low' ? Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.6 : 1) : Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.5 : 2));
 renderer.setPixelRatio(pixelRatio());
 renderer.shadowMap.enabled = !store.get('gpu_lost', false); renderer.shadowMap.type = IS_MOBILE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 // surface shader compile/link failures on screen (phones hide the console)
@@ -224,8 +224,11 @@ function updateSign(tt) {
 } put(box(2.4, 0.9, 0.12, 0x8a1220), 0, 4.0, -3.98);
 const screenMat = new THREE.MeshBasicMaterial({ map: SFX.fluidTex(), toneMapped: false });
 // wall screen ad rotation — Naif's own companies only
-const SCREEN_LIST = [screenMat.map, ADS.adCardTex('ccmedia'), ADS.adCardTex('cc'), ADS.adCardTex('elva')]; let screenI = 0;
-setInterval(() => { screenI = (screenI + 1) % SCREEN_LIST.length; screenMat.map = SCREEN_LIST[screenI]; screenMat.needsUpdate = true; }, 9000);
+const AD_LIST = ['ccmedia', 'elva', 'cc', 'lslco'].map((id) => ADS.adCardTex(id)); let screenI = 0;
+screenMat.map = AD_LIST[0];
+// two big street screens beside the studio entrance show the next ads in the rotation
+const gateMatL = new THREE.MeshBasicMaterial({ map: AD_LIST[1], toneMapped: false }), gateMatR = new THREE.MeshBasicMaterial({ map: AD_LIST[2], toneMapped: false });
+setInterval(() => { screenI = (screenI + 1) % AD_LIST.length; const n = AD_LIST.length; [[screenMat, 0], [gateMatL, 1], [gateMatR, 2]].forEach(([m, o]) => { m.map = AD_LIST[(screenI + o) % n]; m.needsUpdate = true; }); }, 9000);
 const _m2 = cur.children.length;
 put(box(3.5, 2.1, 0.12, 0x2a2b30, { rough: 0.35, metal: 0.6 }), 3, 2.25, -3.98); put(new THREE.Mesh(new THREE.PlaneGeometry(3.38, 1.98), screenMat), 3, 2.25, -3.91);
 const _m3 = cur.children.length;
@@ -247,7 +250,8 @@ put(cyl(0.09, 0.1, 0.03, 0x222222), DESK.x - 0.9, 1.08, DESK.z + 0.2); put(cyl(0
 const PX = DESK.x + 0.8, PZ = DESK.z + 0.1;
 put(cyl(0.36, 0.4, 0.07, 0xffffff), PX, 1.1, PZ).castShadow = true;
 const gold = new THREE.Group(); const GM = { emissive: 0x9a6a00, emissiveIntensity: 0.5 };
-[[-0.11, 0.06], [0.11, 0.06], [0, -0.1]].forEach(([bx, bz]) => { const b = ADS.bottle('elva', 0.42); b.position.set(bx, 0, bz); b.rotation.y = 0.4; gold.add(b); });
+[[-0.15, 0.08], [0.15, 0.08], [0, -0.12]].forEach(([bx, bz]) => { const b = ADS.bottle('elva', 0.56); b.position.set(bx, 0, bz); b.rotation.y = -Math.PI / 2; gold.add(b); });
+{ const st = ADS.stand('elva', 0.62); st.position.set(DESK.x - 0.35, 1.12, DESK.z + 0.25); cur.add(st); }
 put(shadow(gold), PX, 1.14, PZ);
 const cleaner = new THREE.Group();
 put(cyl(0.17, 0.19, 0.42, 0x2fbf71), 0, 0.21, 0, cleaner); put(cyl(0.07, 0.17, 0.12, 0x2fbf71), 0, 0.48, 0, cleaner); put(cyl(0.06, 0.06, 0.1, 0xffffff), 0, 0.58, 0, cleaner);
@@ -258,7 +262,7 @@ const IV = { x: 3, z: -2 };
 const chairHost = armchair(0x3554c9); chairHost.position.set(IV.x - 0.95, 0, IV.z - 0.15); chairHost.rotation.y = 0.45; cur.add(chairHost);
 const chairGuest = armchair(0xd98a2b); chairGuest.position.set(IV.x + 0.95, 0, IV.z - 0.15); chairGuest.rotation.y = -0.45; cur.add(chairGuest);
 put(cyl(0.34, 0.34, 0.04, 0xf6efe2), IV.x, 0.62, IV.z + 0.35).castShadow = true; put(cyl(0.04, 0.04, 0.6, 0x222222), IV.x, 0.3, IV.z + 0.35); put(cyl(0.2, 0.22, 0.03, 0x222222), IV.x, 0.02, IV.z + 0.35);
-{ const b = ADS.bottle('elva', 0.24); b.position.set(IV.x - 0.12, 0.64, IV.z + 0.33); b.rotation.y = 0.6; cur.add(b); } put(cyl(0.05, 0.04, 0.12, 0xffffff), IV.x + 0.12, 0.7, IV.z + 0.4);
+{ const b = ADS.bottle('elva', 0.36); b.position.set(IV.x - 0.12, 0.64, IV.z + 0.33); b.rotation.y = -Math.PI / 2; cur.add(b); } put(cyl(0.05, 0.04, 0.12, 0xffffff), IV.x + 0.12, 0.7, IV.z + 0.4);
 const guest = makeChar(uni({ skin: 3, hairStyle: 1, hairColor: 0, beard: 1 }));
 sit(guest); guest.g.position.set(IV.x + 0.95, -0.14, IV.z - 0.05); guest.g.rotation.y = -0.45; cur.add(guest.g);
 put(sph(0.16, 0xffffff), IV.x + 1.75, 0.16, IV.z + 0.5).castShadow = true; plant(IV.x + 2.0, IV.z - 1.3); plant(DESK.x - 2.4, DESK.z - 1.2);
@@ -326,6 +330,7 @@ function logoSignTex() {
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; return tex;
 }
 put(box(3.9, 1.25, 0.14, 0x15102e), SX, 3.35, -8.16);
+[[-3.05, gateMatL], [3.05, gateMatR]].forEach(([dx, m]) => { put(box(3.0, 1.78, 0.16, 0x15102e, { rough: 0.4, metal: 0.5 }), SX + dx, 1.75, -8.14); put(new THREE.Mesh(new THREE.PlaneGeometry(2.84, 1.6), m), SX + dx, 1.75, -8.05); put(box(3.0, 0.06, 0.18, 0xffcf3f, { emissive: 0xffcf3f }), SX + dx, 2.67, -8.14); });
 const logoSign = put(new THREE.Mesh(new THREE.PlaneGeometry(3.8, 1.11), new THREE.MeshBasicMaterial({ map: logoSignTex(), transparent: true, toneMapped: false })), SX, 3.35, -8.08);
 let logoLang = lang;
 function syncLogoSign() { if (logoLang === lang) return; logoLang = lang; const o = logoSign.material.map; logoSign.material.map = logoSignTex(); logoSign.material.needsUpdate = true; o.dispose(); }
