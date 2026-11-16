@@ -37,7 +37,7 @@ const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), qu
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.5.0';
+const VERSION = '1.5.1';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -201,6 +201,8 @@ function npc(zone, x, z, face, av, name, lines) { const ch = makeChar(uni(av)); 
 const STAGE_R = [];
 // everyone starts in the same plain outfit; looks change only through what the player earns or buys
 const UNI = { top: 0, topColor: 11, bottom: 0, bottomColor: 7, shoes: 1, acc: {} };
+const design = store.get('design', { on: false, top: 11, bot: 7 }); if (design.on) { UNI.topColor = design.top; UNI.bottomColor = design.bot; }
+const fit = { lv: store.get('fit', 0) };
 const uni = (av) => ({ ...av, ...UNI, acc: {} });
 /* ================= STUDIO ================= */
 cur = ZG.studio;
@@ -398,10 +400,10 @@ function syncCity() { if (cityLang === lang) return; cityLang = lang; citySigns.
   [[-21, 6, 0xff8a5c, 0xffffff], [-31.5, 8, 0x5fbf8f, 0xfff3b0], [-42, 5.5, 0xb48cf2, 0xbfe3ff], [-52.5, 7, 0xffcf3f, 0xffffff], [21, 5.5, 0xf2788c, 0xffffff], [31.5, 8.5, 0x6f8cf2, 0xfff3b0], [42, 6, 0x4cc9a0, 0xffffff], [52.5, 7.5, 0xff8a3d, 0xbfe3ff]].forEach(([dx, h, c, wc]) => building(SX + dx, -10.2, 9, h, c, wc));
   [-56, 56].forEach((dx) => put(box(6, 7, 46, 0x8a93a6), SX + dx, 3.5, 10)); // end caps
   // row A (between the two streets): gym, café, the store, park, clothes
-  shopFront(-40, 12, 15, 5.5, 0x3b4a6b, 0xd9342b, '🏋️', () => t('sh_gym'), null, 'sh_gym');
+  shopFront(-40, 12, 15, 5.5, 0x3b4a6b, 0xd9342b, '🏋️', () => t('sh_gym'), () => openPanel('gym'), 'sh_gym');
   shopFront(-20, 12, 15, 5, 0x8a5a3a, 0x5a3a22, '☕', () => t('sh_cafe'), null, 'sh_cafe');
   shopFront(0, 12, 15, 6, 0x0f9d76, 0x0b6f55, '🛍️', () => ADS.WORLD.souq[lang === 'ar' ? 'ar' : 'en'], () => $('hudStore').onclick(), 'sh_market');
-  shopFront(40, 12, 15, 5, 0xe86aa6, 0xb0347a, '👕', () => t('sh_clothes'), null, 'sh_clothes');
+  shopFront(40, 12, 15, 5, 0xe86aa6, 0xb0347a, '👕', () => t('sh_clothes'), () => { $('hudStore').onclick(); if (!$('storeS').hidden) { cs.setCat('skins'); cs.render(); } }, 'sh_clothes');
   // park (open block): grass, trees, fountain, benches
   { const px = SX + 20, pz = 14.1; const gr = put(new THREE.Mesh(new THREE.PlaneGeometry(16, 9), M(0x57b86a, { rough: 0.9 })), px, 0.15, pz); gr.rotation.x = -Math.PI / 2; gr.receiveShadow = true;
     [[-6.5, -3], [6.5, -3], [-6.5, 3], [6.5, 3], [-3, 3.4], [3, 3.4]].forEach(([a, b]) => { tree(px + a, pz + b); COLL.street.push([px + a, pz + b, 0.35]); });
@@ -410,8 +412,8 @@ function syncCity() { if (cityLang === lang) return; cityLang = lang; citySigns.
     const sg = put(new THREE.Mesh(new THREE.PlaneGeometry(4, 1), new THREE.MeshBasicMaterial({ map: shopSignTex('🌳', t('sh_park'), '#2f8f4e'), transparent: true, toneMapped: false })), px, 2.6, pz - 4.6); sg.rotation.y = Math.PI; citySigns.push({ m: sg, icon: '🌳', name: () => t('sh_park'), bg: '#2f8f4e' });
     [-1.9, 1.9].forEach((a) => put(cyl(0.07, 0.07, 3.1, 0x30303a), px + a, 1.55, pz - 4.6)); }
   // row B (south side of the second street): clothes, designer, and ad buildings for our own companies
-  shopFront(-40, 27, 15, 5, 0x4a6fd9, 0x2a3f8f, '🧥', () => t('sh_clothes'), null, 'sh_clothes');
-  shopFront(-20, 27, 15, 6.5, 0x2a2233, 0xd4af37, '✂️', () => t('sh_designer'), null, 'sh_designer');
+  shopFront(-40, 27, 15, 5, 0x4a6fd9, 0x2a3f8f, '🧥', () => t('sh_clothes'), () => { $('hudStore').onclick(); if (!$('storeS').hidden) { cs.setCat('skins'); cs.render(); } }, 'sh_clothes');
+  shopFront(-20, 27, 15, 6.5, 0x2a2233, 0xd4af37, '✂️', () => t('sh_designer'), () => openPanel('designer'), 'sh_designer');
   adBuilding(0, 27, 15, 7, 0x5b3aa6, 'elva'); adBuilding(20, 27, 15, 7, 0x1f6fb2, 'lslco'); adBuilding(40, 27, 15, 7, 0xc46b78, 'ccmedia');
   // street lamps and trees along the second street
   [-45, -30, -10, 10, 30, 45].forEach((dx) => { put(cyl(0.07, 0.09, 3.6, 0x30303a), SX + dx, 1.8, 20.2).castShadow = true; put(sph(0.16, 0xfff3b0, { emissive: 0xfff3b0 }), SX + dx, 3.7, 20.2); COLL.street.push([SX + dx, 20.2, 0.25]); });
@@ -659,7 +661,7 @@ function movePlayer(dt) {
   if (Math.abs(turn) < 0.18) turn = 0; if (Math.abs(fwd) < 0.18) fwd = 0;
   turn = Math.max(-1, Math.min(1, turn)); fwd = Math.max(-1, Math.min(1, fwd));
   G.face -= turn * 2.5 * dt; G.moving = fwd !== 0;
-  if (G.moving) { const sp = (fwd > 0 ? 4.0 : 2.2) * fwd; G.px += Math.sin(G.face) * sp * dt; G.pz += Math.cos(G.face) * sp * dt; G.walk += dt * 11 * Math.abs(fwd); }
+  if (G.moving) { const sp = (fwd > 0 ? 4.0 : 2.2) * fwd * (1 + fit.lv * 0.06); G.px += Math.sin(G.face) * sp * dt; G.pz += Math.cos(G.face) * sp * dt; G.walk += dt * 11 * Math.abs(fwd); }
   const Z = ZONES[G.zone];
   COLL[G.zone].forEach(([x, z, r]) => { const dx = G.px - x, dz = G.pz - z, d = Math.hypot(dx, dz), R = r + 0.3; if (d < R && d > 0.0001) { G.px = x + (dx / d) * R; G.pz = z + (dz / d) * R; } });
   RECTS[G.zone].forEach(([a, b, c, d]) => { const k = 0.3; if (G.px > a - k && G.px < b + k && G.pz > c - k && G.pz < d + k) { const l = G.px - (a - k), r = b + k - G.px, u = G.pz - (c - k), w = d + k - G.pz, mn = Math.min(l, r, u, w); if (mn === l) G.px = a - k; else if (mn === r) G.px = b + k; else if (mn === u) G.pz = c - k; else G.pz = d + k; } });
@@ -881,8 +883,10 @@ let storeFrom = 'menu', storePause = false;
 // store button inside play: opens the store any time; a running broadcast is paused while shopping
 $('hudStore').onclick = () => { if (!UNLOCK.bStore()) { sfx.bad(); gToast(t('locked_hint')); return; } if (storyOn || ivOn || G.asking) return; sfx.click(); storeFrom = 'hud'; storePause = G.on; cs.closeSheet(); cs.render(); $('storeS').hidden = false; $('hud').hidden = true; };
 function pcOpen() { G.asking = true; pcBuild(); $('pc').hidden = false; }
-function pcClose() { $('pc').hidden = true; G.asking = false; }
+function pcClose() { $('pc').hidden = true; G.asking = false; panelMode = null; }
+let panelMode = null; function openPanel(k) { sfx.click(); panelMode = k; pcOpen(); }
 function pcBuild() {
+  if (panelMode === 'gym') return gymBuild(); if (panelMode === 'designer') return designBuild();
   if (pcS.fixed) return pcTab === 'skills' ? skBuild() : pcTab === 'lab' ? labBuild() : pubBuild();
   $('pcTitle').textContent = '🖥️ ' + t('pc_title'); const L = $('pcList'); L.innerHTML = '';
   PC_ALL.forEach((k) => {
@@ -949,6 +953,26 @@ function labBuild() {
     const b = document.createElement('button'); if (licence >= n) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { const ok = licence === n - 1 && tot >= c.fans && G.coins >= c.coins; b.className = ok ? 'big' : 'ghost'; b.disabled = !ok; b.textContent = (licence < n - 1 ? '🔒 ' : '') + '👥 ' + c.fans + ' · 🪙 ' + c.coins;
       b.onclick = () => { addCoins(-c.coins); licence = n; store.set('licence', n); sfx.win(); gToast('🪪 ' + t('lab_lic') + ' ' + n + ' ✅'); labBuild(); }; }
     row.appendChild(b); L.appendChild(row); });
+}
+// gym: paid fitness training, 5 stages, each makes the player 6% faster (handy against the police)
+function gymBuild() {
+  $('pcTitle').textContent = '🏋️ ' + t('sh_gym'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = ''; const lv = fit.lv, row = document.createElement('div'); row.className = 'pcrow';
+  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p);
+  row.innerHTML = '<span class="ic">🏃</span><span class="nm"><b></b><small></small></span>'; row.querySelector('b').textContent = '⚡ +' + lv * 6 + '%'; row.querySelector('small').textContent = '●'.repeat(lv) + '○'.repeat(5 - lv);
+  const b = document.createElement('button'); if (lv >= 5) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { const cost = 150 * (lv + 1); b.className = G.coins >= cost ? 'big' : 'ghost'; b.disabled = G.coins < cost; b.textContent = '⬆ 🪙 ' + cost;
+    b.onclick = () => { addCoins(-cost); fit.lv++; store.set('fit', fit.lv); sfx.win(); gToast('🏃 ⚡ +' + fit.lv * 6 + '%'); gymBuild(); }; }
+  row.appendChild(b); L.appendChild(row);
+}
+// fashion designer: an expensive one-time fee unlocks a custom studio uniform — pick the top and bottom colours for the whole team
+const DESIGN_FEE = 1500;
+function designBuild() {
+  $('pcTitle').textContent = '✂️ ' + t('sh_designer'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = '';
+  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p);
+  if (!design.on) { const b = document.createElement('button'); b.className = G.coins >= DESIGN_FEE ? 'big pubpay' : 'ghost pubpay'; b.disabled = G.coins < DESIGN_FEE; b.textContent = '✂️ 👔 🪙 ' + DESIGN_FEE;
+    b.onclick = () => { addCoins(-DESIGN_FEE); design.on = true; store.set('design', design); sfx.win(); designBuild(); }; L.appendChild(b); return; }
+  [['👕', 'top', 'topColor'], ['👖', 'bot', 'bottomColor']].forEach(([ic, k, uk]) => { const row = document.createElement('div'); row.className = 'pcrow swrow'; const i = document.createElement('span'); i.className = 'ic'; i.textContent = ic; row.appendChild(i);
+    OPT.cloth.forEach((c, n) => { const s = document.createElement('button'); s.className = 'sw' + (design[k] === n ? ' on' : ''); s.style.background = '#' + new THREE.Color(c).getHexString(); s.onclick = () => { design[k] = n; UNI[uk] = n; store.set('design', design); sfx.click(); rebuildPlayer(); Object.keys(STAFF).forEach(restyle); designBuild(); }; row.appendChild(s); });
+    L.appendChild(row); });
 }
 // once everything is diagnosed, Uncle Saleh hands over exactly the price of the broken parts (level 1 each)
 function pcAfterCheck() {
@@ -1125,7 +1149,7 @@ function frame(now) {
 }
 
 // hook for automated checks only
-window.__onair = { R: renderer, sign, chase, startChase, cop, applyRoom, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { R: renderer, openPanel, sign, chase, startChase, cop, applyRoom, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 Object.keys(UNLOCK).forEach((id) => { const run = $(id).onclick; $(id).onclick = (e) => { if (!UNLOCK[id]()) { sfx.bad(); gToast(t('locked_hint')); return; } run(e); }; });
