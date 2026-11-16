@@ -33,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.10';
+const VERSION = '1.4.11';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -425,12 +425,12 @@ const ZONES = {
   street: { ox: SX, bx: [-13.6, 12.7], bz: [-6.9, 5.8], cx: [-22, 22], cz: [-7.6, 14], bg: 0x8fd3ff, fog: [45, 100] },
   event: { ox: EX, bx: [-13.6, 6.1], bz: [-1.5, 1.5], cx: [-22, 12], cz: [-9, 9], bg: 0x1d1440, fog: [30, 80] },
 };
-const ROUND = 180, SEG = 90; let PASS = 0.7;
+let ROUND = 180, SEG = 90, PASS = 0.7;
 // challenge ladder: each passed challenge unlocks the next one — one new prank type at a time, then faster pace and a higher bar
-const CH = [
-  { k: ['product'], pace: 1.9, pass: 0.5 }, { k: ['product', 'camera'], pace: 1.6, pass: 0.55 }, { k: ['product', 'camera', 'light'], pace: 1.4, pass: 0.6 },
-  { k: ['product', 'camera', 'light', 'confetti'], pace: 1.25, pass: 0.6 }, { pace: 1.1, pass: 0.65 }, { pace: 1.0, pass: 0.7 }, { pace: 0.9, pass: 0.7 },
-  { pace: 0.8, pass: 0.75 }, { pace: 0.7, pass: 0.75 }, { pace: 0.6, pass: 0.8 },
+const CH = [ // t = round length in seconds: early challenges are short and lively, later ones longer and harder
+  { t: 60, k: ['product', 'camera'], pace: 0.6, pass: 0.5 }, { t: 75, k: ['product', 'camera', 'light'], pace: 0.7, pass: 0.55 }, { t: 90, pace: 0.8, pass: 0.6 },
+  { t: 105, pace: 0.85, pass: 0.6 }, { t: 120, pace: 0.9, pass: 0.65 }, { t: 150, pace: 0.9, pass: 0.7 }, { t: 180, pace: 0.85, pass: 0.7 },
+  { t: 180, pace: 0.75, pass: 0.75 }, { t: 180, pace: 0.7, pass: 0.75 }, { t: 180, pace: 0.6, pass: 0.8 },
 ];
 let chDone = Math.min(CH.length, store.get('ch', 0));
 const chNow = () => CH[Math.min(chDone, CH.length - 1)];
@@ -479,12 +479,12 @@ const selfPrank = (k) => G.pranks.push({ k, at: G.time, fixed: null, told: true,
 function startRound() {
   lastAct = 0; Object.assign(G, { on: true, zone: 'studio', time: 0, good: 0, bonus: 0, product: true, feed: 0, light: true, mess: 0, pranks: [], next: 9, asked: [], askCd: 0, asking: false, grace: 0, px: 0, pz: 3.3, face: Math.PI });
   confetti.forEach((c) => { c.m.visible = false; }); $('qSheet').hidden = true; show('hud'); syncScene(); resize(); snapCam = true; sfx.seg();
-  const c = chNow(); PASS = c.pass; const prev = chDone > 0 && chDone < CH.length ? CH[chDone - 1].k : null; const fresh = chDone < 4 ? c.k.filter((k) => !prev || !prev.includes(k)) : [];
+  const c = chNow(); PASS = c.pass; ROUND = c.t; SEG = ROUND / 2; G.next = ROUND <= 90 ? 5 : 9; const prev = chDone > 0 && chDone < CH.length ? CH[chDone - 1].k : null; const allK = ['product', 'camera', 'light', 'confetti'], kNow = c.k || allK, kPrev = chDone > 0 ? CH[chDone - 1].k || allK : []; const fresh = chDone < CH.length ? kNow.filter((k) => !kPrev.includes(k)) : [];
   say((chDone < CH.length ? '🎯 ' + t('ch_title').replace('{n}', chDone + 1) + ' · ' : '') + t('ch_goal').replace('{p}', Math.round(PASS * 100)) + (fresh.length ? ' · ' + t('ch_new') + ': ' + fresh.map((k) => t('p_' + k)).join(' + ') : ''), '', true);
   G.bonus += cs.bonuses().trust;
 }
 function endRound() {
-  G.on = false; G.asking = false; $('qSheet').hidden = true; const missed = 3 - G.asked.length; G.bonus -= missed * 6;
+  G.on = false; G.asking = false; $('qSheet').hidden = true; const missed = Math.max(0, (SEG >= 75 ? 3 : SEG >= 45 ? 2 : 1) - G.asked.length); G.bonus -= missed * 6;
   const BN = cs.bonuses();
   const trust = Math.max(0, Math.min(100, (G.good / ROUND) * 100 + G.bonus)) / 100; const pass = trust >= PASS; const coins = Math.round((pass ? 100 + trust * 150 : trust * 60) * (1 + BN.coins / 100));
   let chMsg = ''; const coinsX = 1 + Math.min(chDone, CH.length - 1) * 0.1;
