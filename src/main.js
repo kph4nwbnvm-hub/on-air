@@ -33,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.2';
+const VERSION = '1.4.3';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -191,20 +191,27 @@ const COLL = { studio: [], street: [], event: [] };
 const IT = []; // interactables
 function interact(zone, x, z, r, key, icon, cond, run) { const ringM = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.58, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, side: THREE.DoubleSide })); ringM.rotation.x = -Math.PI / 2; ringM.position.set(x, 0.035, z); ZG[zone].add(ringM); const it = { zone, x, z, r, key, icon, cond, run, ring: ringM }; IT.push(it); return it; }
 const NPCS = [];
-function npc(zone, x, z, face, av, name, lines) { const ch = makeChar(av); ch.g.position.set(x, 0, z); ch.g.rotation.y = face; ZG[zone].add(ch.g); COLL[zone].push([x, z, 0.4]); const n = { ch, x, z, face, name, lines, i: 0, zone }; NPCS.push(n); return n; }
+function npc(zone, x, z, face, av, name, lines) { const ch = makeChar(uni(av)); ch.g.position.set(x, 0, z); ch.g.rotation.y = face; ZG[zone].add(ch.g); COLL[zone].push([x, z, 0.4]); const n = { ch, x, z, face, name, lines, i: 0, zone }; NPCS.push(n); return n; }
 
+// decor that appears as the studio grows: [minLevel, firstChild, endChild) of the studio group
+const STAGE_R = [];
+// everyone starts in the same plain outfit; looks change only through what the player earns or buys
+const UNI = { top: 0, topColor: 11, bottom: 0, bottomColor: 7, shoes: 1, acc: {} };
+const uni = (av) => ({ ...av, ...UNI, acc: {} });
 /* ================= STUDIO ================= */
 cur = ZG.studio;
 ground(26, 22, 0x2f2552, 0, 1);
 const rugA = put(new THREE.Mesh(new THREE.CircleGeometry(2.5, 48), M(0xe0563b)), -2.5, 0.012, -1.7); rugA.rotation.x = -Math.PI / 2; rugA.receiveShadow = true;
 const rugB = put(new THREE.Mesh(new THREE.CircleGeometry(2.2, 48), M(0x2a8f8a)), 3, 0.012, -1.8); rugB.rotation.x = -Math.PI / 2; rugB.receiveShadow = true;
 put(box(15, 6, 0.3, 0x2c2470), 0, 3, -4.2); put(box(0.3, 6, 14, 0x281f66), -7.3, 3, 2.6); put(box(0.3, 6, 14, 0x281f66), 7.3, 3, 2.6);
+const _m0 = cur.children.length;
 { const gt = SFX.galaxyTex(); const gm = new THREE.MeshBasicMaterial({ map: gt, toneMapped: false });
   const gw = put(new THREE.Mesh(new THREE.PlaneGeometry(14, 6), gm), 7.14, 3, 2.6); gw.rotation.y = -Math.PI / 2;
   const gt2 = gt.clone(); gt2.needsUpdate = true; gt2.repeat.set(0.35, 1); gt2.offset.set(0.62, 0); gt2.wrapS = THREE.RepeatWrapping;
   put(new THREE.Mesh(new THREE.PlaneGeometry(2.7, 6), new THREE.MeshBasicMaterial({ map: gt2, toneMapped: false })), 5.95, 3, -4.04); }
 for (let i = 0; i < 4; i++) put(box(1.15, 3, 0.08, i % 2 ? 0x5a3fc0 : 0x6c4fe0, { emissive: i % 2 ? 0x1c0f60 : 0x26157a, emissiveIntensity: 0.9 }), -4.4 + i * 1.27, 2.1, -3.98);
 put(box(15, 0.07, 0.07, 0xffcf3f, { emissive: 0xffcf3f }), 0, 0.35, -4.0); put(box(15, 0.06, 0.06, 0x7fe9ff, { emissive: 0x4cc9f0, emissiveIntensity: 2 }), 0, 4.6, -4.0); put(box(0.06, 0.06, 14, 0x7fe9ff, { emissive: 0x4cc9f0, emissiveIntensity: 2 }), -7.1, 4.6, 2.6);
+const _m1 = cur.children.length;
 const sign = put(signPlane('ON AIR', '#ff2a40', '#ffffff', 2.2, 0.7), 0, 4.0, -3.9);
 // real studio on-air lamp: off while roaming, lit while broadcasting, blinking while a prank is live
 const signLabel = () => (lang === 'ar' ? 'على الهوا' : t('live'));
@@ -219,10 +226,13 @@ const screenMat = new THREE.MeshBasicMaterial({ map: SFX.fluidTex(), toneMapped:
 // wall screen ad rotation — Naif's own companies only
 const SCREEN_LIST = [screenMat.map, ADS.adCardTex('ccmedia'), ADS.adCardTex('cc'), ADS.adCardTex('elva')]; let screenI = 0;
 setInterval(() => { screenI = (screenI + 1) % SCREEN_LIST.length; screenMat.map = SCREEN_LIST[screenI]; screenMat.needsUpdate = true; }, 9000);
+const _m2 = cur.children.length;
 put(box(3.5, 2.1, 0.12, 0x2a2b30, { rough: 0.35, metal: 0.6 }), 3, 2.25, -3.98); put(new THREE.Mesh(new THREE.PlaneGeometry(3.38, 1.98), screenMat), 3, 2.25, -3.91);
+const _m3 = cur.children.length;
 put(box(13, 0.14, 0.14, 0x1c1c22), 0, 5.2, -0.5); put(box(13, 0.14, 0.14, 0x1c1c22), 0, 5.2, 0.1);
 for (let i = 0; i < 14; i++) { const b = box(0.06, 0.06, 0.62, 0x1c1c22); b.rotation.y = i % 2 ? 0.7 : -0.7; put(b, -6 + i * 0.92, 5.2, -0.2); }
 [-4.2, -1.4, 1.4, 4.2].forEach((x, i) => { const c = cyl(0.16, 0.22, 0.4, 0x16161a, { metal: 0.6, rough: 0.4 }); c.rotation.x = 0.5; put(c, x, 4.95, -0.2); const col = [0xff4fa8, 0x22d3ee, 0x34f59a, 0xa855f7][i]; put(sph(0.13, col, { emissive: col, emissiveIntensity: 4 }), x, 4.8, -0.12); });
+const _m4 = cur.children.length;
 // sponsor desk + product
 const DESK = { x: -2.5, z: -2 };
 { const gl = (c) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.28, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.08 });
@@ -249,7 +259,7 @@ const chairHost = armchair(0x3554c9); chairHost.position.set(IV.x - 0.95, 0, IV.
 const chairGuest = armchair(0xd98a2b); chairGuest.position.set(IV.x + 0.95, 0, IV.z - 0.15); chairGuest.rotation.y = -0.45; cur.add(chairGuest);
 put(cyl(0.34, 0.34, 0.04, 0xf6efe2), IV.x, 0.62, IV.z + 0.35).castShadow = true; put(cyl(0.04, 0.04, 0.6, 0x222222), IV.x, 0.3, IV.z + 0.35); put(cyl(0.2, 0.22, 0.03, 0x222222), IV.x, 0.02, IV.z + 0.35);
 { const b = ADS.bottle('elva', 0.24); b.position.set(IV.x - 0.12, 0.64, IV.z + 0.33); b.rotation.y = 0.6; cur.add(b); } put(cyl(0.05, 0.04, 0.12, 0xffffff), IV.x + 0.12, 0.7, IV.z + 0.4);
-const guest = makeChar({ skin: 3, hairStyle: 1, hairColor: 0, beard: 1, top: 0, topColor: 2, bottom: 1, bottomColor: 6, shoes: 3 });
+const guest = makeChar(uni({ skin: 3, hairStyle: 1, hairColor: 0, beard: 1 }));
 sit(guest); guest.g.position.set(IV.x + 0.95, -0.14, IV.z - 0.05); guest.g.rotation.y = -0.45; cur.add(guest.g);
 put(sph(0.16, 0xffffff), IV.x + 1.75, 0.16, IV.z + 0.5).castShadow = true; plant(IV.x + 2.0, IV.z - 1.3); plant(DESK.x - 2.4, DESK.z - 1.2);
 // storage corner (camera 3)
@@ -257,7 +267,7 @@ put(box(1.7, 2.3, 0.5, 0x7a5a3a), 6.2, 1.15, -3.6).castShadow = true;
 for (let i = 0; i < 3; i++) put(box(1.6, 0.06, 0.54, 0x5a4028), 6.2, 0.55 + i * 0.7, -3.58);
 put(box(0.5, 0.4, 0.4, 0xd9a05b), 5.8, 0.8, -3.5); put(box(0.4, 0.5, 0.4, 0x4fb3d9), 6.6, 1.55, -3.5); put(box(0.6, 0.3, 0.4, 0xff4d6d), 6.3, 2.15, -3.5);
 put(box(0.9, 0.7, 0.7, 0xc98f4e), 6.5, 0.35, -2.4).castShadow = true; put(box(0.7, 0.5, 0.6, 0xb57f42), 6.5, 0.95, -2.4).castShadow = true;
-const crew = makeChar({ skin: 0, hairStyle: 0, hairColor: 2, top: 0, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, capColor: 1, acc: { cap: true } });
+const crew = makeChar(uni({ skin: 0, hairStyle: 0, hairColor: 2, top: 0, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, capColor: 1, acc: { cap: true } }));
 crew.g.position.set(5.5, 0, -2.9); cur.add(crew.g);
 const SHOTS = [{ p: [DESK.x + 0.25, 1.62, 1.7], l: [DESK.x + 0.3, 1.2, DESK.z] }, { p: [IV.x, 1.5, 1.6], l: [IV.x, 1.05, IV.z] }, { p: [4.6, 1.62, 0.3], l: [6.1, 1.0, -3.2] }];
 const tripods = SHOTS.map((s, i) => { const tp = SFX.broadcastCam(i + 1, SFX.lab(i + 1)); tp.g.position.set(s.p[0], 0, s.p[2] + 0.55); tp.g.rotation.y = Math.atan2(-(s.l[0] - s.p[0]), -(s.l[2] - s.p[2])); cur.add(tp.g); return tp; });
@@ -276,11 +286,13 @@ const sbFaces = [softbox(-5.2, 1.2, 1.0), softbox(0.3, -3.3, 0), softbox(5.6, 1.
   { const b2 = put(SFX.cardboard(0.7, 0.5, 0.55, 'STUDIO'), 6.45, 0.85, -3.55); b2.rotation.y = -0.15; b2.material.map = ADS.boxTex('lslco'); }
   put(SFX.cardboard(0.55, 0.45, 0.5), 6.5, 1.32, -3.5).rotation.y = 0.2;
   { const b4 = put(SFX.cardboard(0.75, 0.55, 0.6, 'GEAR'), 6.5, 0.275, -2.55); b4.rotation.y = -0.1; b4.material.map = ADS.boxTex('lslco'); }
+  const _m5 = cur.children.length;
   const cr = SFX.crate(0x2563eb); cr.position.set(6.45, 0, -1.8); cr.rotation.y = -0.3; cur.add(cr);
   const cr2 = SFX.crate(0xd9d9de); cr2.position.set(6.4, 0.55, -2.55); cr2.scale.setScalar(0.8); cur.add(cr2);
   const ch = SFX.chest(); ch.position.set(6.3, 0, -0.9); ch.rotation.y = -Math.PI / 2; cur.add(ch);
   put(box(1.5, 0.06, 0.4, 0x2a2b32, { rough: 0.4, metal: 0.5 }), 5.1, 3.1, -3.85);
   [[4.6, 0], [5.0, 2], [5.4, 4], [5.75, 6]].forEach(([fx, k]) => { const f = makeChar({ skin: k % 4, hairStyle: k % 3, hairColor: k % 5, top: k % 2, topColor: k % 7, bottom: 0, bottomColor: (k + 3) % 8, shoes: k % 5 }); f.g.scale.setScalar(0.17); f.g.position.set(fx, 3.13, -3.85); cur.add(f.g); });
+  const _m6 = cur.children.length; STAGE_R.push([2, _m0, _m1], [2, _m2, _m3], [3, _m3, _m4], [4, _m5, _m6]);
   SFX.cableTo(cur, [[SHOTS[0].p[0], SHOTS[0].p[2] + 0.55], [-1.5, 2.6], [CON.x - 0.6, CON.z + 0.4]]);
   SFX.cableTo(cur, [[SHOTS[1].p[0], SHOTS[1].p[2] + 0.55], [1.8, 2.8], [CON.x + 0.6, CON.z + 0.4]]);
   SFX.cableTo(cur, [[SHOTS[2].p[0], SHOTS[2].p[2] + 0.55], [3.6, 1.2], [2.2, 2.4], [CON.x + 0.7, CON.z + 0.1]]);
@@ -366,8 +378,10 @@ STAR_SETUP();
 function STAR_SETUP() { starS.set = [0, 1, 2].map((i) => ({ q: 'qs' + i, a: 'as' + i, v: 1 - i })); starT.set = [0, 1, 2].map((i) => ({ q: 'qt' + i, a: 'at' + i, v: 1 - i })); starS.star = starT.star = true; }
 
 /* ---------- player, lights, confetti ---------- */
-let player = makeChar(avatar); scene.add(player.g);
-function rebuildPlayer() { const pos = player.g.position.clone(), ry = player.g.rotation.y; scene.remove(player.g); player = makeChar(avatar); player.g.position.copy(pos); player.g.rotation.y = ry; scene.add(player.g); }
+// the player's own clothes stay plain until the studio reaches level 2
+const look = () => (shop.level < 2 ? uni(avatar) : avatar);
+let player = makeChar(look()); scene.add(player.g);
+function rebuildPlayer() { const pos = player.g.position.clone(), ry = player.g.rotation.y; scene.remove(player.g); player = makeChar(look()); player.g.position.copy(pos); player.g.rotation.y = ry; scene.add(player.g); }
 const amb = new THREE.HemisphereLight(0xdfe6ff, 0x3a3060, 0.9); scene.add(amb);
 const stageA = new THREE.PointLight(0xa463ff, 6, 12, 1.6); stageA.position.set(-5.5, 3.2, -2.5); scene.add(stageA);
 const stageB = new THREE.PointLight(0x3ad4ff, 6, 12, 1.6); stageB.position.set(5.5, 3.2, -2.5); scene.add(stageB);
@@ -417,7 +431,10 @@ const isActive = (k) => (k === 'product' ? !G.product : k === 'camera' ? G.feed 
 const trustNow = () => Math.max(0, Math.min(100, (G.time > 0.5 ? (G.good / G.time) * 100 : 100) + G.bonus));
 function addCoins(n) { G.coins += n; store.set('coins', G.coins); $('coinN').textContent = G.coins; if ($('crCoins')) $('crCoins').textContent = '🪙 ' + G.coins; }
 
+let lastStage = 0;
+function applyStage() { const lv = shop.level, ch = ZG.studio.children; STAGE_R.forEach(([min, a, b]) => { for (let i = a; i < b; i++) ch[i].visible = lv >= min; }); beams.forEach((b) => { b.visible = lv >= 3 && !ruin.visible; }); if (lastStage && lv > lastStage && lv <= 4) rebuildPlayer(); lastStage = lv; }
 function syncScene() {
+  applyStage();
   const Z = ZONES[G.zone], st = G.zone === 'studio', lit = !st || G.light;
   Object.keys(ZG).forEach((k) => { ZG[k].visible = k === G.zone; });
   scene.background = new THREE.Color(st && !G.light ? 0x07050f : Z.bg); scene.fog = new THREE.Fog(scene.background.getHex(), Z.fog[0], Z.fog[1]);
@@ -572,7 +589,7 @@ function showLevel() {
 function toast(msg) { const el = $('crToast'); el.textContent = msg; el.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => { el.hidden = true; }, 2200); }
 function buildCreator() {
   showLevel();
-  const tabs = $('crTabs'); tabs.innerHTML = ''; ['skin', 'hair', 'clothes', 'acc', 'packs'].forEach((k) => { const b = document.createElement('button'); b.textContent = t('t_' + k); if (k === tab) b.className = 'sel'; b.onclick = () => { tab = k; sfx.click(); buildCreator(); }; tabs.appendChild(b); });
+  const tabs = $('crTabs'); tabs.innerHTML = ''; (shop.level < 2 ? ['skin', 'hair'] : ['skin', 'hair', 'clothes', 'acc', 'packs']).forEach((k) => { const b = document.createElement('button'); b.textContent = t('t_' + k); if (k === tab) b.className = 'sel'; b.onclick = () => { tab = k; sfx.click(); buildCreator(); }; tabs.appendChild(b); });
   const body = $('crBody'); body.innerHTML = '';
   const row = (label) => { const h = document.createElement('h4'); h.textContent = label; body.appendChild(h); const d = document.createElement('div'); d.className = 'opts'; body.appendChild(d); return d; };
   const changed = () => { store.set('avatar', avatar); rebuildPlayer(); sfx.click(); buildCreator(); };
@@ -646,11 +663,11 @@ function sheet(x, z, w, h, d) { const m = new THREE.Mesh(new THREE.BoxGeometry(w
 [[DESK.x, DESK.z + 0.9, 3.5, 1.5, 1.6], [CON.x, CON.z + 0.4, 1.8, 1.5, 1.3], [IV.x, IV.z + 0.1, 3.3, 1.15, 1.6]].forEach(([x, z, w, h, d]) => DUST.push({ m: sheet(x, z, w, h, d), x, z: z + d / 2 + 0.3, done: false }));
 let storyOn = false, cleaning = false, SI = -1, afterCreator = false;
 const salehAv = { skin: 2, hairStyle: 1, hairColor: 5, beard: 1, top: 2, topColor: 4, bottom: 0, bottomColor: 3, shoes: 1 };
-const salehSt = makeChar(salehAv); salehSt.g.visible = false; ZG.street.add(salehSt.g);
-const salehIn = makeChar(salehAv); salehIn.g.visible = false; ZG.studio.add(salehIn.g);
+const salehSt = makeChar(uni(salehAv)); salehSt.g.visible = false; ZG.street.add(salehSt.g);
+const salehIn = makeChar(uni(salehAv)); salehIn.g.visible = false; ZG.studio.add(salehIn.g);
 DUST.forEach((d) => interact('studio', d.x, d.z, 1.05, 'a_clean', '🧹', () => cleaning && !d.done, () => cleanOne(d)));
 function ruinGear(on) { tripods.forEach((tp) => { tp.g.visible = !on; }); beams.forEach((b) => { if (b && b.isObject3D) b.visible = !on; }); }
-function cleanOne(d) { d.done = true; d.m.visible = false; sfx.fix(); const left = DUST.filter((x) => !x.done).length; if (left) say('🧹 ' + left, '', true); else { cleaning = false; ruin.visible = false; ruinGear(false); G.light = true; syncScene(); sfx.win(); storyNext(); } }
+function cleanOne(d) { d.done = true; d.m.visible = false; sfx.fix(); const left = DUST.filter((x) => !x.done).length; if (left) say('🧹 ' + left, '', true); else { cleaning = false; ruin.visible = false; ruinGear(false); applyStage(); G.light = true; syncScene(); sfx.win(); storyNext(); } }
 const STORY = [
   { who: 'sn_father', k: 's1a', black: true }, { who: 'sn_father', k: 's1b', black: true }, { k: 's1c', black: true },
   { act: 'street' }, { who: 'sn_saleh', k: 's2a' }, { who: 'sn_me', k: 's2b' },
