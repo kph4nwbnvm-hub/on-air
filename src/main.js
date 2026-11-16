@@ -34,7 +34,8 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.16';
+const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
+const VERSION = '1.4.17';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -501,12 +502,12 @@ function endRound() {
   G.on = false; G.asking = false; $('qSheet').hidden = true; const missed = Math.max(0, (SEG >= 75 ? 3 : SEG >= 45 ? 2 : 1) - G.asked.length); G.bonus -= missed * 6;
   const BN = cs.bonuses();
   const trust = Math.max(0, Math.min(100, (G.good / ROUND) * 100 + G.bonus)) / 100; const pass = trust >= PASS; const coins = Math.round((pass ? 100 + trust * 150 : trust * 60) * (1 + BN.coins / 100));
-  let chMsg = ''; const coinsX = 1 + Math.min(chDone, CH.length - 1) * 0.1;
+  let chMsg = ''; const coinsX = (1 + Math.min(chDone, CH.length - 1) * 0.1) * (1 + skills.deals * 0.04);
   if (pass && chDone < CH.length) { chDone++; store.set('ch', chDone); chMsg = chDone < CH.length ? '🎯 ' + t('ch_next').replace('{n}', chDone + 1) : '🏆 ' + t('ch_done'); }
   addCoins(Math.round(coins * coinsX)); (pass ? sfx.win : sfx.lose)(); buzz(pass ? [60, 40, 120] : 200);
   stats.rounds++; if (pass) stats.wins++; stats.best = Math.max(stats.best, Math.round(trust * 100)); store.set('stats', stats);
   if (trust > 0) { const clips = store.get('interviews', []); clips.push({ q: Math.round(trust * 100), at: Date.now(), clip: true }); store.set('interviews', clips.slice(-30)); }
-  const xp = Math.round(roundXp(trust, pass) * (1 + BN.xp / 100)), up = shop.addXp(xp); showLevel();
+  const xp = Math.round(roundXp(trust, pass) * (1 + BN.xp / 100) * (1 + skills.learn * 0.05)), up = shop.addXp(xp); showLevel();
   let drop = null; if (Math.random() * 100 < 4 + BN.luck) drop = cs.grantRandom(cs.dropLevel(trust)); cs.consumeBoosts();
   $('rXp').textContent = '+' + xp + ' ' + t('xp') + ' · ' + t('lvl') + ' ' + shop.level; $('rUp').hidden = !up && !drop && !chMsg; $('rUp').textContent = [chMsg, up ? '⭐ ' + t('level_up') : '', drop ? '🎁 ' + t('st_drop') + ': ' + drop.fam.icon + ' ' + cs.nameOf(drop) : ''].filter(Boolean).join('  ·  ');
   $('rTitle').textContent = t(pass ? 'r_pass' : 'r_fail'); $('rTitle').className = pass ? 'pass' : 'fail';
@@ -735,7 +736,7 @@ function startInterview(n) {
   if (!store.get('story4_done', false)) dlg([{ who: 'sn_me', k: 's4a' }, { who: t(n.name), raw: true, k: 's4b' }, { k: 's4c' }], openIv); else openIv();
 }
 function openIv() {
-  const cam = Math.max(1, gearLv('cam')); ivZoneW = Math.min(0.6, 0.2 + cam * 0.028); ivSpeed = Math.max(0.8, 1.9 - cam * 0.08); ivStep = 0; ivHits = 0; ivT = Math.random() * 6;
+  const cam = Math.max(1, gearLv('cam')); ivZoneW = Math.min(0.6, 0.2 + cam * 0.028); ivZoneW = Math.min(0.7, ivZoneW + skills.steady * 0.02); ivSpeed = Math.max(0.6, 1.9 - cam * 0.08 - skills.steady * 0.1); ivStep = 0; ivHits = 0; ivT = Math.random() * 6;
   $('ivZone').style.width = (ivZoneW * 100) + '%'; $('ivHint').textContent = t('iv_keep'); $('ivQ').textContent = t('iq1'); ivStat(); $('iv').hidden = false;
 }
 function ivStat() { const mic = Math.max(1, gearLv('mic')); $('ivStat').textContent = t('iv_q') + ': ' + Math.round((ivHits / 3) * 100) + '%  ·  ' + t('iv_noise') + ': ' + Math.max(0, 70 - mic * 5) + '%'; }
@@ -750,8 +751,8 @@ function finishIv() {
   const q = Math.round(Math.min(100, (ivHits / 3) * 70 + (ivHits ? Math.min(30, (gearLv('cam') + mic) * 1.0) : 0)));
   // XP follows performance: nothing for a fully missed shoot, and the story only moves on after a usable first interview (2+ good answers)
   const first = !store.get('story4_done', false), okFirst = first && ivHits >= 2;
-  const xp = ivHits === 0 ? 0 : first ? ivHits * 5 : ivHits + Math.round(q / 25);
-  if (ivHits > 0) { const list = store.get('interviews', []); list.push({ q, at: Date.now(), who: ivNpc.name }); store.set('interviews', list.slice(-30)); }
+  const xp = Math.round((ivHits === 0 ? 0 : first ? ivHits * 5 : ivHits + Math.round(q / 25)) * (1 + skills.learn * 0.05));
+  if (ivHits > 0) { const list = store.get('interviews', []); list.push({ q, at: Date.now(), who: ivNpc.name }); store.set('interviews', list.slice(-30)); stats.ivs = (stats.ivs || 0) + 1; store.set('stats', stats); }
   const up = xp > 0 && shop.addXp(xp); showLevel();
   const end = () => { ivOn = false; G.asking = false; const fail = ivHits === 0 || (first && !okFirst);
     say((fail ? '📉 ' + t('iv_keep') + ' · ' : '') + (ivHits ? t('iv_saved').replace('{q}', q) + ' · ' : '') + '+' + xp + ' ' + t('xp') + (up ? '  ⭐ ' + t('level_up') : ''), fail ? 'warn' : 'ok', true); };
@@ -783,7 +784,7 @@ $('hudStore').onclick = () => { if (!UNLOCK.bStore()) { sfx.bad(); gToast(t('loc
 function pcOpen() { G.asking = true; pcBuild(); $('pc').hidden = false; }
 function pcClose() { $('pc').hidden = true; G.asking = false; }
 function pcBuild() {
-  if (pcS.fixed) return pubBuild();
+  if (pcS.fixed) return pcTab === 'skills' ? skBuild() : pubBuild();
   $('pcTitle').textContent = '🖥️ ' + t('pc_title'); const L = $('pcList'); L.innerHTML = '';
   PC_ALL.forEach((k) => {
     const row = document.createElement('div'); row.className = 'pcrow'; const bad = PC_BAD.includes(k), chk = pcS.checked[k], inst = pcS.installed[k];
@@ -804,7 +805,7 @@ const PLAT = { shoofni: { ic: '📺', fans: 1, coin: 0.25 }, laqta: { ic: '🎬'
 const fans = store.get('fans', { shoofni: 0, laqta: 0, sada: 0 });
 const platName = (k) => ADS.WORLD[k][lang === 'ar' ? 'ar' : 'en'];
 function pubBuild() {
-  $('pcTitle').textContent = '🖥️ ' + t('pub_title'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = '';
+  $('pcTitle').textContent = '🖥️ ' + t('pub_title'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = ''; pcTabs(L);
   const head = document.createElement('div'); head.className = 'pubhead';
   Object.keys(PLAT).forEach((k) => { const c = document.createElement('div'); c.innerHTML = '<i>' + PLAT[k].ic + '</i><b></b><span></span>'; c.querySelector('b').textContent = platName(k); c.querySelector('span').textContent = '👥 ' + fans[k] + ' ' + t('pub_fans'); head.appendChild(c); });
   L.appendChild(head);
@@ -815,13 +816,30 @@ function pubBuild() {
   const list = store.get('interviews', []);
   if (!list.length) { const e = document.createElement('p'); e.className = 'pubempty'; e.textContent = '🎤 ' + t('pub_empty'); L.appendChild(e); return; }
   list.slice().reverse().forEach((iv) => {
-    const row = document.createElement('div'); row.className = 'pcrow'; const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = (iv.clip ? '🎥 ' + t('pub_clip') : '🎤 ' + (iv.who || '')) + ' · ' + t('pub_q') + ' ' + Math.round(iv.q) + '%'; row.appendChild(nm);
+    const row = document.createElement('div'); row.className = 'pcrow'; const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = (iv.clip ? '🎥 ' + t('pub_clip') : '🎤 ' + (iv.who ? t(iv.who) || iv.who : '')) + ' · ' + t('pub_q') + ' ' + Math.round(iv.q) + '%'; row.appendChild(nm);
     Object.keys(PLAT).forEach((k) => { const b = document.createElement('button'); const done = iv.pub && iv.pub[k]; b.className = done ? 'ghost' : 'big'; b.textContent = done ? '✅' : PLAT[k].ic; b.disabled = !!done;
-      b.onclick = () => { const f = Math.max(1, Math.round((iv.q / 10) * PLAT[k].fans)), c = Math.max(1, Math.round(iv.q * PLAT[k].coin)); iv.pub = { ...(iv.pub || {}), [k]: true }; store.set('interviews', list);
+      b.onclick = () => { const f = Math.max(1, Math.round((iv.q / 10) * PLAT[k].fans * (1 + skills.charm * 0.1))), c = Math.max(1, Math.round(iv.q * PLAT[k].coin * (1 + skills.deals * 0.04))); iv.pub = { ...(iv.pub || {}), [k]: true }; store.set('interviews', list);
         fans[k] += f; store.set('fans', fans); addCoins(c); const up = shop.addXp(2); showLevel(); sfx.good(); gToast(PLAT[k].ic + ' ' + platName(k) + ' · 👥 +' + f + ' · 🪙 +' + c); if (up) say('⭐ ' + t('level_up'), 'ok', true); pubBuild(); };
       row.appendChild(b); });
     L.appendChild(row);
   });
+}
+// tabs on the working computer: publishing | skill tree
+let pcTab = 'pub';
+function pcTabs(L) { const w = document.createElement('div'); w.className = 'pctabs'; [['pub', '📡 ' + t('pub_title')], ['skills', '🌳 ' + t('sk_title')]].forEach(([k, txt]) => { const b = document.createElement('button'); b.className = pcTab === k ? 'big' : 'ghost'; b.textContent = txt; b.onclick = () => { sfx.click(); pcTab = k; pcBuild(); }; w.appendChild(b); }); L.appendChild(w); }
+// skill tree: 5 stages per skill, stage n costs n points; points come from levels, filmed interviews and challenge wins
+const SKILLS = { steady: ['🎥', (n) => '🎯 +' + n * 8 + '%'], charm: ['✨', (n) => '👥 +' + n * 10 + '%'], deals: ['🤝', (n) => '🪙 +' + n * 4 + '%'], learn: ['📚', (n) => '⭐ +' + n * 5 + '%'] };
+const skEarned = () => (shop.level - 1) * 2 + (stats.wins || 0) + (stats.ivs || 0);
+const skSpent = () => Object.keys(SKILLS).reduce((a, k) => a + (skills[k] * (skills[k] + 1)) / 2, 0);
+function skBuild() {
+  $('pcTitle').textContent = '🖥️ ' + t('sk_title'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = ''; pcTabs(L); const free = skEarned() - skSpent();
+  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🔹 ' + t('sk_pts') + ': ' + free; L.appendChild(p);
+  Object.keys(SKILLS).forEach((k) => { const lv = skills[k], row = document.createElement('div'); row.className = 'pcrow';
+    row.innerHTML = '<span class="ic"></span><span class="nm"><b></b><small></small></span>'; row.children[0].textContent = SKILLS[k][0]; row.querySelector('b').textContent = t('sk_' + k); row.querySelector('small').textContent = '●'.repeat(lv) + '○'.repeat(5 - lv) + '  ' + SKILLS[k][1](lv);
+    const b = document.createElement('button'); if (lv >= 5) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { const cost = lv + 1; b.className = free >= cost ? 'big' : 'ghost'; b.disabled = free < cost; b.textContent = '⬆ 🔹' + cost;
+      b.onclick = () => { skills[k]++; store.set('skills', skills); sfx.win(); gToast(SKILLS[k][0] + ' ' + t('sk_' + k) + ' ' + SKILLS[k][1](skills[k])); skBuild(); }; }
+    row.appendChild(b); L.appendChild(row); });
+  const h = document.createElement('p'); h.className = 'pubempty'; h.textContent = 'ℹ️ ' + t('sk_hint'); L.appendChild(h);
 }
 // once everything is diagnosed, Uncle Saleh hands over exactly the price of the broken parts (level 1 each)
 function pcAfterCheck() {
