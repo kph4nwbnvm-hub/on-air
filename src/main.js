@@ -34,8 +34,9 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
+let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.4.17';
+const VERSION = '1.4.18';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -502,7 +503,7 @@ function endRound() {
   G.on = false; G.asking = false; $('qSheet').hidden = true; const missed = Math.max(0, (SEG >= 75 ? 3 : SEG >= 45 ? 2 : 1) - G.asked.length); G.bonus -= missed * 6;
   const BN = cs.bonuses();
   const trust = Math.max(0, Math.min(100, (G.good / ROUND) * 100 + G.bonus)) / 100; const pass = trust >= PASS; const coins = Math.round((pass ? 100 + trust * 150 : trust * 60) * (1 + BN.coins / 100));
-  let chMsg = ''; const coinsX = (1 + Math.min(chDone, CH.length - 1) * 0.1) * (1 + skills.deals * 0.04);
+  let chMsg = ''; const coinsX = (1 + Math.min(chDone, CH.length - 1) * 0.1) * (1 + skills.deals * 0.04) * (1 + (licence ? LIC[licence].ads : 0) / 100);
   if (pass && chDone < CH.length) { chDone++; store.set('ch', chDone); chMsg = chDone < CH.length ? '🎯 ' + t('ch_next').replace('{n}', chDone + 1) : '🏆 ' + t('ch_done'); }
   addCoins(Math.round(coins * coinsX)); (pass ? sfx.win : sfx.lose)(); buzz(pass ? [60, 40, 120] : 200);
   stats.rounds++; if (pass) stats.wins++; stats.best = Math.max(stats.best, Math.round(trust * 100)); store.set('stats', stats);
@@ -784,7 +785,7 @@ $('hudStore').onclick = () => { if (!UNLOCK.bStore()) { sfx.bad(); gToast(t('loc
 function pcOpen() { G.asking = true; pcBuild(); $('pc').hidden = false; }
 function pcClose() { $('pc').hidden = true; G.asking = false; }
 function pcBuild() {
-  if (pcS.fixed) return pcTab === 'skills' ? skBuild() : pubBuild();
+  if (pcS.fixed) return pcTab === 'skills' ? skBuild() : pcTab === 'lab' ? labBuild() : pubBuild();
   $('pcTitle').textContent = '🖥️ ' + t('pc_title'); const L = $('pcList'); L.innerHTML = '';
   PC_ALL.forEach((k) => {
     const row = document.createElement('div'); row.className = 'pcrow'; const bad = PC_BAD.includes(k), chk = pcS.checked[k], inst = pcS.installed[k];
@@ -826,7 +827,7 @@ function pubBuild() {
 }
 // tabs on the working computer: publishing | skill tree
 let pcTab = 'pub';
-function pcTabs(L) { const w = document.createElement('div'); w.className = 'pctabs'; [['pub', '📡 ' + t('pub_title')], ['skills', '🌳 ' + t('sk_title')]].forEach(([k, txt]) => { const b = document.createElement('button'); b.className = pcTab === k ? 'big' : 'ghost'; b.textContent = txt; b.onclick = () => { sfx.click(); pcTab = k; pcBuild(); }; w.appendChild(b); }); L.appendChild(w); }
+function pcTabs(L) { const w = document.createElement('div'); w.className = 'pctabs'; [['pub', '📡'], ['skills', '🌳'], ['lab', '🪪']].forEach(([k, txt]) => { const b = document.createElement('button'); b.className = pcTab === k ? 'big' : 'ghost'; b.textContent = txt; b.onclick = () => { sfx.click(); pcTab = k; pcBuild(); }; w.appendChild(b); }); L.appendChild(w); }
 // skill tree: 5 stages per skill, stage n costs n points; points come from levels, filmed interviews and challenge wins
 const SKILLS = { steady: ['🎥', (n) => '🎯 +' + n * 8 + '%'], charm: ['✨', (n) => '👥 +' + n * 10 + '%'], deals: ['🤝', (n) => '🪙 +' + n * 4 + '%'], learn: ['📚', (n) => '⭐ +' + n * 5 + '%'] };
 const skEarned = () => (shop.level - 1) * 2 + (stats.wins || 0) + (stats.ivs || 0);
@@ -840,6 +841,16 @@ function skBuild() {
       b.onclick = () => { skills[k]++; store.set('skills', skills); sfx.win(); gToast(SKILLS[k][0] + ' ' + t('sk_' + k) + ' ' + SKILLS[k][1](skills[k])); skBuild(); }; }
     row.appendChild(b); L.appendChild(row); });
   const h = document.createElement('p'); h.className = 'pubempty'; h.textContent = 'ℹ️ ' + t('sk_hint'); L.appendChild(h);
+}
+// StudioLab: three licence tiers, bought in order; each needs followers and coins and raises ad income from broadcasts
+function labBuild() {
+  $('pcTitle').textContent = '🪪 StudioLab'; $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = ''; pcTabs(L); const tot = fans.shoofni + fans.laqta + fans.sada;
+  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '👥 ' + tot + ' ' + t('pub_fans') + '  ·  🪙 ' + G.coins; L.appendChild(p);
+  [1, 2, 3].forEach((n) => { const c = LIC[n], row = document.createElement('div'); row.className = 'pcrow';
+    row.innerHTML = '<span class="ic">🪪</span><span class="nm"><b></b><small></small></span>'; row.querySelector('b').textContent = t('lab_lic') + ' ' + n + ' · 📢 🪙 +' + c.ads + '%'; row.querySelector('small').textContent = t('lab_d' + n);
+    const b = document.createElement('button'); if (licence >= n) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { const ok = licence === n - 1 && tot >= c.fans && G.coins >= c.coins; b.className = ok ? 'big' : 'ghost'; b.disabled = !ok; b.textContent = (licence < n - 1 ? '🔒 ' : '') + '👥 ' + c.fans + ' · 🪙 ' + c.coins;
+      b.onclick = () => { addCoins(-c.coins); licence = n; store.set('licence', n); sfx.win(); gToast('🪪 ' + t('lab_lic') + ' ' + n + ' ✅'); labBuild(); }; }
+    row.appendChild(b); L.appendChild(row); });
 }
 // once everything is diagnosed, Uncle Saleh hands over exactly the price of the broken parts (level 1 each)
 function pcAfterCheck() {
