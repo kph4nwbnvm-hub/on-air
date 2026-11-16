@@ -4,10 +4,10 @@ import IMG from './brandimg.js';
 
 // Naif's companies (logos cropped from his posters until clean files arrive; LSLCO has no logo yet -> wordmark)
 export const SPONSORS = {
-  cc: { name: 'Creative Codes', ar: 'أكواد الإبداع', tag: 'شريكك التقني لنمو أعمالك', sub: 'creative-codes.sa', bg: '#fbf7f1', ink: '#1d1d1f', accent: '#f08a1c', logo: 'cc' },
-  ccmedia: { name: 'CC Media Solutions', ar: 'سي سي ميديا', tag: 'وصول أوسع لرسالتك', sub: 'حلول إعلامية متكاملة', bg: '#fbf1f1', ink: '#2a2226', accent: '#c46b78', logo: 'ccmedia' },
-  elva: { name: 'ELVA water', ar: 'مياه إلفا', tag: 'هادئة، صافية، استثنائية', sub: 'elva.sa', bg: '#f6f2fb', ink: '#3b2770', accent: '#5b3aa6', logo: 'elva' },
-  lslco: { name: 'LSLCO', ar: 'LSLCO للخدمات اللوجستية', tag: 'شحن ونقل وتخزين', sub: '', bg: '#eef3f8', ink: '#0f2a44', accent: '#1f6fb2', logo: null },
+  cc: { name: 'Creative Codes', ar: 'أكواد الإبداع', tag: 'ad_cc', sub: '=creative-codes.sa', bg: '#fbf7f1', ink: '#1d1d1f', accent: '#f08a1c', logo: 'cc' },
+  ccmedia: { name: 'CC Media Solutions', ar: 'سي سي ميديا', tag: 'ad_ccm', sub: 'ad_ccm2', bg: '#fbf1f1', ink: '#2a2226', accent: '#c46b78', logo: 'ccmedia' },
+  elva: { name: 'ELVA water', ar: 'مياه إلفا', tag: 'ad_elva', sub: '=elva.sa', bg: '#f6f2fb', ink: '#3b2770', accent: '#5b3aa6', logo: 'elva' },
+  lslco: { name: 'LSLCO', ar: 'LSLCO للخدمات اللوجستية', tag: 'ad_lslco', sub: '=', bg: '#eef3f8', ink: '#0f2a44', accent: '#1f6fb2', logo: null },
 };
 
 // Every place an ad can live in the game (used by the ad study and the booking system later)
@@ -33,6 +33,12 @@ export const WORLD = {
 const AR_FONT = "'Tajawal','Noto Kufi Arabic','Noto Sans Arabic','Segoe UI',system-ui,sans-serif";
 const cnv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
 const rr = (x, X, Y, W, H, R) => { x.beginPath(); x.roundRect(X, Y, W, H, R); };
+let T = (k) => k; const REDRAW = [];
+// keys starting with '=' are literal (web addresses)
+const tx = (k) => (k.startsWith('=') ? k.slice(1) : T(k));
+export function setTr(fn) { T = fn; REDRAW.forEach((f) => f()); }
+// shrink a font until the text fits maxW
+function fit(x, txt, weight, size, maxW) { let s = size; do { x.font = `${weight} ${s}px ${AR_FONT}`; s -= 2; } while (s > 10 && x.measureText(txt).width > maxW); }
 const imgs = {}; const TEXC = {}; const cached = (k, f) => TEXC[k] || (TEXC[k] = f());
 const MOB = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.userAgent);
 function img(key) { if (!imgs[key]) { const i = new Image(); i.src = IMG[key]; imgs[key] = i; } return imgs[key]; }
@@ -40,7 +46,7 @@ function mk(c) { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGB
 // draw into a canvas texture; redraw once the logo image has decoded
 function live(w, h, draw, key) {
   const [c, x] = cnv(w, h); const t = mk(c); const go = () => { x.clearRect(0, 0, w, h); draw(x, w, h); t.needsUpdate = true; };
-  go(); if (key) { const i = img(key); if (!i.complete) i.addEventListener('load', go, { once: true }); }
+  go(); REDRAW.push(go); if (key) { const i = img(key); if (!i.complete) i.addEventListener('load', go, { once: true }); }
   return t;
 }
 function logo(x, key, cx, cy, maxW, maxH) {
@@ -57,9 +63,9 @@ function _adCardTex(id) {
     const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, s.bg); g.addColorStop(1, '#ffffff'); x.fillStyle = g; x.fillRect(0, 0, W, H);
     x.fillStyle = s.accent; x.globalAlpha = 0.12; x.beginPath(); x.arc(W * 0.85, H * 0.2, 340, 0, 7); x.fill(); x.beginPath(); x.arc(W * 0.1, H * 0.95, 260, 0, 7); x.fill(); x.globalAlpha = 1;
     if (s.logo) logo(x, s.logo, W / 2, H * 0.38, W * 0.5, H * 0.42); else wordmark(x, s, W / 2, H * 0.38, 150);
-    x.direction = 'rtl'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.fillStyle = s.ink; x.font = `800 64px ${AR_FONT}`; x.fillText(s.tag, W / 2, H * 0.72);
-    x.fillStyle = s.accent; x.font = `600 36px ${AR_FONT}`; x.fillText(s.sub, W / 2, H * 0.84);
+    x.direction = 'inherit'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillStyle = s.ink; fit(x, tx(s.tag), 800, 64, W * 0.9); x.fillText(tx(s.tag), W / 2, H * 0.72);
+    x.fillStyle = s.accent; fit(x, tx(s.sub), 600, 36, W * 0.9); x.fillText(tx(s.sub), W / 2, H * 0.84);
     x.fillStyle = s.accent; x.fillRect(W / 2 - 60, H * 0.62, 120, 6); x.restore();
   }, s.logo);
 }
@@ -70,7 +76,7 @@ function _plaqueTex(id) {
   return live(512, 384, (x, W, H) => {
     x.fillStyle = 'rgba(0,0,0,.35)'; rr(x, 10, 14, W - 16, H - 18, 34); x.fill();
     x.fillStyle = s.bg; rr(x, 4, 4, W - 16, H - 18, 34); x.fill();
-    x.direction = 'rtl'; x.textAlign = 'center'; x.fillStyle = s.ink; x.font = `700 40px ${AR_FONT}`; x.fillText('برعاية', W / 2 - 6, 62);
+    x.textAlign = 'center'; x.fillStyle = s.ink; fit(x, T('ad_by'), 700, 40, W * 0.8); x.fillText(T('ad_by'), W / 2 - 6, 62);
     if (s.logo) logo(x, s.logo, W / 2 - 6, H / 2 + 34, W * 0.72, H * 0.55); else wordmark(x, s, W / 2 - 6, H / 2 + 30, 70);
   }, s.logo);
 }
@@ -93,7 +99,7 @@ function _boxTex(id) {
     for (let i = 0; i < 700; i++) { x.fillStyle = `rgba(${90 + Math.random() * 60},${60 + Math.random() * 40},20,${0.05 + Math.random() * 0.08})`; x.fillRect(Math.random() * W, Math.random() * H, 2 + Math.random() * 6, 1); }
     x.fillStyle = 'rgba(210,190,150,.85)'; x.fillRect(0, 112, W, 30);
     x.fillStyle = '#f7f7f2'; x.fillRect(38, 150, 180, 92); x.fillStyle = s.accent; x.fillRect(38, 150, 180, 26);
-    x.fillStyle = '#fff'; x.font = `800 17px ${AR_FONT}`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('SHIPPED BY', 128, 164);
+    x.fillStyle = '#fff'; x.textAlign = 'center'; x.textBaseline = 'middle'; fit(x, T('ad_ship'), 800, 17, 170); x.fillText(T('ad_ship'), 128, 164);
     x.fillStyle = s.ink; x.font = `900 44px ${AR_FONT}`; x.fillText(s.name, 128, 212);
     x.fillStyle = s.ink; x.font = `900 34px ${AR_FONT}`; x.fillText(s.name, 128, 60);
   }, s.logo);

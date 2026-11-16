@@ -15,13 +15,24 @@ import { preview as dailyPreview, claim as dailyClaim, rewardFor, isBig, CYCLE }
 
 /* ---------- storage, i18n, sound ---------- */
 const store = { get(k, d) { try { const v = localStorage.getItem('onair_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem('onair_' + k, JSON.stringify(v)); } catch (e) {} } };
-let lang = store.get('lang', 'ar');
+// first visit: take the language the player's phone / Pi app is set to; a manual pick in settings wins afterwards
+function detectLang() {
+  const codes = LANGS.map((l) => l.code); const list = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']);
+  for (const raw of list) {
+    const tag = String(raw || '').toLowerCase(); const base = tag.split(/[-_]/)[0];
+    if (base === 'zh') return /hant|tw|hk|mo/.test(tag) ? 'zh-Hant' : 'zh-Hans';
+    const alias = { tl: 'fil', nb: 'no', nn: 'no', iw: 'he', in: 'id', ckb: 'ku', kmr: 'ku' }[base] || base;
+    if (codes.includes(alias)) return alias;
+  }
+  return 'en';
+}
+let lang = store.get('lang', null) || detectLang();
 let soundOn = store.get('sound', true);
 const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.3.6';
+const VERSION = '1.3.7';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -40,7 +51,7 @@ function applyLang() {
   const L = LANGS.find((l) => l.code === lang) || LANGS[0];
   document.documentElement.lang = L.code; document.documentElement.dir = L.rtl ? 'rtl' : 'ltr';
   document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
-  if (typeof syncSignText === 'function') try { syncSignText(); } catch (_) {}
+  try { syncSignText(); syncLogoSign(); ADS.setTr(t); } catch (_) {}
   $('langBtn').textContent = '🌐 ' + L.name; $('bProfile').textContent = '👤 ' + t('profile'); $('bSettings').textContent = '⚙️ ' + t('settings'); $('bStore').textContent = '🛍️ ' + t('st_store');
   if (!$('settings').hidden) buildSettings(); if (!$('profile').hidden) buildProfile(); if (!$('storeS').hidden) cs.render(); if (!$('storeS').hidden) cs.render();
 }
@@ -124,6 +135,9 @@ function slab(w, h, d, r, c, o) {
   const g = new THREE.ExtrudeGeometry(s, { depth: h, bevelEnabled: true, bevelSize: 0.02, bevelThickness: 0.02, bevelSegments: 2 });
   g.rotateX(-Math.PI / 2); g.translate(0, -h, 0); return new THREE.Mesh(g, M(c, o));
 }
+const UI_FONT = "'Tajawal','Noto Kufi Arabic','Noto Sans Arabic',system-ui,sans-serif";
+const _mx = document.createElement('canvas').getContext('2d');
+function fitFont(txt, weight, size, maxW) { let s = size; do { _mx.font = `${weight} ${s}px ${UI_FONT}`; s -= 2; } while (s > 12 && _mx.measureText(txt).width > maxW); return _mx.font; }
 function textTex(txt, bg, fg, w = 512, h = 160, font = 'bold 104px system-ui, sans-serif') {
   const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const x = cv.getContext('2d');
   x.fillStyle = bg; x.fillRect(0, 0, w, h); x.fillStyle = fg; x.font = font; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(txt, w / 2, h / 2 + 6);
@@ -192,9 +206,9 @@ for (let i = 0; i < 4; i++) put(box(1.15, 3, 0.08, i % 2 ? 0x5a3fc0 : 0x6c4fe0, 
 put(box(15, 0.07, 0.07, 0xffcf3f, { emissive: 0xffcf3f }), 0, 0.35, -4.0); put(box(15, 0.06, 0.06, 0x7fe9ff, { emissive: 0x4cc9f0, emissiveIntensity: 2 }), 0, 4.6, -4.0); put(box(0.06, 0.06, 14, 0x7fe9ff, { emissive: 0x4cc9f0, emissiveIntensity: 2 }), -7.1, 4.6, 2.6);
 const sign = put(signPlane('ON AIR', '#ff2a40', '#ffffff', 2.2, 0.7), 0, 4.0, -3.9);
 // real studio on-air lamp: off while roaming, lit while broadcasting, blinking while a prank is live
-const signLabel = () => (lang === 'ar' ? 'على الهوا' : 'ON AIR');
+const signLabel = () => (lang === 'ar' ? 'على الهوا' : t('live'));
 let signTxt = '';
-function syncSignText() { const l = signLabel(); if (l === signTxt) return; signTxt = l; const old = sign.material.map; sign.material.map = textTex(l, '#ff2a40', '#ffffff', 512, 160, l === 'ON AIR' ? undefined : "900 96px 'Tajawal','Noto Kufi Arabic','Noto Sans Arabic',system-ui"); sign.material.needsUpdate = true; if (old) old.dispose(); }
+function syncSignText() { const l = signLabel(); if (l === signTxt) return; signTxt = l; const old = sign.material.map; sign.material.map = textTex(l, '#ff2a40', '#ffffff', 512, 160, fitFont(l, 900, 96, 470)); sign.material.needsUpdate = true; if (old) old.dispose(); }
 const SIGN_OFF = new THREE.Color(0x2a2328), SIGN_ON = new THREE.Color(0xffffff), SIGN_DIM = new THREE.Color(0x8a6a72);
 function updateSign(tt) {
   const live = G.on && G.zone === 'studio'; const prank = live && ['product', 'camera', 'light', 'confetti'].some(isActive);
@@ -293,13 +307,15 @@ function logoSignTex() {
   [44, 82, 120].forEach((r) => { x.beginPath(); x.arc(cx, cy, r, -Math.PI * 0.78, -Math.PI * 0.22); x.stroke(); });
   x.fillStyle = '#ff2a40'; x.beginPath(); x.arc(cx, cy, 22, 0, 7); x.fill();
   x.fillStyle = '#ff2a40'; x.beginPath(); x.roundRect(310, 52, 670, 140, 30); x.fill();
-  x.fillStyle = '#ffffff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.direction = 'rtl';
-  x.font = "900 104px 'Tajawal','Noto Kufi Arabic','Noto Sans Arabic',system-ui"; x.fillText('على الهوا', 645, 126);
-  x.direction = 'ltr'; x.fillStyle = '#ffcf3f'; x.font = '800 52px system-ui, sans-serif'; x.fillText('ON AIR STUDIO', 645, 245);
-  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+  const big = lang === 'ar' ? 'على الهوا' : t('title'), small = lang === 'ar' ? 'ON AIR STUDIO' : t('tagline');
+  x.fillStyle = '#ffffff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = fitFont(big, 900, 104, 620); x.fillText(big, 645, 126);
+  x.fillStyle = '#ffcf3f'; x.font = fitFont(small, 800, 52, 680); x.fillText(small, 645, 245);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; return tex;
 }
 put(box(3.9, 1.25, 0.14, 0x15102e), SX, 3.35, -8.16);
-put(new THREE.Mesh(new THREE.PlaneGeometry(3.8, 1.11), new THREE.MeshBasicMaterial({ map: logoSignTex(), transparent: true, toneMapped: false })), SX, 3.35, -8.08);
+const logoSign = put(new THREE.Mesh(new THREE.PlaneGeometry(3.8, 1.11), new THREE.MeshBasicMaterial({ map: logoSignTex(), transparent: true, toneMapped: false })), SX, 3.35, -8.08);
+let logoLang = lang;
+function syncLogoSign() { if (logoLang === lang) return; logoLang = lang; const o = logoSign.material.map; logoSign.material.map = logoSignTex(); logoSign.material.needsUpdate = true; o.dispose(); }
 put(box(4, 0.12, 1.4, 0xd9342b), SX - 10.5, 2.7, -7.6); put(signPlane('SHAWARMA', '#ffffff', '#d9342b', 3.4, 0.7, 640, 130, 'bold 90px system-ui'), SX - 10.5, 3.3, -8.15);
 [-12, -4, 4, 12].forEach((dx) => tree(SX + dx, 7.4));
 [-7, 0, 7].forEach((dx) => { put(cyl(0.07, 0.09, 3.6, 0x30303a), SX + dx, 1.8, -3.5).castShadow = true; put(box(0.9, 0.08, 0.14, 0x30303a), SX + dx + 0.4, 3.6, -3.5); put(sph(0.16, 0xfff3b0, { emissive: 0xfff3b0 }), SX + dx + 0.8, 3.5, -3.5); });
