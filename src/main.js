@@ -13,6 +13,7 @@ import { tokenPrice } from './pricing.js';
 import * as SFX from './studiofx.js';
 import * as ADS from './ads.js';
 import * as ROOM from './room.js';
+import { CATS } from './catalog.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { preview as dailyPreview, claim as dailyClaim, rewardFor, isBig, CYCLE } from './daily.js';
 
@@ -37,7 +38,7 @@ const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), qu
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.5.1';
+const VERSION = '1.5.2';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -203,6 +204,7 @@ const STAGE_R = [];
 const UNI = { top: 0, topColor: 11, bottom: 0, bottomColor: 7, shoes: 1, acc: {} };
 const design = store.get('design', { on: false, top: 11, bot: 7 }); if (design.on) { UNI.topColor = design.top; UNI.bottomColor = design.bot; }
 const fit = { lv: store.get('fit', 0) };
+const upg = { room: 0, pc: 0, desk: 0, ...store.get('upg', {}) }; const applySlots = () => CATS.forEach((c) => { if (c.id === 'furniture' || c.id === 'decor') c.slots = 3 + upg.room; }); applySlots();
 const uni = (av) => ({ ...av, ...UNI, acc: {} });
 /* ================= STUDIO ================= */
 cur = ZG.studio;
@@ -576,7 +578,7 @@ function startRound() {
   confetti.forEach((c) => { c.m.visible = false; }); $('qSheet').hidden = true; show('hud'); syncScene(); resize(); snapCam = true; sfx.seg();
   const c = chNow(); PASS = c.pass; ROUND = c.t; SEG = ROUND / 2; G.next = ROUND <= 90 ? 5 : 9; const prev = chDone > 0 && chDone < CH.length ? CH[chDone - 1].k : null; const allK = ['product', 'camera', 'light', 'confetti'], kNow = c.k || allK, kPrev = chDone > 0 ? CH[chDone - 1].k || allK : []; const fresh = chDone < CH.length ? kNow.filter((k) => !kPrev.includes(k)) : [];
   say((chDone < CH.length ? '🎯 ' + t('ch_title').replace('{n}', chDone + 1) + ' · ' : '') + t('ch_goal').replace('{p}', Math.round(PASS * 100)) + (fresh.length ? ' · ' + t('ch_new') + ': ' + fresh.map((k) => t('p_' + k)).join(' + ') : ''), '', true);
-  G.bonus += cs.bonuses().trust;
+  G.bonus += cs.bonuses().trust + upg.desk * 3;
 }
 function endRound() {
   G.on = false; G.asking = false; $('qSheet').hidden = true; const missed = Math.max(0, (SEG >= 75 ? 3 : SEG >= 45 ? 2 : 1) - G.asked.length); G.bonus -= missed * 6;
@@ -862,7 +864,7 @@ function finishIv() {
 
 // ───────── father's broken office PC: the player diagnoses it, buys the parts in the store and installs them ─────────
 const PCX = -5.7, PCZ = 3.6;
-const pcScreenM = new THREE.MeshBasicMaterial({ color: 0x0a0a10, toneMapped: false });
+const pcScreenM = new THREE.MeshBasicMaterial({ color: 0x0a0a10, toneMapped: false }); const pcUp = {};
 { const g = new THREE.Group(); g.position.set(PCX, 0, PCZ); g.rotation.y = Math.PI / 2; ZG.studio.add(g);
   const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 0.8 }), grey = new THREE.MeshStandardMaterial({ color: 0xcfc9b8, roughness: 0.7 }), dark = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.6 });
   const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; g.add(o); return o; };
@@ -870,14 +872,18 @@ const pcScreenM = new THREE.MeshBasicMaterial({ color: 0x0a0a10, toneMapped: fal
   add(new THREE.BoxGeometry(0.62, 0.46, 0.4), grey, -0.1, 1.1, -0.1); add(new THREE.BoxGeometry(0.3, 0.08, 0.28), grey, -0.1, 0.84, -0.1);
   const scr = add(new THREE.PlaneGeometry(0.5, 0.36), pcScreenM, -0.1, 1.11, 0.105); scr.castShadow = false;
   add(new THREE.BoxGeometry(0.22, 0.5, 0.5), grey, 0.5, 1.06, -0.05); add(new THREE.BoxGeometry(0.5, 0.03, 0.18), dark, -0.12, 0.83, 0.24);
+  pcUp.mon = add(new THREE.BoxGeometry(0.5, 0.34, 0.04), dark, -0.62, 1.1, 0.0); pcUp.scr = add(new THREE.PlaneGeometry(0.44, 0.28), new THREE.MeshBasicMaterial({ color: 0x2f7bff, toneMapped: false }), -0.62, 1.1, 0.025); pcUp.rgb = add(new THREE.BoxGeometry(1.5, 0.03, 0.03), new THREE.MeshBasicMaterial({ color: 0xff4fa8, toneMapped: false }), 0, 0.83, 0.36);
+  [pcUp.mon, pcUp.scr, pcUp.rgb].forEach((o) => { o.castShadow = false; });
   COLL.studio.push([PCX, PCZ, 0.75]); }
+const deskTrim = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.05, 0.06), new THREE.MeshBasicMaterial({ color: 0xd4af37, toneMapped: false })); deskTrim.position.set(DESK.x, 1.02, DESK.z + 0.62); ZG.studio.add(deskTrim);
+function applyUpg() { pcUp.mon.visible = pcUp.scr.visible = upg.pc >= 1 && pcS.fixed; pcUp.rgb.visible = upg.pc >= 2 && pcS.fixed; deskTrim.visible = upg.desk >= 1 && !ruin.visible; deskTrim.material.color.set(upg.desk >= 2 ? 0x7fe9ff : 0xd4af37); }
 const PC_ALL = ['psu', 'board', 'ram', 'disk', 'fan'], PC_BAD = ['psu', 'ram', 'fan'], PC_ICON = { psu: '🔌', board: '🟩', ram: '🧠', disk: '💽', fan: '🌀' };
 const pcS = store.get('pc', { seen: false, checked: {}, installed: {}, gift: false, fixed: false });
 const pcSave = () => store.set('pc', pcS);
 // straight from the store to the PC once every needed part is bought
 function pcFromStore() { cs.closeSheet(); storeFrom = 'menu'; storePause = false; if (G.on) return; if (G.zone !== 'studio') enterZone('studio', PCX + 1.15, PCZ, -Math.PI / 2); else { G.px = PCX + 1.15; G.pz = PCZ; G.face = -Math.PI / 2; } show('hud'); resize(); syncScene(); snapCam = true; pcOpen(); }
 cs.setNeeds(() => (pcS.gift && !pcS.fixed ? PC_BAD.filter((k) => !pcS.installed[k]) : []), () => { sfx.click(); pcFromStore(); });
-const pcLit = () => { pcScreenM.color.set(pcS.fixed ? 0x2f7bff : 0x0a0a10); };
+const pcLit = () => { pcScreenM.color.set(pcS.fixed ? 0x2f7bff : 0x0a0a10); try { applyUpg(); } catch (_) {} };
 pcLit();
 let storeFrom = 'menu', storePause = false;
 // store button inside play: opens the store any time; a running broadcast is paused while shopping
@@ -886,8 +892,9 @@ function pcOpen() { G.asking = true; pcBuild(); $('pc').hidden = false; }
 function pcClose() { $('pc').hidden = true; G.asking = false; panelMode = null; }
 let panelMode = null; function openPanel(k) { sfx.click(); panelMode = k; pcOpen(); }
 function pcBuild() {
+  if (panelMode === 'edit' && ed) return edBuild();
   if (panelMode === 'gym') return gymBuild(); if (panelMode === 'designer') return designBuild();
-  if (pcS.fixed) return pcTab === 'skills' ? skBuild() : pcTab === 'lab' ? labBuild() : pubBuild();
+  if (pcS.fixed) return pcTab === 'skills' ? skBuild() : pcTab === 'lab' ? labBuild() : pcTab === 'up' ? upBuild() : pubBuild();
   $('pcTitle').textContent = '🖥️ ' + t('pc_title'); const L = $('pcList'); L.innerHTML = '';
   PC_ALL.forEach((k) => {
     const row = document.createElement('div'); row.className = 'pcrow'; const bad = PC_BAD.includes(k), chk = pcS.checked[k], inst = pcS.installed[k];
@@ -920,8 +927,9 @@ function pubBuild() {
   if (!list.length) { const e = document.createElement('p'); e.className = 'pubempty'; e.textContent = '🎤 ' + t('pub_empty'); L.appendChild(e); return; }
   list.slice().reverse().forEach((iv) => {
     const row = document.createElement('div'); row.className = 'pcrow'; const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = (iv.clip ? '🎥 ' + t('pub_clip') : '🎤 ' + (iv.who ? t(iv.who) || iv.who : '')) + ' · ' + t('pub_q') + ' ' + Math.round(iv.q) + '%'; row.appendChild(nm);
+    if (!iv.cut && !(iv.pub && Object.keys(iv.pub).length)) { const e = document.createElement('button'); e.className = 'ghost'; e.textContent = '✂️'; e.onclick = () => { sfx.click(); edOpen(iv, list); }; row.appendChild(e); }
     Object.keys(PLAT).forEach((k) => { const b = document.createElement('button'); const done = iv.pub && iv.pub[k]; b.className = done ? 'ghost' : 'big'; b.textContent = done ? '✅' : PLAT[k].ic; b.disabled = !!done;
-      b.onclick = () => { const f = Math.max(1, Math.round((iv.q / 10) * PLAT[k].fans * (1 + skills.charm * 0.1))), c = Math.max(1, Math.round(iv.q * PLAT[k].coin * (1 + skills.deals * 0.04))); iv.pub = { ...(iv.pub || {}), [k]: true }; store.set('interviews', list);
+      b.onclick = () => { const f = Math.max(1, Math.round((iv.q / 10) * PLAT[k].fans * (1 + skills.charm * 0.1) * (1 + upg.pc * 0.2))), c = Math.max(1, Math.round(iv.q * PLAT[k].coin * (1 + skills.deals * 0.04) * (1 + upg.pc * 0.2))); iv.pub = { ...(iv.pub || {}), [k]: true }; store.set('interviews', list);
         fans[k] += f; store.set('fans', fans); addCoins(c); const up = shop.addXp(2); showLevel(); sfx.good(); gToast(PLAT[k].ic + ' ' + platName(k) + ' · 👥 +' + f + ' · 🪙 +' + c); if (up) say('⭐ ' + t('level_up'), 'ok', true); pubBuild(); };
       row.appendChild(b); });
     L.appendChild(row);
@@ -929,7 +937,7 @@ function pubBuild() {
 }
 // tabs on the working computer: publishing | skill tree
 let pcTab = 'pub';
-function pcTabs(L) { const w = document.createElement('div'); w.className = 'pctabs'; [['pub', '📡'], ['skills', '🌳'], ['lab', '🪪']].forEach(([k, txt]) => { const b = document.createElement('button'); b.className = pcTab === k ? 'big' : 'ghost'; b.textContent = txt; b.onclick = () => { sfx.click(); pcTab = k; pcBuild(); }; w.appendChild(b); }); L.appendChild(w); }
+function pcTabs(L) { const w = document.createElement('div'); w.className = 'pctabs'; [['pub', '📡'], ['skills', '🌳'], ['lab', '🪪'], ['up', '🛠️']].forEach(([k, txt]) => { const b = document.createElement('button'); b.className = pcTab === k ? 'big' : 'ghost'; b.textContent = txt; b.onclick = () => { sfx.click(); pcTab = k; pcBuild(); }; w.appendChild(b); }); L.appendChild(w); }
 // skill tree: 5 stages per skill, stage n costs n points; points come from levels, filmed interviews and challenge wins
 const SKILLS = { steady: ['🎥', (n) => '🎯 +' + n * 8 + '%'], charm: ['✨', (n) => '👥 +' + n * 10 + '%'], deals: ['🤝', (n) => '🪙 +' + n * 4 + '%'], learn: ['📚', (n) => '⭐ +' + n * 5 + '%'] };
 const skEarned = () => (shop.level - 1) * 2 + (stats.wins || 0) + (stats.ivs || 0);
@@ -973,6 +981,28 @@ function designBuild() {
   [['👕', 'top', 'topColor'], ['👖', 'bot', 'bottomColor']].forEach(([ic, k, uk]) => { const row = document.createElement('div'); row.className = 'pcrow swrow'; const i = document.createElement('span'); i.className = 'ic'; i.textContent = ic; row.appendChild(i);
     OPT.cloth.forEach((c, n) => { const s = document.createElement('button'); s.className = 'sw' + (design[k] === n ? ' on' : ''); s.style.background = '#' + new THREE.Color(c).getHexString(); s.onclick = () => { design[k] = n; UNI[uk] = n; store.set('design', design); sfx.click(); rebuildPlayer(); Object.keys(STAFF).forEach(restyle); designBuild(); }; row.appendChild(s); });
     L.appendChild(row); });
+}
+// upgrades tab: studio expansion (needs a licence, adds furniture/decor slots), computer (publishing reach), anchor desk (starting trust)
+const UPG = { room: { ic: '🏗️', cost: [3000, 8000], lic: [1, 2], fx: (n) => '🛋️ +' + n + ' · 🪴 +' + n }, pc: { ic: '🖥️', cost: [800, 2500], fx: (n) => '👥 🪙 +' + n * 20 + '%' }, desk: { ic: '🎙️', cost: [600, 2000], fx: (n) => '📈 +' + n * 3 } };
+function upBuild() {
+  $('pcTitle').textContent = '🛠️ ' + t('up_room'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = ''; pcTabs(L);
+  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p);
+  Object.keys(UPG).forEach((k) => { const U = UPG[k], lv = upg[k], row = document.createElement('div'); row.className = 'pcrow';
+    row.innerHTML = '<span class="ic"></span><span class="nm"><b></b><small></small></span>'; row.children[0].textContent = U.ic; row.querySelector('b').textContent = t('up_' + k); row.querySelector('small').textContent = '●'.repeat(lv) + '○'.repeat(2 - lv) + '  ' + U.fx(lv);
+    const b = document.createElement('button'); if (lv >= 2) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { const cost = U.cost[lv], need = U.lic ? U.lic[lv] : 0, ok = G.coins >= cost && licence >= need; b.className = ok ? 'big' : 'ghost'; b.disabled = !ok; b.textContent = (licence < need ? '🔒 🪪' + need + ' · ' : '⬆ ') + '🪙 ' + cost;
+      b.onclick = () => { addCoins(-cost); upg[k]++; store.set('upg', upg); applySlots(); applyUpg(); sfx.win(); gToast(U.ic + ' ' + t('up_' + k) + ' · ' + U.fx(upg[k])); upBuild(); }; }
+    row.appendChild(b); L.appendChild(row); });
+}
+// easy editor: five shots per clip, tap the bad ones away and save — each right cut adds quality, each wrong cut costs some
+const ED_GOOD = ['🎯', '😀', '🎤', '👍', '✨'], ED_BAD = ['😵', '🤧', '📉', '🫨', '🙈']; let ed = null;
+function edOpen(iv, list) { const shots = []; let bad = 0; for (let i = 0; i < 5; i++) { const b = Math.random() < 0.45 && bad < 3; if (b) bad++; shots.push({ b, cut: false, ic: (b ? ED_BAD : ED_GOOD)[Math.floor(Math.random() * 5)] }); } if (!bad) { shots[2].b = true; shots[2].ic = ED_BAD[0]; } ed = { iv, list, shots }; panelMode = 'edit'; pcBuild(); }
+function edBuild() {
+  $('pcTitle').textContent = '✂️ ' + t('ed_title'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = '';
+  const h = document.createElement('p'); h.className = 'pubempty'; h.textContent = t('ed_hint'); L.appendChild(h);
+  const row = document.createElement('div'); row.className = 'edrow'; ed.shots.forEach((s) => { const b = document.createElement('button'); b.className = 'edshot' + (s.cut ? ' cut' : ''); b.textContent = s.ic; b.onclick = () => { s.cut = !s.cut; sfx.click(); edBuild(); }; row.appendChild(b); }); L.appendChild(row);
+  const sv = document.createElement('button'); sv.className = 'big pubpay'; sv.textContent = '💾 ' + t('ed_save');
+  sv.onclick = () => { let d = 0; ed.shots.forEach((s) => { if (s.cut) d += s.b ? 5 : -5; }); const q0 = ed.iv.q; ed.iv.q = Math.max(1, Math.min(100, q0 + d)); ed.iv.cut = true; store.set('interviews', ed.list); (d > 0 ? sfx.win : sfx.bad)(); gToast('✂️ ' + t('pub_q') + ' ' + Math.round(q0) + '% ➜ ' + Math.round(ed.iv.q) + '%'); ed = null; panelMode = null; pcBuild(); };
+  L.appendChild(sv);
 }
 // once everything is diagnosed, Uncle Saleh hands over exactly the price of the broken parts (level 1 each)
 function pcAfterCheck() {
@@ -1025,8 +1055,8 @@ rebuildPlayer();
 // ───────── studio customisation: equipped furniture, decor and set cards change the room itself ─────────
 const roomG = new THREE.Group(); ZG.studio.add(roomG); let roomSpin = [];
 const R_SLOTS = {
-  floor: [[-5.3, 0, -0.9, Math.PI / 2], [3.4, 0, 4.0, Math.PI], [-2.8, 0, 4.1, Math.PI]], wall: [[-7.1, 2.9, -2.6, Math.PI / 2], [-7.1, 2.9, -0.6, Math.PI / 2], [7.05, 2.9, 1.2, -Math.PI / 2]],
-  deco: [[-6.3, 0, -3.2, 0], [4.6, 0, 4.3, 0], [-4.3, 0, 4.5, 0]], hang: [[-2.5, 4.7, 1.0, 0], [2.5, 4.7, 1.0, 0], [0, 4.7, 3.2, 0]],
+  floor: [[-5.3, 0, -0.9, Math.PI / 2], [3.4, 0, 4.0, Math.PI], [-2.8, 0, 4.1, Math.PI], [0.4, 0, 4.2, Math.PI], [5.6, 0, 0.9, -Math.PI / 2]], wall: [[-7.1, 2.9, -2.6, Math.PI / 2], [-7.1, 2.9, -0.6, Math.PI / 2], [7.05, 2.9, 1.2, -Math.PI / 2], [7.05, 2.9, -0.8, -Math.PI / 2], [-7.1, 2.9, 3.4, Math.PI / 2]],
+  deco: [[-6.3, 0, -3.2, 0], [4.6, 0, 4.3, 0], [-4.3, 0, 4.5, 0], [1.9, 0, 4.4, 0], [-6.3, 0, 4.4, 0]], hang: [[-2.5, 4.7, 1.0, 0], [2.5, 4.7, 1.0, 0], [0, 4.7, 3.2, 0], [-4.5, 4.7, 3.0, 0], [4.5, 4.7, 3.0, 0]],
 };
 function applyRoom() {
   roomG.clear(); roomSpin = []; const used = { floor: 0, wall: 0, deco: 0, hang: 0 };
@@ -1034,7 +1064,7 @@ function applyRoom() {
     const g = ROOM.buildProp(fam, +lv); g.position.set(sl[0], sl[1], sl[2]); g.rotation.y = sl[3]; roomG.add(g); if (g.userData.spin) roomSpin.push(g.userData.spin); }));
   const setF = cs.equippedFam('sets'), wc = setF && ROOM.setWall(setF);
   WALLS.forEach((w, i) => w.material.color.set(wc ? wc : WALL_C[i])); backdrop.visible = !!wc; if (wc) { backdrop.material.map = ROOM.backdropTex(setF); backdrop.material.needsUpdate = true; }
-  roomG.visible = !ruin.visible; applyStage();
+  roomG.visible = !ruin.visible; applyStage(); applyUpg();
 }
 applyRoom();
 
