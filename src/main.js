@@ -21,7 +21,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.3.4';
+const VERSION = '1.3.5';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -40,6 +40,7 @@ function applyLang() {
   const L = LANGS.find((l) => l.code === lang) || LANGS[0];
   document.documentElement.lang = L.code; document.documentElement.dir = L.rtl ? 'rtl' : 'ltr';
   document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
+  if (typeof syncSignText === 'function') try { syncSignText(); } catch (_) {}
   $('langBtn').textContent = '🌐 ' + L.name; $('bProfile').textContent = '👤 ' + t('profile'); $('bSettings').textContent = '⚙️ ' + t('settings'); $('bStore').textContent = '🛍️ ' + t('st_store');
   if (!$('settings').hidden) buildSettings(); if (!$('profile').hidden) buildProfile(); if (!$('storeS').hidden) cs.render(); if (!$('storeS').hidden) cs.render();
 }
@@ -189,7 +190,16 @@ put(box(15, 6, 0.3, 0x2c2470), 0, 3, -4.2); put(box(0.3, 6, 14, 0x281f66), -7.3,
   put(new THREE.Mesh(new THREE.PlaneGeometry(2.7, 6), new THREE.MeshBasicMaterial({ map: gt2, toneMapped: false })), 5.95, 3, -4.04); }
 for (let i = 0; i < 4; i++) put(box(1.15, 3, 0.08, i % 2 ? 0x5a3fc0 : 0x6c4fe0, { emissive: i % 2 ? 0x1c0f60 : 0x26157a, emissiveIntensity: 0.9 }), -4.4 + i * 1.27, 2.1, -3.98);
 put(box(15, 0.07, 0.07, 0xffcf3f, { emissive: 0xffcf3f }), 0, 0.35, -4.0); put(box(15, 0.06, 0.06, 0x7fe9ff, { emissive: 0x4cc9f0, emissiveIntensity: 2 }), 0, 4.6, -4.0); put(box(0.06, 0.06, 14, 0x7fe9ff, { emissive: 0x4cc9f0, emissiveIntensity: 2 }), -7.1, 4.6, 2.6);
-const sign = put(signPlane('ON AIR', '#ff2a40', '#ffffff', 2.2, 0.7), 0, 4.0, -3.9); put(box(2.4, 0.9, 0.12, 0x8a1220), 0, 4.0, -3.98);
+const sign = put(signPlane('ON AIR', '#ff2a40', '#ffffff', 2.2, 0.7), 0, 4.0, -3.9);
+// real studio on-air lamp: off while roaming, lit while broadcasting, blinking while a prank is live
+const signLabel = () => (lang === 'ar' ? 'على الهوا' : 'ON AIR');
+let signTxt = '';
+function syncSignText() { const l = signLabel(); if (l === signTxt) return; signTxt = l; const old = sign.material.map; sign.material.map = textTex(l, '#ff2a40', '#ffffff', 512, 160, l === 'ON AIR' ? undefined : "900 96px 'Tajawal','Noto Kufi Arabic','Noto Sans Arabic',system-ui"); sign.material.needsUpdate = true; if (old) old.dispose(); }
+const SIGN_OFF = new THREE.Color(0x2a2328), SIGN_ON = new THREE.Color(0xffffff), SIGN_DIM = new THREE.Color(0x8a6a72);
+function updateSign(tt) {
+  const live = G.on && G.zone === 'studio'; const prank = live && ['product', 'camera', 'light', 'confetti'].some(isActive);
+  sign.material.color.copy(!live ? SIGN_OFF : prank && Math.sin(tt * 10) < 0 ? SIGN_DIM : SIGN_ON);
+} put(box(2.4, 0.9, 0.12, 0x8a1220), 0, 4.0, -3.98);
 const screenMat = new THREE.MeshBasicMaterial({ map: SFX.fluidTex(), toneMapped: false });
 // wall screen ad rotation — Naif's own companies only
 const SCREEN_LIST = [screenMat.map, ADS.adCardTex('ccmedia'), ADS.adCardTex('cc'), ADS.adCardTex('elva')]; let screenI = 0;
@@ -649,7 +659,7 @@ function frameBody(now) {
   gold.rotation.y = tt * 0.7; guest.head.rotation.y = Math.sin(tt * 0.8) * 0.25; guest.armR.rotation.x = -0.5 + Math.sin(tt * 2) * 0.12;
   crew.g.rotation.y = Math.sin(tt * 1.1) * 0.9 - 0.6; crew.armL.rotation.x = -1.2 + Math.sin(tt * 3) * 0.3; crew.armR.rotation.x = -1.0 + Math.cos(tt * 3) * 0.3;
   crowd.forEach((c, i) => { c.g.position.y = Math.abs(Math.sin(tt * 3 + i * 1.3)) * 0.12; c.armL.rotation.x = c.armR.rotation.x = -2.7 + Math.sin(tt * 6 + i) * 0.3; });
-  trophy.rotation.y = tt * 0.5; if (G.zone === 'studio') atmos(dt, tt);
+  trophy.rotation.y = tt * 0.5; if (G.zone === 'studio') atmos(dt, tt); updateSign(tt);
   NPCS.forEach((n, i) => { const d = Math.hypot(G.px - n.x, G.pz - n.z); const want = d < 3.5 && n.zone === G.zone ? Math.atan2(G.px - n.x, G.pz - n.z) : n.face; let dr = want - n.ch.g.rotation.y; while (dr > Math.PI) dr -= 6.283; while (dr < -Math.PI) dr += 6.283; n.ch.g.rotation.y += dr * Math.min(1, dt * 5); n.ch.armR.rotation.x = Math.sin(tt * 1.5 + i) * 0.12; n.ch.head.rotation.x = Math.sin(tt * 1.1 + i * 2) * 0.05; });
   IT.forEach((it, i) => { it.ring.visible = it.zone === G.zone && it.cond(); it.ring.material.opacity = 0.25 + Math.sin(tt * 3 + i) * 0.12; });
   confetti.forEach((c) => { if (c.m.visible && c.m.position.y > c.ty) { c.m.position.y = Math.max(c.ty, c.m.position.y - c.vy * dt); c.m.rotation.x += dt * 6; c.m.rotation.z += dt * 4; if (c.m.position.y === c.ty) c.m.rotation.set(-Math.PI / 2, 0, c.m.rotation.z); } });
@@ -699,7 +709,7 @@ function frame(now) {
 }
 
 // hook for automated checks only
-window.__onair = { PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { sign, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 setupFX(); applyLang(); syncScene(); show('menu'); resize();
