@@ -12,6 +12,7 @@ import { makeStore, TOKEN } from './store.js';
 import { tokenPrice } from './pricing.js';
 import * as SFX from './studiofx.js';
 import * as ADS from './ads.js';
+import * as ROOM from './room.js';
 import { preview as dailyPreview, claim as dailyClaim, rewardFor, isBig, CYCLE } from './daily.js';
 
 /* ---------- storage, i18n, sound ---------- */
@@ -33,7 +34,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.13';
+const VERSION = '1.4.14';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -203,7 +204,8 @@ cur = ZG.studio;
 ground(26, 22, 0x2f2552, 0, 1);
 const rugA = put(new THREE.Mesh(new THREE.CircleGeometry(2.5, 48), M(0xe0563b)), -2.5, 0.012, -1.7); rugA.rotation.x = -Math.PI / 2; rugA.receiveShadow = true;
 const rugB = put(new THREE.Mesh(new THREE.CircleGeometry(2.2, 48), M(0x2a8f8a)), 3, 0.012, -1.8); rugB.rotation.x = -Math.PI / 2; rugB.receiveShadow = true;
-put(box(15, 6, 0.3, 0x2c2470), 0, 3, -4.2); put(box(0.3, 6, 14, 0x281f66), -7.3, 3, 2.6); put(box(0.3, 6, 14, 0x281f66), 7.3, 3, 2.6);
+const WALLS = [put(box(15, 6, 0.3, 0x2c2470), 0, 3, -4.2), put(box(0.3, 6, 14, 0x281f66), -7.3, 3, 2.6), put(box(0.3, 6, 14, 0x281f66), 7.3, 3, 2.6)]; const WALL_C = [0x2c2470, 0x281f66, 0x281f66];
+const backdrop = put(new THREE.Mesh(new THREE.PlaneGeometry(14.4, 5.9), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false })), 0, 3, -4.03); backdrop.visible = false;
 const _m0 = cur.children.length;
 { const gt = SFX.galaxyTex(); const gm = new THREE.MeshBasicMaterial({ map: gt, toneMapped: false });
   const gw = put(new THREE.Mesh(new THREE.PlaneGeometry(14, 6), gm), 7.14, 3, 2.6); gw.rotation.y = -Math.PI / 2;
@@ -457,7 +459,7 @@ const trustNow = () => Math.max(0, Math.min(100, (G.time > 0.5 ? (G.good / G.tim
 function addCoins(n) { G.coins += n; store.set('coins', G.coins); $('coinN').textContent = G.coins; if ($('crCoins')) $('crCoins').textContent = '🪙 ' + G.coins; }
 
 let lastStage = 0;
-function applyStage() { const lv = shop.level, ch = ZG.studio.children; STAGE_R.forEach(([min, a, b]) => { for (let i = a; i < b; i++) ch[i].visible = lv >= min; }); beams.forEach((b) => { b.visible = lv >= 3 && !ruin.visible; }); if (lastStage && lv > lastStage && lv <= 4) rebuildPlayer(); lastStage = lv; }
+function applyStage() { const lv = shop.level, ch = ZG.studio.children; STAGE_R.forEach(([min, a, b]) => { for (let i = a; i < b; i++) ch[i].visible = lv >= min; }); beams.forEach((b) => { b.visible = lv >= 3 && !ruin.visible; }); if (cs.equippedFam('sets')) { const [, a, b] = STAGE_R[0]; for (let i = a; i < b; i++) ch[i].visible = false; } if (lastStage && lv > lastStage && lv <= 4) rebuildPlayer(); lastStage = lv; }
 function syncScene() {
   applyStage();
   const Z = ZONES[G.zone], st = G.zone === 'studio', lit = !st || G.light;
@@ -678,7 +680,7 @@ $('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syn
 function gToast(msg) { const el = $('gToast'); el.textContent = msg; el.hidden = false; clearTimeout(gToast.h); gToast.h = setTimeout(() => { el.hidden = true; }, 2200); }
 const cs = makeStore({ store, t, getLang: () => lang, sfx, toast: gToast, $ });
 $('bStore').onclick = () => { sfx.click(); storeFrom = 'menu'; cs.closeSheet(); cs.render(); show('storeS'); };
-$('stBack').onclick = () => { sfx.click(); cs.closeSheet(); rebuildPlayer(); Object.keys(STAFF).forEach(restyle); if (cs.needsReady()) { pcFromStore(); return; } if (storeFrom === 'hud') { storeFrom = 'menu'; storePause = false; show('hud'); resize(); syncScene(); } else show('menu'); };
+$('stBack').onclick = () => { sfx.click(); cs.closeSheet(); rebuildPlayer(); Object.keys(STAFF).forEach(restyle); applyRoom(); if (cs.needsReady()) { pcFromStore(); return; } if (storeFrom === 'hud') { storeFrom = 'menu'; storePause = false; show('hud'); resize(); syncScene(); } else show('menu'); };
 
 // ───────── opening story (shown once per player, never repeated) ─────────
 // scenes 1–3: father's will → Uncle Saleh at the door → abandoned studio → cleaning. Later scenes hook in as their features land.
@@ -696,7 +698,7 @@ const salehSt = makeChar(uni(salehAv)); salehSt.g.visible = false; ZG.street.add
 const salehIn = makeChar(uni(salehAv)); salehIn.g.visible = false; ZG.studio.add(salehIn.g);
 DUST.forEach((d) => interact('studio', d.x, d.z, 1.05, 'a_clean', '🧹', () => cleaning && !d.done, () => cleanOne(d)));
 function ruinGear(on) { tripods.forEach((tp) => { tp.g.visible = !on; }); beams.forEach((b) => { if (b && b.isObject3D) b.visible = !on; }); }
-function cleanOne(d) { d.done = true; d.m.visible = false; sfx.fix(); const left = DUST.filter((x) => !x.done).length; if (left) say('🧹 ' + left, '', true); else { cleaning = false; ruin.visible = false; ruinGear(false); applyStage(); G.light = true; syncScene(); sfx.win(); storyNext(); } }
+function cleanOne(d) { d.done = true; d.m.visible = false; sfx.fix(); const left = DUST.filter((x) => !x.done).length; if (left) say('🧹 ' + left, '', true); else { cleaning = false; ruin.visible = false; ruinGear(false); applyRoom(); G.light = true; syncScene(); sfx.win(); storyNext(); } }
 const STORY = [
   { who: 'sn_father', k: 's1a', black: true }, { who: 'sn_father', k: 's1b', black: true }, { k: 's1c', black: true },
   { act: 'street' }, { who: 'sn_saleh', k: 's2a' }, { who: 'sn_me', k: 's2b' },
@@ -708,7 +710,7 @@ function faceTo(ch, x, z) { ch.g.rotation.y = Math.atan2(x - ch.g.position.x, z 
 function storyNext() {
   SI++; const st = STORY[SI]; const box = $('story'); if (!st) return;
   if (st.act === 'street') { enterZone('street', 0.6, -4.4, Math.PI); salehSt.g.position.set(SX - 0.9, 0, -6.2); faceTo(salehSt, G.px, G.pz); salehSt.g.visible = true; show('hud'); return storyNext(); }
-  if (st.act === 'enter') { salehSt.g.visible = false; ruin.visible = true; ruinGear(true); G.light = false; enterZone('studio', 5.2, 3.4, -Math.PI / 2); salehIn.g.position.set(6.0, 0, 2.2); faceTo(salehIn, G.px, G.pz); salehIn.g.visible = true; syncScene(); return storyNext(); }
+  if (st.act === 'enter') { salehSt.g.visible = false; ruin.visible = true; roomG.visible = false; ruinGear(true); G.light = false; enterZone('studio', 5.2, 3.4, -Math.PI / 2); salehIn.g.position.set(6.0, 0, 2.2); faceTo(salehIn, G.px, G.pz); salehIn.g.visible = true; syncScene(); return storyNext(); }
   if (st.act === 'clean') { box.hidden = true; cleaning = true; say(t('s3a'), '', true); return; }
   if (st.act === 'end') { box.hidden = true; storyOn = false; salehIn.g.visible = false; store.set('story_done', true); store.set('tour_done', true); say(t('roam_hint'), '', true); return; }
   if (st.act === 'xp') { const up = shop.addXp(10); showLevel(); if (up) say('⭐ ' + t('level_up'), '', true); }
@@ -843,6 +845,22 @@ interact('studio', IV.x + 0.95, IV.z + 1.25, 1.1, 'a_dress', '👔', () => roam(
 Object.keys(STAFF).forEach((k) => { if (looks[k] || looks.all) restyle(k); });
 rebuildPlayer();
 
+// ───────── studio customisation: equipped furniture, decor and set cards change the room itself ─────────
+const roomG = new THREE.Group(); ZG.studio.add(roomG); let roomSpin = [];
+const R_SLOTS = {
+  floor: [[-5.3, 0, -0.9, Math.PI / 2], [3.4, 0, 4.0, Math.PI], [-2.8, 0, 4.1, Math.PI]], wall: [[-7.1, 2.9, -2.6, Math.PI / 2], [-7.1, 2.9, -0.6, Math.PI / 2], [7.05, 2.9, 1.2, -Math.PI / 2]],
+  deco: [[-6.3, 0, -3.2, 0], [4.6, 0, 4.3, 0], [-4.3, 0, 4.5, 0]], hang: [[-2.5, 4.7, 1.0, 0], [2.5, 4.7, 1.0, 0], [0, 4.7, 3.2, 0]],
+};
+function applyRoom() {
+  roomG.clear(); roomSpin = []; const used = { floor: 0, wall: 0, deco: 0, hang: 0 };
+  ['furniture', 'decor'].forEach((cat) => (cs.S.equip[cat] || []).forEach((id) => { const [, fam, lv] = id.split('.'), kind = ROOM.KIND[fam]; if (!kind) return; const sl = R_SLOTS[kind][used[kind]++]; if (!sl) return;
+    const g = ROOM.buildProp(fam, +lv); g.position.set(sl[0], sl[1], sl[2]); g.rotation.y = sl[3]; roomG.add(g); if (g.userData.spin) roomSpin.push(g.userData.spin); }));
+  const setF = cs.equippedFam('sets'), wc = setF && ROOM.setWall(setF);
+  WALLS.forEach((w, i) => w.material.color.set(wc ? wc : WALL_C[i])); backdrop.visible = !!wc; if (wc) { backdrop.material.map = ROOM.backdropTex(setF); backdrop.material.needsUpdate = true; }
+  roomG.visible = !ruin.visible; applyStage();
+}
+applyRoom();
+
 // first-time guided tour: the camera flies to each part of the studio and explains it
 const TOUR = [
   { p: [0.5, 3.4, 8.5], l: [0.5, 1.4, -1.5] }, { p: [DESK.x + 0.3, 2.2, DESK.z + 3.1], l: [DESK.x, 1.1, DESK.z] },
@@ -901,7 +919,7 @@ function frameBody(now) {
   gold.rotation.y = tt * 0.7; guest.head.rotation.y = Math.sin(tt * 0.8) * 0.25; guest.armR.rotation.x = -0.5 + Math.sin(tt * 2) * 0.12;
   crew.g.rotation.y = Math.sin(tt * 1.1) * 0.9 - 0.6; crew.armL.rotation.x = -1.2 + Math.sin(tt * 3) * 0.3; crew.armR.rotation.x = -1.0 + Math.cos(tt * 3) * 0.3;
   crowd.forEach((c, i) => { c.g.position.y = Math.abs(Math.sin(tt * 3 + i * 1.3)) * 0.12; c.armL.rotation.x = c.armR.rotation.x = -2.7 + Math.sin(tt * 6 + i) * 0.3; });
-  trophy.rotation.y = tt * 0.5; if (G.zone === 'studio') atmos(dt, tt); updateSign(tt); ivTick(dt);
+  trophy.rotation.y = tt * 0.5; if (G.zone === 'studio') atmos(dt, tt); updateSign(tt); ivTick(dt); roomSpin.forEach((b) => { b.rotation.y += dt * 0.8; });
   NPCS.forEach((n, i) => { const d = Math.hypot(G.px - n.x, G.pz - n.z); const want = d < 3.5 && n.zone === G.zone ? Math.atan2(G.px - n.x, G.pz - n.z) : n.face; let dr = want - n.ch.g.rotation.y; while (dr > Math.PI) dr -= 6.283; while (dr < -Math.PI) dr += 6.283; n.ch.g.rotation.y += dr * Math.min(1, dt * 5); n.ch.armR.rotation.x = Math.sin(tt * 1.5 + i) * 0.12; n.ch.head.rotation.x = Math.sin(tt * 1.1 + i * 2) * 0.05; });
   IT.forEach((it, i) => { it.ring.visible = it.zone === G.zone && it.cond(); it.ring.material.opacity = 0.25 + Math.sin(tt * 3 + i) * 0.12; });
   confetti.forEach((c) => { if (c.m.visible && c.m.position.y > c.ty) { c.m.position.y = Math.max(c.ty, c.m.position.y - c.vy * dt); c.m.rotation.x += dt * 6; c.m.rotation.z += dt * 4; if (c.m.position.y === c.ty) c.m.rotation.set(-Math.PI / 2, 0, c.m.rotation.z); } });
@@ -954,7 +972,7 @@ function frame(now) {
 }
 
 // hook for automated checks only
-window.__onair = { sign, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { sign, applyRoom, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 Object.keys(UNLOCK).forEach((id) => { const run = $(id).onclick; $(id).onclick = (e) => { if (!UNLOCK[id]()) { sfx.bad(); gToast(t('locked_hint')); return; } run(e); }; });
