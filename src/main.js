@@ -13,6 +13,7 @@ import { tokenPrice } from './pricing.js';
 import * as SFX from './studiofx.js';
 import * as ADS from './ads.js';
 import * as ROOM from './room.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { preview as dailyPreview, claim as dailyClaim, rewardFor, isBig, CYCLE } from './daily.js';
 
 /* ---------- storage, i18n, sound ---------- */
@@ -36,7 +37,7 @@ const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), qu
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.4.18';
+const VERSION = '1.5.0';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -55,7 +56,7 @@ function applyLang() {
   const L = LANGS.find((l) => l.code === lang) || LANGS[0];
   document.documentElement.lang = L.code; document.documentElement.dir = L.rtl ? 'rtl' : 'ltr';
   document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
-  try { syncSignText(); syncLogoSign(); ADS.setTr(t); } catch (_) {}
+  try { syncSignText(); syncLogoSign(); ADS.setTr(t); } catch (_) {} try { syncCity(); } catch (_) {}
   $('langBtn').textContent = '🌐 ' + L.name; $('bProfile').textContent = '👤 ' + t('profile'); $('bSettings').textContent = '⚙️ ' + t('settings'); $('bStore').textContent = '🛍️ ' + t('st_store');
   if (!$('settings').hidden) buildSettings(); if (!$('profile').hidden) buildProfile(); if (!$('storeS').hidden) cs.render(); if (!$('storeS').hidden) cs.render();
 }
@@ -184,13 +185,13 @@ function plant(x, z, s = 1) {
   put(cyl(0.22 * s, 0.17 * s, 0.4 * s, 0xd9d2c5), x, 0.2 * s, z).castShadow = true;
   [[0, 0.75, 0, 0.32], [0.14, 0.62, 0.08, 0.22], [-0.13, 0.66, -0.06, 0.24]].forEach(([dx, y, dz, r]) => { const l = sph(r * s, 0x2f9e5b); l.scale.y = 1.35; put(l, x + dx * s, y * s, z + dz * s).castShadow = true; });
 }
-function tree(x, z) { put(cyl(0.16, 0.22, 1.8, 0x7a5230), x, 0.9, z).castShadow = true; [[0, 2.5, 0, 1.0], [0.6, 2.1, 0.2, 0.7], [-0.55, 2.2, -0.2, 0.75]].forEach(([dx, y, dz, r]) => { put(sph(r, 0x3fae5e), x + dx, y, z + dz).castShadow = true; }); }
+function tree(x, z) { put(cyl(0.16, 0.22, 1.8, 0x7a5230), x, 0.9, z).castShadow = true; [[0, 2.5, 0, 1.0], [0.6, 2.1, 0.2, 0.7], [-0.55, 2.2, -0.2, 0.75]].forEach(([dx, y, dz, r]) => { put(new THREE.Mesh(new THREE.SphereGeometry(r, 12, 9), M(0x3fae5e)), x + dx, y, z + dz).castShadow = true; }); }
 function building(x, z, w, h, c, wc) {
   put(box(w, h, 4, c), x, h / 2, z).castShadow = true; put(box(w + 0.3, 0.25, 4.3, 0xffffff), x, h + 0.12, z);
   const cols = Math.floor(w / 1.6), rows = Math.floor((h - 2.6) / 1.5);
   for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) put(box(0.9, 0.9, 0.06, wc, { emissive: wc, emissiveIntensity: 0.25 }), x - ((cols - 1) * 1.6) / 2 + i * 1.6, 3.4 + j * 1.5, z + 2.02);
 }
-const COLL = { studio: [], street: [], event: [] };
+const COLL = { studio: [], street: [], event: [] }; const RECTS = { studio: [], street: [], event: [] };
 const IT = []; // interactables
 function interact(zone, x, z, r, key, icon, cond, run) { const ringM = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.58, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, side: THREE.DoubleSide })); ringM.rotation.x = -Math.PI / 2; ringM.position.set(x, 0.035, z); ZG[zone].add(ringM); const it = { zone, x, z, r, key, icon, cond, run, ring: ringM }; IT.push(it); return it; }
 const NPCS = [];
@@ -316,7 +317,7 @@ COLL.studio.push([DESK.x - 1.1, DESK.z, 0.85], [DESK.x, DESK.z, 0.85], [DESK.x +
 
 /* ================= STREET ================= */
 cur = ZG.street; const SX = 100;
-ground(60, 40, 0x6a7080, SX, 0);
+ground(124, 84, 0x6a7080, SX, 10);
 put(box(40, 0.14, 5.2, 0xd8d2c4), SX, 0.07, -5.6).receiveShadow = true; put(box(40, 0.14, 3, 0xd8d2c4), SX, 0.07, 7.6).receiveShadow = true;
 for (let i = -6; i <= 6; i++) put(box(1.6, 0.02, 0.18, 0xffffff), SX + i * 3, 0.02, 1.6);
 building(SX, -10.2, 9, 6.5, 0x7a57e6, 0xbfe3ff); building(SX - 10.5, -10.2, 9, 5, 0xffcf3f, 0xffffff); building(SX + 10.5, -10.2, 9, 7.5, 0x4cc9f0, 0xfff3b0);
@@ -363,6 +364,82 @@ npc('street', SX - 3.5, -1.5, 0.4, { skin: 2, hairStyle: 2, hairColor: 0, top: 0
 npc('street', SX - 8, -5.7, 0, { skin: 4, hairStyle: 5, hairColor: 0, beard: 3, top: 0, topColor: 6, bottom: 0, bottomColor: 7, shoes: 1, capColor: 1, acc: { cap: true } }, 'n_vendor', ['n_vendor1', 'n_vendor2']);
 const kid = npc('street', SX + 4, 2.2, 3.4, { skin: 1, hairStyle: 3, hairColor: 1, top: 0, topColor: 3, bottom: 1, bottomColor: 1, shoes: 4 }, 'n_kid', ['n_kid1', 'n_kid2']); kid.ch.g.scale.setScalar(0.72);
 npc('street', SX + 8.5, -2.6, -0.6, { skin: 0, hairStyle: 4, hairColor: 6, top: 2, topColor: 7, bottom: 0, bottomColor: 5, shoes: 2, acc: { headphones: true, chain: true } }, 'n_rival', ['n_rival1', 'n_rival2']);
+
+// ───────── city district: the street grows ~10× — two streets, four cross lanes, shops, a park and ad buildings for our own brands ─────────
+const citySigns = [];
+function shopSignTex(icon, text, bg) {
+  const W = 1024, H = 256, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
+  x.fillStyle = bg; x.beginPath(); x.roundRect(0, 0, W, H, 40); x.fill(); x.strokeStyle = '#ffffff'; x.lineWidth = 8; x.beginPath(); x.roundRect(10, 10, W - 20, H - 20, 32); x.stroke();
+  x.textAlign = 'center'; x.textBaseline = 'middle'; x.font = '150px system-ui'; x.fillText(icon, 150, 138); x.fillStyle = '#ffffff'; x.font = fitFont(text, 900, 120, 700); x.fillText(text, 620, 132);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8; return tex;
+}
+// a shop whose front faces north (towards -z); name() is re-read when the language changes
+function shopFront(dx, zf, w, h, c, c2, icon, name, run, key) {
+  const x = SX + dx; put(box(w, h, 6, c), x, h / 2, zf + 3).castShadow = true; put(box(w + 0.4, 0.3, 6.4, 0xffffff), x, h + 0.15, zf + 3);
+  put(box(w, 0.16, 1.3, c2), x, 2.95, zf - 0.6); put(box(1.5, 2.4, 0.12, 0x23233a), x, 1.2, zf - 0.04);
+  [-1, 1].forEach((s) => put(box(w * 0.28, 1.5, 0.08, 0xbfe3ff, { emissive: 0xbfe3ff, emissiveIntensity: 0.25 }), x + s * w * 0.3, 1.55, zf - 0.03));
+  const sg = put(new THREE.Mesh(new THREE.PlaneGeometry(Math.min(w - 1, 7), Math.min(w - 1, 7) / 4), new THREE.MeshBasicMaterial({ map: shopSignTex(icon, name(), '#' + c2.toString(16).padStart(6, '0')), transparent: true, toneMapped: false })), x, 4.05, zf - 0.08); sg.rotation.y = Math.PI;
+  citySigns.push({ m: sg, icon, name, bg: '#' + c2.toString(16).padStart(6, '0') }); RECTS.street.push([x - w / 2, x + w / 2, zf, zf + 6]);
+  interact('street', x, zf - 1.3, 1.3, key, icon, () => roam(), run || (() => { sfx.click(); gToast(icon + ' ' + name() + ' · ' + t('sh_soon')); }));
+}
+function adBuilding(dx, zf, w, h, c, id) {
+  const x = SX + dx; put(box(w, h, 6, c), x, h / 2, zf + 3).castShadow = true; put(box(w + 0.4, 0.3, 6.4, 0xffffff), x, h + 0.15, zf + 3); RECTS.street.push([x - w / 2, x + w / 2, zf, zf + 6]);
+  put(box(8.3, 4.8, 0.2, 0x15102e), x, 3.4, zf - 0.1); const p = put(new THREE.Mesh(new THREE.PlaneGeometry(8, 4.5), new THREE.MeshBasicMaterial({ map: ADS.adCardTex(id), toneMapped: false })), x, 3.4, zf - 0.22); p.rotation.y = Math.PI;
+}
+let cityLang = lang;
+function syncCity() { if (cityLang === lang) return; cityLang = lang; citySigns.forEach((s) => { const o = s.m.material.map; s.m.material.map = shopSignTex(s.icon, s.name(), s.bg); s.m.material.needsUpdate = true; o.dispose(); }); }
+{
+  // pavements: longer main-street sidewalks, block pads, second street
+  [-36, 36].forEach((dx) => { put(box(32, 0.14, 5.2, 0xd8d2c4), SX + dx, 0.07, -5.6).receiveShadow = true; put(box(32, 0.14, 3, 0xd8d2c4), SX + dx, 0.07, 7.6).receiveShadow = true; });
+  [-40, -20, 0, 20, 40].forEach((dx) => { put(box(17, 0.14, 10, 0xd8d2c4), SX + dx, 0.07, 14.1).receiveShadow = true; });
+  put(box(104, 0.14, 8, 0xd8d2c4), SX, 0.07, 30.5).receiveShadow = true;
+  for (let i = -16; i <= 16; i++) { if (Math.abs(i) > 6) put(box(1.6, 0.02, 0.18, 0xffffff), SX + i * 3, 0.02, 1.6); put(box(1.6, 0.02, 0.18, 0xffffff), SX + i * 3, 0.02, 22.8); }
+  // north row: more city buildings beside the studio
+  [[-21, 6, 0xff8a5c, 0xffffff], [-31.5, 8, 0x5fbf8f, 0xfff3b0], [-42, 5.5, 0xb48cf2, 0xbfe3ff], [-52.5, 7, 0xffcf3f, 0xffffff], [21, 5.5, 0xf2788c, 0xffffff], [31.5, 8.5, 0x6f8cf2, 0xfff3b0], [42, 6, 0x4cc9a0, 0xffffff], [52.5, 7.5, 0xff8a3d, 0xbfe3ff]].forEach(([dx, h, c, wc]) => building(SX + dx, -10.2, 9, h, c, wc));
+  [-56, 56].forEach((dx) => put(box(6, 7, 46, 0x8a93a6), SX + dx, 3.5, 10)); // end caps
+  // row A (between the two streets): gym, café, the store, park, clothes
+  shopFront(-40, 12, 15, 5.5, 0x3b4a6b, 0xd9342b, '🏋️', () => t('sh_gym'), null, 'sh_gym');
+  shopFront(-20, 12, 15, 5, 0x8a5a3a, 0x5a3a22, '☕', () => t('sh_cafe'), null, 'sh_cafe');
+  shopFront(0, 12, 15, 6, 0x0f9d76, 0x0b6f55, '🛍️', () => ADS.WORLD.souq[lang === 'ar' ? 'ar' : 'en'], () => $('hudStore').onclick(), 'sh_market');
+  shopFront(40, 12, 15, 5, 0xe86aa6, 0xb0347a, '👕', () => t('sh_clothes'), null, 'sh_clothes');
+  // park (open block): grass, trees, fountain, benches
+  { const px = SX + 20, pz = 14.1; const gr = put(new THREE.Mesh(new THREE.PlaneGeometry(16, 9), M(0x57b86a, { rough: 0.9 })), px, 0.15, pz); gr.rotation.x = -Math.PI / 2; gr.receiveShadow = true;
+    [[-6.5, -3], [6.5, -3], [-6.5, 3], [6.5, 3], [-3, 3.4], [3, 3.4]].forEach(([a, b]) => { tree(px + a, pz + b); COLL.street.push([px + a, pz + b, 0.35]); });
+    put(cyl(1.3, 1.4, 0.4, 0xbfc5cf), px, 0.35, pz).castShadow = true; put(cyl(1.15, 1.15, 0.06, 0x4cc9f0, { emissive: 0x1c7fa8, emissiveIntensity: 0.6 }), px, 0.55, pz); put(cyl(0.14, 0.2, 1.1, 0xbfc5cf), px, 0.95, pz); put(sph(0.2, 0x9fe6ff, { emissive: 0x4cc9f0, emissiveIntensity: 0.8 }), px, 1.6, pz); COLL.street.push([px, pz, 1.4]);
+    [-4, 4].forEach((a) => { put(box(1.8, 0.1, 0.5, 0x8a5a2b), px + a, 0.6, pz - 1).castShadow = true; put(box(1.8, 0.5, 0.08, 0x8a5a2b), px + a, 0.95, pz - 0.75); COLL.street.push([px + a - 0.5, pz - 1, 0.5], [px + a + 0.5, pz - 1, 0.5]); });
+    const sg = put(new THREE.Mesh(new THREE.PlaneGeometry(4, 1), new THREE.MeshBasicMaterial({ map: shopSignTex('🌳', t('sh_park'), '#2f8f4e'), transparent: true, toneMapped: false })), px, 2.6, pz - 4.6); sg.rotation.y = Math.PI; citySigns.push({ m: sg, icon: '🌳', name: () => t('sh_park'), bg: '#2f8f4e' });
+    [-1.9, 1.9].forEach((a) => put(cyl(0.07, 0.07, 3.1, 0x30303a), px + a, 1.55, pz - 4.6)); }
+  // row B (south side of the second street): clothes, designer, and ad buildings for our own companies
+  shopFront(-40, 27, 15, 5, 0x4a6fd9, 0x2a3f8f, '🧥', () => t('sh_clothes'), null, 'sh_clothes');
+  shopFront(-20, 27, 15, 6.5, 0x2a2233, 0xd4af37, '✂️', () => t('sh_designer'), null, 'sh_designer');
+  adBuilding(0, 27, 15, 7, 0x5b3aa6, 'elva'); adBuilding(20, 27, 15, 7, 0x1f6fb2, 'lslco'); adBuilding(40, 27, 15, 7, 0xc46b78, 'ccmedia');
+  // street lamps and trees along the second street
+  [-45, -30, -10, 10, 30, 45].forEach((dx) => { put(cyl(0.07, 0.09, 3.6, 0x30303a), SX + dx, 1.8, 20.2).castShadow = true; put(sph(0.16, 0xfff3b0, { emissive: 0xfff3b0 }), SX + dx, 3.7, 20.2); COLL.street.push([SX + dx, 20.2, 0.25]); });
+  [-30, -10, 10, 30].forEach((dx) => { tree(SX + dx, 25.6); COLL.street.push([SX + dx, 25.6, 0.35]); }); [-34, -26, 22, 30, 38, 46].forEach((dx) => tree(SX + dx, 7.4));
+  // more people to interview around the district
+  npc('street', SX - 24, 3.2, 1.2, { skin: 3, hairStyle: 1, hairColor: 2, top: 1, topColor: 2, bottom: 0, bottomColor: 3, shoes: 2 }, 'n_fan', ['n_fan1', 'n_fan2']);
+  npc('street', SX - 38, 10.2, 0, { skin: 1, hairStyle: 4, hairColor: 0, top: 2, topColor: 5, bottom: 1, bottomColor: 0, shoes: 3, acc: { headphones: true } }, 'n_rival', ['n_rival1', 'n_rival2']);
+  npc('street', SX + 17, 16.5, -1, { skin: 2, hairStyle: 3, hairColor: 3, top: 0, topColor: 1, bottom: 1, bottomColor: 6, shoes: 0 }, 'n_fan', ['n_fan1', 'n_fan2']);
+  npc('street', SX + 36, 4, -1.6, { skin: 4, hairStyle: 0, hairColor: 0, beard: 2, top: 0, topColor: 7, bottom: 0, bottomColor: 2, shoes: 1, acc: { glasses: true } }, 'n_vendor', ['n_vendor1', 'n_vendor2']);
+  npc('street', SX - 4, 21, 2.6, { skin: 0, hairStyle: 2, hairColor: 5, top: 1, topColor: 4, bottom: 0, bottomColor: 1, shoes: 4 }, 'n_fan', ['n_fan1', 'n_fan2']);
+  npc('street', SX + 30, 23.5, 3.1, { skin: 3, hairStyle: 5, hairColor: 1, top: 2, topColor: 0, bottom: 1, bottomColor: 5, shoes: 2, capColor: 3, acc: { cap: true } }, 'n_rival', ['n_rival1', 'n_rival2']);
+}
+// police officer for the chase (filming without a StudioLab licence)
+const cop = makeChar({ skin: 2, hairStyle: 0, hairColor: 0, beard: 1, top: 0, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, capColor: 4, acc: { cap: true } });
+const copLamp = put(sph(0.13, 0xff2a40, { emissive: 0xff2a40, emissiveIntensity: 2 }), 0, 2.05, 0, cop.g); cop.g.visible = false; cur.add(cop.g);
+
+// bake the static street scenery into two meshes (lit + glowing) so the big district costs a handful of draw calls
+{
+  const litC = {}, glowC = {}, gone = [];
+  ZG.street.children.forEach((o) => { const mt = o.material; if (!o.isMesh || !mt || !mt.isMeshStandardMaterial || mt.map || mt.transparent) return;
+    o.updateMatrix(); const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); g.applyMatrix4(o.matrix); const em = mt.emissive.getHex() !== 0, c = em ? mt.emissive : mt.color, n = g.attributes.position.count, col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(col, 3)); Object.keys(g.attributes).forEach((k) => { if (!['position', 'normal', 'color'].includes(k)) g.deleteAttribute(k); });
+    const key = Math.floor(o.position.x / 24) + ',' + Math.floor((o.position.z + 8) / 18), B = em ? glowC : litC; (B[key] = B[key] || []).push(g); gone.push(o); });
+  gone.forEach((o) => { ZG.street.remove(o); o.geometry.dispose(); o.material.dispose(); });
+  const litM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, metalness: 0.05 }), glowM = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
+  Object.values(litC).forEach((L) => { const ms = new THREE.Mesh(mergeGeometries(L), litM); ms.castShadow = true; ms.receiveShadow = true; ZG.street.add(ms); L.forEach((g) => g.dispose()); });
+  Object.values(glowC).forEach((L) => { ZG.street.add(new THREE.Mesh(mergeGeometries(L), glowM)); L.forEach((g) => g.dispose()); });
+}
 
 /* ================= AWARDS NIGHT ================= */
 cur = ZG.event; const EX = 200;
@@ -438,7 +515,7 @@ function dropConfetti(cx, cz) {
 /* ---------- state ---------- */
 const ZONES = {
   studio: { ox: 0, bx: [-6.6, 6.6], bz: [-3.4, 4.8], cx: [-6.9, 6.9], cz: [-3.8, 9.5], bg: 0x140f26, fog: [16, 34] },
-  street: { ox: SX, bx: [-13.6, 12.7], bz: [-6.9, 5.8], cx: [-22, 22], cz: [-7.6, 14], bg: 0x8fd3ff, fog: [45, 100] },
+  street: { ox: SX, bx: [-50, 50], bz: [-6.9, 26.5], cx: [-58, 58], cz: [-7.6, 34], bg: 0x8fd3ff, fog: [45, 100] },
   event: { ox: EX, bx: [-13.6, 6.1], bz: [-1.5, 1.5], cx: [-22, 12], cz: [-9, 9], bg: 0x1d1440, fog: [30, 80] },
 };
 let ROUND = 180, SEG = 90, PASS = 0.7;
@@ -546,7 +623,7 @@ interact('event', EX - 13.2, 0, 1.2, 'a_back', '🚪', roam, () => enterZone('st
 NPCS.forEach((n) => {
   const fx = n.x + Math.sin(n.face) * 1.1, fz = n.z + Math.cos(n.face) * 1.1;
   if (n.star) interact(n.zone, fx, fz, 1.3, 'a_interview', '🎤', () => roam() && !n.done, () => openQuestions(n.set, (q) => { n.done = true; const rw = q.v > 0 ? 60 : q.v === 0 ? 20 : 0; addCoins(rw); say(t(n.name) + ': ' + t(q.a), q.v > 0 ? 'ok' : q.v < 0 ? 'warn' : ''); $('coinBox').classList.remove('pop'); void $('coinBox').offsetWidth; if (rw) $('coinBox').classList.add('pop'); }));
-  else if (n.zone === 'street') interact(n.zone, fx, fz, 1.3, 'a_interview', '🎤', () => roam() && !ivOn && !storyOn, () => startInterview(n));
+  else if (n.zone === 'street') interact(n.zone, fx, fz, 1.3, 'a_interview', '🎤', () => roam() && !ivOn && !storyOn && !chase.on, () => startInterview(n));
   else interact(n.zone, fx, fz, 1.3, 'a_talk', '💬', roam, () => { sfx.click(); say(t(n.name) + ': ' + t(n.lines[n.i++ % n.lines.length])); });
 });
 function currentAction() {
@@ -585,6 +662,8 @@ function movePlayer(dt) {
   if (G.moving) { const sp = (fwd > 0 ? 4.0 : 2.2) * fwd; G.px += Math.sin(G.face) * sp * dt; G.pz += Math.cos(G.face) * sp * dt; G.walk += dt * 11 * Math.abs(fwd); }
   const Z = ZONES[G.zone];
   COLL[G.zone].forEach(([x, z, r]) => { const dx = G.px - x, dz = G.pz - z, d = Math.hypot(dx, dz), R = r + 0.3; if (d < R && d > 0.0001) { G.px = x + (dx / d) * R; G.pz = z + (dz / d) * R; } });
+  RECTS[G.zone].forEach(([a, b, c, d]) => { const k = 0.3; if (G.px > a - k && G.px < b + k && G.pz > c - k && G.pz < d + k) { const l = G.px - (a - k), r = b + k - G.px, u = G.pz - (c - k), w = d + k - G.pz, mn = Math.min(l, r, u, w); if (mn === l) G.px = a - k; else if (mn === r) G.px = b + k; else if (mn === u) G.pz = c - k; else G.pz = d + k; } });
+  if (G.zone === 'street') { sun.position.set(G.px + 8, 16, G.pz + 9); sun.target.position.set(G.px, 0, G.pz); }
   G.px = Math.max(Z.ox + Z.bx[0], Math.min(Z.ox + Z.bx[1], G.px)); G.pz = Math.max(Z.bz[0], Math.min(Z.bz[1], G.pz));
   player.g.position.set(G.px, G.moving ? Math.abs(Math.sin(G.walk)) * 0.05 : 0, G.pz); player.g.rotation.y = G.face;
   const sw = G.moving ? Math.sin(G.walk) * 0.8 : 0; player.legL.rotation.x = sw; player.legR.rotation.x = -sw; player.armL.rotation.x = -sw * 0.8; if (Math.abs(player.armR.rotation.x) < 1.2) player.armR.rotation.x = sw * 0.8;
@@ -747,6 +826,25 @@ $('ivGo').onclick = () => {
   ivStep++; $('ivQ').textContent = (hit ? '✅ ' : '📉 ') + t(ivNpc.name) + ': ' + t('ia' + ivStep); ivStat();
   if (ivStep >= 3) { $('ivGo').disabled = true; setTimeout(finishIv, 1400); } else setTimeout(() => { if (!$('iv').hidden) $('ivQ').textContent = t('iq' + (ivStep + 1)); }, 1300);
 };
+// police chase: an interview filmed without licence 1 brings an officer; reach the studio (or outrun him) to keep the clip
+const chase = { on: false, t: 0, mark: 0 };
+function startChase() {
+  chase.on = true; chase.t = 25; chase.mark = 25; const Z = ZONES.street, dir = G.px > Z.ox ? -1 : 1;
+  cop.g.position.set(Math.max(Z.ox + Z.bx[0], Math.min(Z.ox + Z.bx[1], G.px + dir * 13)), 0, G.pz); cop.g.visible = true; sfx.bad(); buzz(200); say('🚓 ' + t('pol_run'), 'warn', true);
+}
+function endChase(caught) {
+  chase.on = false; cop.g.visible = false;
+  if (!caught) { sfx.win(); say('✅ ' + t('pol_safe'), 'ok', true); return; }
+  const fine = Math.min(G.coins, 30 + Math.round(G.coins * 0.1)); addCoins(-fine); const list = store.get('interviews', []); for (let i = list.length - 1; i >= 0; i--) if (!list[i].clip) { list.splice(i, 1); break; } store.set('interviews', list);
+  sfx.lose(); buzz([120, 60, 120]); say('🚓 ' + t('pol_fine') + (fine ? ' · 🪙 -' + fine : ''), 'warn', true);
+}
+function chaseTick(dt, tt) {
+  if (!chase.on) return; if (G.zone !== 'street') return endChase(false); chase.t -= dt; if (chase.t <= 0) return endChase(false);
+  const p = cop.g.position, dx = G.px - p.x, dz = G.pz - p.z, d = Math.hypot(dx, dz); if (d < 0.9) return endChase(true);
+  p.x += (dx / d) * 3.5 * dt; p.z += (dz / d) * 3.5 * dt; cop.g.rotation.y = Math.atan2(dx, dz); const sw = Math.sin(tt * 12) * 0.8; cop.legL.rotation.x = sw; cop.legR.rotation.x = -sw; cop.armL.rotation.x = -sw * 0.8; cop.armR.rotation.x = sw * 0.8;
+  copLamp.material.color.set(Math.floor(tt * 6) % 2 ? 0xff2a40 : 0x2a6bff); copLamp.material.emissive.copy(copLamp.material.color);
+  if (chase.t < chase.mark - 5) { chase.mark -= 5; say('🚓 ' + Math.ceil(chase.t) + ' · ' + t('pol_run'), 'warn', true); }
+}
 function finishIv() {
   $('ivGo').disabled = false; $('iv').hidden = true; const mic = Math.max(1, gearLv('mic'));
   const q = Math.round(Math.min(100, (ivHits / 3) * 70 + (ivHits ? Math.min(30, (gearLv('cam') + mic) * 1.0) : 0)));
@@ -756,7 +854,7 @@ function finishIv() {
   if (ivHits > 0) { const list = store.get('interviews', []); list.push({ q, at: Date.now(), who: ivNpc.name }); store.set('interviews', list.slice(-30)); stats.ivs = (stats.ivs || 0) + 1; store.set('stats', stats); }
   const up = xp > 0 && shop.addXp(xp); showLevel();
   const end = () => { ivOn = false; G.asking = false; const fail = ivHits === 0 || (first && !okFirst);
-    say((fail ? '📉 ' + t('iv_keep') + ' · ' : '') + (ivHits ? t('iv_saved').replace('{q}', q) + ' · ' : '') + '+' + xp + ' ' + t('xp') + (up ? '  ⭐ ' + t('level_up') : ''), fail ? 'warn' : 'ok', true); };
+    say((fail ? '📉 ' + t('iv_keep') + ' · ' : '') + (ivHits ? t('iv_saved').replace('{q}', q) + ' · ' : '') + '+' + xp + ' ' + t('xp') + (up ? '  ⭐ ' + t('level_up') : ''), fail ? 'warn' : 'ok', true); if (!first && ivHits > 0 && licence < 1) setTimeout(startChase, 1800); };
   if (okFirst) { store.set('story4_done', true); dlg([{ who: 'sn_me', k: 's4d' }, { who: 'sn_saleh', k: 's4e' }].concat(xp === 15 ? [{ k: 's4f' }] : []), end); } else end();
 }
 
@@ -974,7 +1072,7 @@ function frameBody(now) {
   gold.rotation.y = tt * 0.7; guest.head.rotation.y = Math.sin(tt * 0.8) * 0.25; guest.armR.rotation.x = -0.5 + Math.sin(tt * 2) * 0.12;
   crew.g.rotation.y = Math.sin(tt * 1.1) * 0.9 - 0.6; crew.armL.rotation.x = -1.2 + Math.sin(tt * 3) * 0.3; crew.armR.rotation.x = -1.0 + Math.cos(tt * 3) * 0.3;
   crowd.forEach((c, i) => { c.g.position.y = Math.abs(Math.sin(tt * 3 + i * 1.3)) * 0.12; c.armL.rotation.x = c.armR.rotation.x = -2.7 + Math.sin(tt * 6 + i) * 0.3; });
-  trophy.rotation.y = tt * 0.5; if (G.zone === 'studio') atmos(dt, tt); updateSign(tt); ivTick(dt); roomSpin.forEach((b) => { b.rotation.y += dt * 0.8; });
+  trophy.rotation.y = tt * 0.5; if (G.zone === 'studio') atmos(dt, tt); updateSign(tt); ivTick(dt); chaseTick(dt, tt); if (G.zone === 'street') { const L = NPCS.filter((n) => n.zone === 'street').map((n) => [Math.hypot(n.ch.g.position.x - G.px, n.ch.g.position.z - G.pz), n]).sort((p, q) => p[0] - q[0]); L.forEach(([d, n], i) => { n.ch.g.visible = i < 4 && d < 32; }); } roomSpin.forEach((b) => { b.rotation.y += dt * 0.8; });
   NPCS.forEach((n, i) => { const d = Math.hypot(G.px - n.x, G.pz - n.z); const want = d < 3.5 && n.zone === G.zone ? Math.atan2(G.px - n.x, G.pz - n.z) : n.face; let dr = want - n.ch.g.rotation.y; while (dr > Math.PI) dr -= 6.283; while (dr < -Math.PI) dr += 6.283; n.ch.g.rotation.y += dr * Math.min(1, dt * 5); n.ch.armR.rotation.x = Math.sin(tt * 1.5 + i) * 0.12; n.ch.head.rotation.x = Math.sin(tt * 1.1 + i * 2) * 0.05; });
   IT.forEach((it, i) => { it.ring.visible = it.zone === G.zone && it.cond(); it.ring.material.opacity = 0.25 + Math.sin(tt * 3 + i) * 0.12; });
   confetti.forEach((c) => { if (c.m.visible && c.m.position.y > c.ty) { c.m.position.y = Math.max(c.ty, c.m.position.y - c.vy * dt); c.m.rotation.x += dt * 6; c.m.rotation.z += dt * 4; if (c.m.position.y === c.ty) c.m.rotation.set(-Math.PI / 2, 0, c.m.rotation.z); } });
@@ -1027,7 +1125,7 @@ function frame(now) {
 }
 
 // hook for automated checks only
-window.__onair = { sign, applyRoom, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { R: renderer, sign, chase, startChase, cop, applyRoom, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 Object.keys(UNLOCK).forEach((id) => { const run = $(id).onclick; $(id).onclick = (e) => { if (!UNLOCK[id]()) { sfx.bad(); gToast(t('locked_hint')); return; } run(e); }; });
