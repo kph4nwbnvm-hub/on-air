@@ -145,10 +145,55 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
 .danger{background:rgba(217,52,43,.25)!important}
 .danger.armed{background:#d9342b!important}
 .ver{font-size:12px;opacity:.55;margin:10px 0 0}
+.ghost.store{background:linear-gradient(90deg,rgba(164,99,255,.55),rgba(58,139,255,.55));font-weight:800}
+#storeS{padding:0;justify-content:flex-start}
+#stPanel{width:min(560px,100%);height:100%;overflow:auto;background:rgba(14,10,30,.94);padding:12px 12px 30px;box-sizing:border-box;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#stHead{display:flex;align-items:center;gap:10px;position:sticky;top:-12px;background:rgba(14,10,30,.97);padding:8px 0;z-index:2}
+#stHead h3{flex:1;margin:0;text-align:start}
+#stBack,#shClose{background:rgba(255,255,255,.12);width:36px;height:36px;border-radius:12px;font-size:16px}
+#stTok{font-weight:800;color:#7fd0ff;font-size:17px}
+.small{padding:8px!important;font-size:13px!important;margin-top:6px!important}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0 4px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:0 0 auto;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);padding:7px 11px;border-radius:999px;font-size:13px;white-space:nowrap}
+.chips button.sel{background:#ffcf3f;color:#2a1c00;font-weight:800;border-color:#ffcf3f}
+#stTools{display:flex;gap:6px;margin-top:4px}
+#stTools input{flex:1;font:inherit;font-size:15px;padding:9px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#fff;min-width:0}
+#stTools select{font:inherit;font-size:14px;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.18);padding:0 8px}
+#stTools select option{color:#000}
+#stBonus{font-size:12px;color:#9fe8b4;margin:8px 0 0;text-align:start}
+#stCols{margin-top:8px}
+.colh{font-size:12px;opacity:.85;text-align:start;margin:4px 0}
+.col{display:grid;grid-template-columns:1fr auto;gap:2px 8px;text-align:start;background:rgba(255,255,255,.06);border-radius:12px;padding:8px 10px;margin-top:6px;font-size:13px}
+.col small{grid-column:1/-1;opacity:.75;font-size:11px}
+.col.ok{border:1px solid #3fbf6f;background:rgba(63,191,111,.14)}
+#stGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.card{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px 8px;border-radius:14px;background:radial-gradient(circle at 50% 25%,color-mix(in srgb,var(--rc) 30%,transparent),rgba(255,255,255,.05) 70%);border:1.5px solid var(--rc);min-height:128px;box-shadow:0 0 0 0 transparent}
+.card.r4,.card.r5{box-shadow:0 0 14px -4px var(--rc)}
+.card.on{outline:2px solid #3fbf6f;outline-offset:1px}
+.card .ic{font-size:34px;line-height:1.1;filter:drop-shadow(0 3px 6px rgba(0,0,0,.4))}
+.card b{font-size:12px;line-height:1.2}
+.card small{font-size:10px;opacity:.8;line-height:1.2}
+.card em{font-style:normal;font-size:12px;font-weight:800;color:#7fd0ff;margin-top:auto}
+.card .cnt{position:absolute;top:4px;inset-inline-end:6px;font-style:normal;font-size:11px;font-weight:800;color:#ffcf3f}
+.empty{grid-column:1/-1;opacity:.7}
+#stMore{margin-top:12px}
+#stSheet{position:fixed;inset:0;display:flex;align-items:flex-end;justify-content:center;background:rgba(5,3,15,.55);z-index:20}
+.sh{position:relative;width:min(520px,100%);background:linear-gradient(180deg,color-mix(in srgb,var(--rc) 22%,#160f30),#120c28 60%);border-top:2px solid var(--rc);border-radius:22px 22px 0 0;padding:18px 18px 26px;box-sizing:border-box}
+.sh #shClose{position:absolute;top:12px;inset-inline-end:12px;z-index:3}
+#shIc{font-size:72px;filter:drop-shadow(0 0 18px var(--rc))}
+#shName{margin:4px 0}
+#shMeta{color:var(--rc);font-weight:700;font-size:13px;margin:0 0 10px}
+#shUse,#shGoal{font-size:14px;text-align:start;background:rgba(255,255,255,.06);border-radius:12px;padding:9px 12px;margin:6px 0}
+#shActs{display:grid;gap:6px;margin-top:10px}
+#shActs .merge{background:linear-gradient(90deg,#a463ff,#ffb020)!important;color:#1a1030;font-weight:800}
+#gToast{position:fixed;left:50%;top:14%;transform:translateX(-50%);z-index:60;background:rgba(10,8,25,.95);border:1px solid rgba(255,207,63,.6);padding:10px 16px;border-radius:14px;font-weight:700;font-size:14px;max-width:86%;text-align:center}
+#vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 55%,rgba(5,2,20,.45) 100%)}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="vig"></div>
 
 <section id="menu" class="screen">
   <div class="panel">
@@ -157,6 +202,7 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
     <p class="proto" data-t="proto"></p>
     <button id="bPlay" class="big" data-t="play"></button>
     <button id="bChar" class="ghost" data-t="customize"></button>
+    <button id="bStore" class="ghost store"></button>
     <button id="bHow" class="ghost" data-t="how"></button>
     <div class="two"><button id="bProfile" class="ghost"></button><button id="bSettings" class="ghost"></button></div>
   </div>
@@ -215,6 +261,21 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
   </div>
 </section>
 
+<section id="storeS" class="screen" hidden>
+  <div id="stPanel">
+    <div id="stHead"><button id="stBack">✕</button><h3 data-t="st_store"></h3><span id="stTok"></span></div>
+    <button id="stTest" class="ghost small" data-t="st_test"></button>
+    <div id="stCats" class="chips"></div>
+    <div id="stTools"><input id="stSearch" autocomplete="off" spellcheck="false"><select id="stSort"></select></div>
+    <div id="stRar" class="chips"></div>
+    <p id="stBonus" hidden></p>
+    <div id="stCols" hidden></div>
+    <div id="stGrid"></div>
+    <button id="stMore" class="ghost" hidden></button>
+  </div>
+  <div id="stSheet" hidden><div class="sh"><button id="shClose">✕</button><div id="shIc"></div><h3 id="shName"></h3><p id="shMeta"></p><p id="shUse"></p><p id="shGoal"></p><div id="shActs"></div></div></div>
+</section>
+<div id="gToast" hidden></div>
 <div id="daily" hidden>
   <div class="panel">
     <h3 data-t="d_title"></h3>

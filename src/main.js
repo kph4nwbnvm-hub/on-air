@@ -1,8 +1,14 @@
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { LANGS, STR } from './i18n.js';
 import { piSignIn, PiState } from './pi.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
 import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL, isExclusive, EXCLUSIVE } from './shop.js';
+import { makeStore, TOKEN } from './store.js';
 import { preview as dailyPreview, claim as dailyClaim, rewardFor, isBig, CYCLE } from './daily.js';
 
 /* ---------- storage, i18n, sound ---------- */
@@ -30,8 +36,8 @@ function applyLang() {
   const L = LANGS.find((l) => l.code === lang) || LANGS[0];
   document.documentElement.lang = L.code; document.documentElement.dir = L.rtl ? 'rtl' : 'ltr';
   document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
-  $('langBtn').textContent = '🌐 ' + L.name; $('bProfile').textContent = '👤 ' + t('profile'); $('bSettings').textContent = '⚙️ ' + t('settings');
-  if (!$('settings').hidden) buildSettings(); if (!$('profile').hidden) buildProfile();
+  $('langBtn').textContent = '🌐 ' + L.name; $('bProfile').textContent = '👤 ' + t('profile'); $('bSettings').textContent = '⚙️ ' + t('settings'); $('bStore').textContent = '🛍️ ' + t('st_store');
+  if (!$('settings').hidden) buildSettings(); if (!$('profile').hidden) buildProfile(); if (!$('storeS').hidden) cs.render(); if (!$('storeS').hidden) cs.render();
 }
 let AC = null;
 function tone(f, dur, type = 'sine', when = 0, vol = 0.12) {
@@ -86,8 +92,10 @@ const canvas = $('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 const pixelRatio = () => (cfg.quality === 'low' ? 1 : Math.min(window.devicePixelRatio || 1, 2));
 renderer.setPixelRatio(pixelRatio());
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.0;
 const scene = new THREE.Scene();
+{ const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; scene.environmentIntensity = 0.55; }
 const cam = new THREE.PerspectiveCamera(60, 1, 0.1, 110);
 const feedCam = new THREE.PerspectiveCamera(42, 16 / 9, 0.1, 40);
 
@@ -116,7 +124,7 @@ function gradTex(c1, c2, c3) {
   const tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; return tx;
 }
 const signPlane = (txt, bg, fg, w, h, tw, th, font) => new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: textTex(txt, bg, fg, tw || 512, th || 160, font) }));
-const ground = (w, d, c, x, z) => { const g = put(new THREE.Mesh(new THREE.PlaneGeometry(w, d), M(c)), x, 0, z); g.rotation.x = -Math.PI / 2; g.receiveShadow = true; return g; };
+const ground = (w, d, c, x, z) => { const g = put(new THREE.Mesh(new THREE.PlaneGeometry(w, d), M(c, { rough: 0.38, metal: 0.08 })), x, 0, z); g.rotation.x = -Math.PI / 2; g.receiveShadow = true; return g; };
 function armchair(c) {
   const g = new THREE.Group();
   put(slab(0.95, 0.3, 0.9, 0.12, c), 0, 0.5, 0, g); put(slab(0.95, 0.8, 0.24, 0.1, c), 0, 1.15, -0.4, g);
@@ -282,11 +290,23 @@ function STAR_SETUP() { starS.set = [0, 1, 2].map((i) => ({ q: 'qs' + i, a: 'as'
 let player = makeChar(avatar); scene.add(player.g);
 function rebuildPlayer() { const pos = player.g.position.clone(), ry = player.g.rotation.y; scene.remove(player.g); player = makeChar(avatar); player.g.position.copy(pos); player.g.rotation.y = ry; scene.add(player.g); }
 const amb = new THREE.HemisphereLight(0xdfe6ff, 0x3a3060, 0.9); scene.add(amb);
+const stageA = new THREE.PointLight(0xa463ff, 6, 12, 1.6); stageA.position.set(-5.5, 3.2, -2.5); scene.add(stageA);
+const stageB = new THREE.PointLight(0x3ad4ff, 6, 12, 1.6); stageB.position.set(5.5, 3.2, -2.5); scene.add(stageB);
 const key = new THREE.SpotLight(0xfff2d6, 220, 24, 0.8, 0.6, 1.3); key.position.set(0.5, 8.5, 5.5); key.target.position.set(0.3, 0.5, -1.6); key.castShadow = true;
-key.shadow.mapSize.set(1024, 1024); key.shadow.bias = -0.002; key.shadow.camera.near = 2; key.shadow.camera.far = 24; scene.add(key); scene.add(key.target);
+key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0008; key.shadow.radius = 4; key.shadow.camera.near = 2; key.shadow.camera.far = 24; scene.add(key); scene.add(key.target);
 const rim = new THREE.DirectionalLight(0x9db4ff, 0.7); rim.position.set(-5, 6, -2); scene.add(rim);
 const sun = new THREE.DirectionalLight(0xffffff, 0); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.002;
 Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: 1, far: 60 }); scene.add(sun); scene.add(sun.target);
+// atmosphere: volumetric light beams and floating dust in the studio
+const beamTex = (() => { const cv = document.createElement('canvas'); cv.width = 4; cv.height = 128; const x = cv.getContext('2d'); const g = x.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 4, 128); const tx = new THREE.CanvasTexture(cv); return tx; })();
+const beams = [[-4.2, -1.8, 0xb48cff], [-1.4, -2.4, 0xfff0cc], [1.4, -2.4, 0xfff0cc], [4.2, -1.8, 0x7fe0ff]].map(([x, z, c]) => {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 1.3, 5.2, 32, 1, true), new THREE.MeshBasicMaterial({ color: c, map: beamTex, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+  m.position.set(x, 3.0, z); m.rotation.z = x * 0.04; ZG.studio.add(m); return m;
+});
+const dust = (() => { const n = 260, pos = new Float32Array(n * 3); for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - 0.5) * 13; pos[i * 3 + 1] = Math.random() * 5; pos[i * 3 + 2] = -3.4 + Math.random() * 8; }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(g, new THREE.PointsMaterial({ map: (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const x = cv.getContext('2d'); const g = x.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(cv); })(), color: 0xfff4dd, size: 0.06, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); ZG.studio.add(pts); return pts; })();
+function atmos(dt, tt) { const a = dust.geometry.attributes.position; for (let i = 0; i < a.count; i++) { let y = a.getY(i) + dt * 0.08; if (y > 5) y = 0; a.setY(i, y); a.setX(i, a.getX(i) + Math.sin(tt * 0.3 + i) * dt * 0.02); } a.needsUpdate = true; beams.forEach((b, i) => { b.material.opacity = (G.light ? 0.13 : 0.03) + Math.sin(tt * 0.8 + i) * 0.025; }); }
 const CONF_N = 90; const confetti = []; const confCols = [0xff4d6d, 0xffd23f, 0x3ddc97, 0x4cc9f0, 0xb388ff, 0xff9f1c];
 for (let i = 0; i < CONF_N; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.14), new THREE.MeshBasicMaterial({ color: confCols[i % 6], side: THREE.DoubleSide })); m.visible = false; ZG.studio.add(m); confetti.push({ m, ty: 0, vy: 0 }); }
 const mess = { x: 0, z: 0 };
@@ -317,14 +337,14 @@ function syncScene() {
   const Z = ZONES[G.zone], st = G.zone === 'studio', lit = !st || G.light;
   Object.keys(ZG).forEach((k) => { ZG[k].visible = k === G.zone; });
   scene.background = new THREE.Color(st && !G.light ? 0x07050f : Z.bg); scene.fog = new THREE.Fog(scene.background.getHex(), Z.fog[0], Z.fog[1]);
-  key.intensity = st && G.light ? 220 : 0; rim.intensity = st ? (G.light ? 0.7 : 0.2) : 0;
-  amb.intensity = st ? (G.light ? 0.9 : 0.32) : G.zone === 'street' ? 1.5 : 0.95;
+  key.intensity = st && G.light ? 150 : 0; rim.intensity = st ? (G.light ? 0.9 : 0.2) : 0; stageA.intensity = stageB.intensity = st ? (G.light ? 6 : 2.5) : 0; scene.environmentIntensity = st ? (G.light ? 0.45 : 0.12) : 0.6;
+  amb.intensity = st ? (G.light ? 0.7 : 0.22) : G.zone === 'street' ? 1.2 : 0.75;
   sun.intensity = st ? 0 : G.zone === 'street' ? 2.2 : 1.2; sun.color.set(G.zone === 'event' ? 0xc9b8ff : 0xffffff);
   sun.position.set(Z.ox + 8, 16, 9); sun.target.position.set(Z.ox, 0, 0);
   gold.visible = G.product; cleaner.visible = !G.product;
   sbFaces.forEach((f) => { f.material.color.set(lit ? 0xfff3d6 : 0x222222); }); screenMat.color.set(lit ? 0xffffff : 0x333333);
   lever.position.y = G.light ? 1.5 : 1.36; bulb.material.color.set(G.light ? 0x3ddc97 : 0xff3b4e);
-  tripods.forEach((tp, i) => { tp.tally.visible = i === G.feed; }); conBtns.forEach((b, i) => { b.material.emissiveIntensity = i === G.feed ? 2.2 : 0; });
+  tripods.forEach((tp, i) => { tp.tally.visible = i === G.feed; }); conBtns.forEach((b, i) => { b.material.emissiveIntensity = i === G.feed ? 7 : 0; });
   const s = SHOTS[G.feed]; feedCam.position.set(...s.p); feedCam.lookAt(...s.l); conScreen.material.color.set(G.feed === needCam() ? 0x3ddc97 : 0xff8a3d);
   $('hud').className = 'screen ' + (G.on ? 'round' : 'roam'); $('coinN').textContent = G.coins;
 }
@@ -340,19 +360,22 @@ function firePrank() {
   if (k === 'light') G.light = false; if (k === 'confetti') { G.mess = 3; const c = seg() === 0 ? DESK : IV; dropConfetti(c.x, c.z); }
   G.pranks.push({ k, at: G.time, fixed: null, told: false }); sfx.prank(); syncScene();
 }
-function markFixed(k) { const p = G.pranks.slice().reverse().find((x) => x.k === k && x.fixed === null); if (p) { p.fixed = G.time; sfx.fix(); say(t('sp_ok'), 'ok', true); } }
+function markFixed(k) { const p = G.pranks.slice().reverse().find((x) => x.k === k && x.fixed === null); if (p) { p.fixed = G.time; G.bonus += cs.bonuses().fix; sfx.fix(); say(t('sp_ok'), 'ok', true); } }
 const selfPrank = (k) => G.pranks.push({ k, at: G.time, fixed: null, told: true, self: true });
 function startRound() {
   lastAct = 0; Object.assign(G, { on: true, zone: 'studio', time: 0, good: 0, bonus: 0, product: true, feed: 0, light: true, mess: 0, pranks: [], next: 9, asked: [], askCd: 0, asking: false, grace: 0, px: 0, pz: 3.3, face: Math.PI });
   confetti.forEach((c) => { c.m.visible = false; }); $('qSheet').hidden = true; show('hud'); syncScene(); resize(); snapCam = true; sfx.seg(); say(t('sp_start'));
+  G.bonus += cs.bonuses().trust;
 }
 function endRound() {
   G.on = false; G.asking = false; $('qSheet').hidden = true; const missed = 3 - G.asked.length; G.bonus -= missed * 6;
-  const trust = Math.max(0, Math.min(100, (G.good / ROUND) * 100 + G.bonus)) / 100; const pass = trust >= PASS; const coins = pass ? Math.round(100 + trust * 150) : Math.round(trust * 60);
+  const BN = cs.bonuses();
+  const trust = Math.max(0, Math.min(100, (G.good / ROUND) * 100 + G.bonus)) / 100; const pass = trust >= PASS; const coins = Math.round((pass ? 100 + trust * 150 : trust * 60) * (1 + BN.coins / 100));
   addCoins(coins); (pass ? sfx.win : sfx.lose)(); buzz(pass ? [60, 40, 120] : 200);
   stats.rounds++; if (pass) stats.wins++; stats.best = Math.max(stats.best, Math.round(trust * 100)); store.set('stats', stats);
-  const xp = roundXp(trust, pass), up = shop.addXp(xp); showLevel();
-  $('rXp').textContent = '+' + xp + ' ' + t('xp') + ' · ' + t('lvl') + ' ' + shop.level; $('rUp').hidden = !up; if (up) $('rUp').textContent = '⭐ ' + t('level_up');
+  const xp = Math.round(roundXp(trust, pass) * (1 + BN.xp / 100)), up = shop.addXp(xp); showLevel();
+  let drop = null; if (Math.random() * 100 < 4 + BN.luck) drop = cs.grantRandom(1); cs.consumeBoosts();
+  $('rXp').textContent = '+' + xp + ' ' + t('xp') + ' · ' + t('lvl') + ' ' + shop.level; $('rUp').hidden = !up && !drop; $('rUp').textContent = [up ? '⭐ ' + t('level_up') : '', drop ? '🎁 ' + t('st_drop') + ': ' + drop.fam.icon + ' ' + cs.nameOf(drop) : ''].filter(Boolean).join('  ·  ');
   $('rTitle').textContent = t(pass ? 'r_pass' : 'r_fail'); $('rTitle').className = pass ? 'pass' : 'fail';
   $('rTrust').textContent = Math.round(trust * 100) + '%'; $('rAir').textContent = fmt(G.good) + ' / ' + fmt(ROUND); $('rCoins').textContent = '+' + coins;
   const line = t(trust >= 0.85 ? 'sp_end_great' : pass ? 'sp_end_ok' : 'sp_end_bad'); $('rSponsor').textContent = line; speak(line);
@@ -442,9 +465,15 @@ function followCam(dt) {
 
 /* ---------- screens ---------- */
 let pip = { x: 0, y: 0, w: 0, h: 0 };
-function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); const r = $('pip').getBoundingClientRect(); pip = { x: r.left, y: h - r.bottom, w: r.width, h: r.height }; }
+let composer = null, bloom = null;
+function setupFX() {
+  if (cfg.quality === 'low') { composer = null; return; }
+  composer = new EffectComposer(renderer); composer.addPass(new RenderPass(scene, cam));
+  bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 2.6); composer.addPass(bloom); composer.addPass(new OutputPass());
+}
+function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); } const r = $('pip').getBoundingClientRect(); pip = { x: r.left, y: h - r.bottom, w: r.width, h: r.height }; }
 window.addEventListener('resize', resize);
-function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator', 'profile', 'settings'].forEach((s) => { $(s).hidden = s !== id; }); if (id === 'menu') checkDaily(); }
+function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator', 'profile', 'settings', 'storeS'].forEach((s) => { $(s).hidden = s !== id; }); if (id === 'menu') checkDaily(); }
 function buildLangs() { const g = $('langGrid'); g.innerHTML = ''; LANGS.forEach((l) => { const b = document.createElement('button'); b.textContent = l.name; b.dir = l.rtl ? 'rtl' : 'ltr'; if (l.code === lang) b.className = 'sel'; b.onclick = () => { lang = l.code; store.set('lang', lang); applyLang(); show('settings'); buildSettings(); }; g.appendChild(b); }); }
 function enterRoam() { lastAct = 0; G.on = false; G.zone = 'studio'; G.px = 0; G.pz = 3.3; G.face = Math.PI; player.armR.rotation.set(0, 0, 0); show('hud'); resize(); syncScene(); snapCam = true; say(t('roam_hint'), '', true); }
 // character creator
@@ -500,6 +529,7 @@ function checkDaily() {
 $('dClaim').onclick = () => {
   const r = dailyClaim(dailyState); $('daily').hidden = true; if (!r) return;
   dailyState = r.state; store.set('daily', dailyState); addCoins(r.coins); sfx.win();
+  if ([7, 14, 21].includes(r.day)) cs.grantRandom(r.day === 21 ? 2 : 1);
   if (r.grand) {
     const id = shop.nextExclusive(); if (id) shop.grant([id]); else addCoins(500);
     $('dGrid').innerHTML = ''; $('dNote').hidden = false; $('dNote').textContent = '👑 ' + t('d_grand'); $('daily').hidden = false;
@@ -511,6 +541,11 @@ piSignIn().then(showPiUser); showLevel();
 $('bPlay').onclick = () => { sfx.click(); enterRoam(); }; $('bAgain').onclick = startRound; $('bMenu').onclick = enterRoam;
 $('bHow').onclick = () => show('how'); $('bHowBack').onclick = () => show('menu'); $('langBtn').onclick = () => { buildLangs(); show('langs'); }; $('bLangBack').onclick = () => { show('settings'); buildSettings(); };
 $('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }; $('bCharDone').onclick = () => { sfx.click(); stripUnowned(); store.set('avatar', avatar); rebuildPlayer(); show('menu'); };
+// app-token store
+function gToast(msg) { const el = $('gToast'); el.textContent = msg; el.hidden = false; clearTimeout(gToast.h); gToast.h = setTimeout(() => { el.hidden = true; }, 2200); }
+const cs = makeStore({ store, t, getLang: () => lang, sfx, toast: gToast, $ });
+$('bStore').onclick = () => { sfx.click(); cs.closeSheet(); cs.render(); show('storeS'); };
+$('stBack').onclick = () => { sfx.click(); cs.closeSheet(); show('menu'); };
 // profile & settings
 function buildProfile() {
   const n = $('pName'); n.value = store.get('name', '') || PiState.user || ''; n.placeholder = PiState.user || t('p_guest');
@@ -530,7 +565,7 @@ function buildSettings() {
   row(soundOn ? '🔊' : '🔇', t('sound'), t(soundOn ? 'on' : 'off'), () => { soundOn = !soundOn; store.set('sound', soundOn); if (!soundOn && window.speechSynthesis) speechSynthesis.cancel(); });
   row('🗣️', t('s_voice'), t(cfg.voice ? 'on' : 'off'), () => { cfg.voice = !cfg.voice; store.set('voice', cfg.voice); if (!cfg.voice && window.speechSynthesis) speechSynthesis.cancel(); });
   row('📳', t('s_vibe'), t(cfg.vibe ? 'on' : 'off'), () => { cfg.vibe = !cfg.vibe; store.set('vibe', cfg.vibe); buzz(80); });
-  row('🖥️', t('s_quality'), t(cfg.quality === 'low' ? 'q_low' : 'q_high'), () => { cfg.quality = cfg.quality === 'low' ? 'high' : 'low'; store.set('quality', cfg.quality); renderer.setPixelRatio(pixelRatio()); resize(); });
+  row('🖥️', t('s_quality'), t(cfg.quality === 'low' ? 'q_low' : 'q_high'), () => { cfg.quality = cfg.quality === 'low' ? 'high' : 'low'; store.set('quality', cfg.quality); renderer.setPixelRatio(pixelRatio()); setupFX(); resize(); });
   $('setVer').textContent = t('s_version') + ' ' + VERSION; const r = $('bReset'); r.classList.remove('armed'); r.textContent = t('s_reset');
 }
 $('bReset').onclick = () => {
@@ -550,7 +585,7 @@ function frame(now) {
   gold.rotation.y = tt * 0.7; guest.head.rotation.y = Math.sin(tt * 0.8) * 0.25; guest.armR.rotation.x = -0.5 + Math.sin(tt * 2) * 0.12;
   crew.g.rotation.y = Math.sin(tt * 1.1) * 0.9 - 0.6; crew.armL.rotation.x = -1.2 + Math.sin(tt * 3) * 0.3; crew.armR.rotation.x = -1.0 + Math.cos(tt * 3) * 0.3;
   crowd.forEach((c, i) => { c.g.position.y = Math.abs(Math.sin(tt * 3 + i * 1.3)) * 0.12; c.armL.rotation.x = c.armR.rotation.x = -2.7 + Math.sin(tt * 6 + i) * 0.3; });
-  trophy.rotation.y = tt * 0.5;
+  trophy.rotation.y = tt * 0.5; if (G.zone === 'studio') atmos(dt, tt);
   NPCS.forEach((n, i) => { const d = Math.hypot(G.px - n.x, G.pz - n.z); const want = d < 3.5 && n.zone === G.zone ? Math.atan2(G.px - n.x, G.pz - n.z) : n.face; let dr = want - n.ch.g.rotation.y; while (dr > Math.PI) dr -= 6.283; while (dr < -Math.PI) dr += 6.283; n.ch.g.rotation.y += dr * Math.min(1, dt * 5); n.ch.armR.rotation.x = Math.sin(tt * 1.5 + i) * 0.12; n.ch.head.rotation.x = Math.sin(tt * 1.1 + i * 2) * 0.05; });
   IT.forEach((it, i) => { it.ring.visible = it.zone === G.zone && it.cond(); it.ring.material.opacity = 0.25 + Math.sin(tt * 3 + i) * 0.12; });
   confetti.forEach((c) => { if (c.m.visible && c.m.position.y > c.ty) { c.m.position.y = Math.max(c.ty, c.m.position.y - c.vy * dt); c.m.rotation.x += dt * 6; c.m.rotation.z += dt * 4; if (c.m.position.y === c.ty) c.m.rotation.set(-Math.PI / 2, 0, c.m.rotation.z); } });
@@ -583,7 +618,8 @@ function frame(now) {
   // render: the creator shows the character in the top half only
   const vh = creating ? Math.round(h * 0.46) : h, vy = h - vh; const fov = creating ? 34 : w < h ? 72 : 58;
   if (cam.aspect !== w / vh || cam.fov !== fov) { cam.aspect = w / vh; cam.fov = fov; cam.updateProjectionMatrix(); }
-  renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h); renderer.clear(); renderer.setViewport(0, vy, w, vh); renderer.render(scene, cam);
+  renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h); renderer.clear();
+  if (composer && !creating) composer.render(); else { renderer.setViewport(0, vy, w, vh); renderer.render(scene, cam); }
   if (playing && G.on && pip.w > 0) {
     renderer.setScissorTest(true); renderer.setScissor(pip.x, pip.y, pip.w, pip.h); renderer.setViewport(pip.x, pip.y, pip.w, pip.h);
     IT.forEach((it) => { it.ring.visible = false; }); renderer.render(scene, feedCam); renderer.setScissorTest(false);
@@ -594,5 +630,6 @@ function frame(now) {
 // hook for automated checks only
 window.__onair = { PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
-applyLang(); syncScene(); show('menu'); resize();
+scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
+setupFX(); applyLang(); syncScene(); show('menu'); resize();
 requestAnimationFrame(frame);

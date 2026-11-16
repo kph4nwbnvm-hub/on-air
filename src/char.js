@@ -1,14 +1,21 @@
 import * as THREE from 'three';
 
-// 4-step toon ramp shared by every material: gives the flat cartoon look
-const ramp = new THREE.DataTexture(new Uint8Array([70, 130, 200, 255]), 4, 1, THREE.RedFormat);
-ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.needsUpdate = true;
-export const M = (c, o = {}) => new THREE.MeshToonMaterial({ color: c, gradientMap: ramp, emissive: o.emissive || 0x000000, emissiveIntensity: o.emissiveIntensity === undefined ? 1 : o.emissiveIntensity, transparent: !!o.transparent, opacity: o.opacity === undefined ? 1 : o.opacity });
+// Physically based materials (lit by the studio environment map): metals for gold/chrome, soft plastics, fabric.
+const GOLD = new Set([0xffcf3f, 0xd4af37, 0xffd23f]);
+const lum = (c) => (((c >> 16) & 255) * 0.299 + ((c >> 8) & 255) * 0.587 + (c & 255) * 0.114) / 255;
+export const M = (c, o = {}) => {
+  const gold = GOLD.has(c), dark = lum(c) < 0.12;
+  return new THREE.MeshStandardMaterial({
+    color: c, roughness: o.rough ?? (gold ? 0.32 : dark ? 0.5 : 0.66), metalness: o.metal ?? (gold ? 0.8 : 0.0),
+    emissive: o.emissive || 0x000000, emissiveIntensity: o.emissiveIntensity === undefined ? 1 : o.emissiveIntensity,
+    transparent: !!o.transparent, opacity: o.opacity === undefined ? 1 : o.opacity,
+  });
+};
 export const box = (w, h, d, c, o) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M(c, o));
-export const cyl = (r1, r2, h, c, o, seg = 24) => new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, seg), M(c, o));
-export const sph = (r, c, o) => new THREE.Mesh(new THREE.SphereGeometry(r, 24, 18), M(c, o));
-export const cap = (r, l, c, o) => new THREE.Mesh(new THREE.CapsuleGeometry(r, l, 6, 16), M(c, o));
-export const tor = (r, t, c, arc = Math.PI * 2) => new THREE.Mesh(new THREE.TorusGeometry(r, t, 8, 24, arc), M(c));
+export const cyl = (r1, r2, h, c, o, seg = 24) => new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, Math.max(seg, 32)), M(c, o));
+export const sph = (r, c, o) => new THREE.Mesh(new THREE.SphereGeometry(r, 36, 26), M(c, o));
+export const cap = (r, l, c, o) => new THREE.Mesh(new THREE.CapsuleGeometry(r, l, 10, 24), M(c, o));
+export const tor = (r, t, c, arc = Math.PI * 2) => new THREE.Mesh(new THREE.TorusGeometry(r, t, 12, 40, arc), M(c));
 export function at(m, x, y, z, parent) { m.position.set(x, y, z); if (parent) parent.add(m); return m; }
 
 export const OPT = {
@@ -33,7 +40,7 @@ export function makeChar(a) {
     const L = pivot(0.13 * s, 0.62);
     if (bottom === 'pants') at(cap(0.095, 0.42, botC), 0, -0.25, 0, L);
     else { at(cap(0.105, 0.14, botC), 0, -0.1, 0, L); at(cap(0.08, 0.3, skin), 0, -0.36, 0, L); }
-    at(box(0.17, 0.09, 0.3, OPT.shoes[a.shoes]), 0, -0.6, 0.06, L);
+    { const sh = at(cap(0.085, 0.16, OPT.shoes[a.shoes], { rough: 0.45 }), 0, -0.6, 0.06, L); sh.rotation.x = Math.PI / 2; sh.scale.set(1.05, 1, 0.7); at(box(0.17, 0.025, 0.32, 0xd9d9d9, { rough: 0.85 }), 0, -0.655, 0.06, L); }
     p[s < 0 ? 'legL' : 'legR'] = L;
   });
   // torso
@@ -59,8 +66,15 @@ export function makeChar(a) {
   if (a.acc.bag) { at(box(0.38, 0.44, 0.17, 0x8a5a2b), 0, 1.02, -0.3, g); at(box(0.3, 0.12, 0.03, 0x6b4520), 0, 0.95, -0.39, g); at(box(0.05, 0.5, 0.5, 0x6b4520), -0.17, 1.1, -0.05, g); at(box(0.05, 0.5, 0.5, 0x6b4520), 0.17, 1.1, -0.05, g); }
   // head
   const head = at(sph(0.25, skin), 0, 1.66, 0, g); p.head = head;
-  [-0.09, 0.09].forEach((x) => { at(sph(0.036, 0x1a1a1a), x, 0.02, 0.225, head); at(sph(0.013, 0xffffff), x + 0.012, 0.035, 0.255, head); at(box(0.075, 0.018, 0.02, hairC), x, 0.095, 0.232, head); });
-  at(box(0.1, 0.02, 0.02, 0x8a3b2e), 0, -0.1, 0.235, head);
+  [-0.09, 0.09].forEach((x) => {
+    const w = at(sph(0.05, 0xffffff, { rough: 0.15 }), x, 0.02, 0.205, head); w.scale.set(1, 1.1, 0.6);
+    at(sph(0.032, 0x3b2414, { rough: 0.1 }), x, 0.018, 0.232, head); at(sph(0.017, 0x050505, { rough: 0.05 }), x, 0.018, 0.249, head);
+    at(sph(0.009, 0xffffff, { emissive: 0xffffff, emissiveIntensity: 0.6 }), x + 0.012, 0.034, 0.258, head);
+    const br = at(cap(0.012, 0.06, hairC), x, 0.1, 0.228, head); br.rotation.z = Math.PI / 2 + (x < 0 ? 0.12 : -0.12);
+    const ch = at(sph(0.04, 0xff8a8a, { transparent: true, opacity: 0.28 }), x * 1.55, -0.06, 0.2, head); ch.scale.set(1, 0.6, 0.4);
+  });
+  const nose = at(sph(0.034, skin), 0, -0.025, 0.245, head); nose.scale.set(0.9, 1, 1.1);
+  { const mo = at(tor(0.045, 0.011, 0x8a3b2e, Math.PI), 0, -0.088, 0.228, head); mo.rotation.z = Math.PI; }
   at(sph(0.05, skin), -0.245, 0, 0, head); at(sph(0.05, skin), 0.245, 0, 0, head);
   const dome = (r) => new THREE.Mesh(new THREE.SphereGeometry(r, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.05), M(hairC));
   const hs = a.acc.cap && a.hairStyle !== 5 && a.hairStyle !== 4 ? 1 : a.hairStyle;
