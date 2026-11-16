@@ -9,6 +9,7 @@ import { piSignIn, PiState } from './pi.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
 import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL, isExclusive, EXCLUSIVE } from './shop.js';
 import { makeStore, TOKEN } from './store.js';
+import * as SFX from './studiofx.js';
 import { preview as dailyPreview, claim as dailyClaim, rewardFor, isBig, CYCLE } from './daily.js';
 
 /* ---------- storage, i18n, sound ---------- */
@@ -171,19 +172,28 @@ cur = ZG.studio;
 ground(26, 22, 0x2f2552, 0, 1);
 const rugA = put(new THREE.Mesh(new THREE.CircleGeometry(2.5, 48), M(0xe0563b)), -2.5, 0.012, -1.7); rugA.rotation.x = -Math.PI / 2; rugA.receiveShadow = true;
 const rugB = put(new THREE.Mesh(new THREE.CircleGeometry(2.2, 48), M(0x2a8f8a)), 3, 0.012, -1.8); rugB.rotation.x = -Math.PI / 2; rugB.receiveShadow = true;
-put(box(15, 6, 0.3, 0x45358a), 0, 3, -4.2); put(box(0.3, 6, 14, 0x3b2d78), -7.3, 3, 2.6); put(box(0.3, 6, 14, 0x3b2d78), 7.3, 3, 2.6);
-for (let i = 0; i < 4; i++) put(box(1.15, 3, 0.08, i % 2 ? 0x7a57e6 : 0x9a76ff, { emissive: i % 2 ? 0x2a1680 : 0x3a2499, emissiveIntensity: 0.9 }), -4.4 + i * 1.27, 2.1, -3.98);
-put(box(15, 0.07, 0.07, 0xffcf3f, { emissive: 0xffcf3f }), 0, 0.35, -4.0); put(box(15, 0.07, 0.07, 0x4cc9f0, { emissive: 0x4cc9f0 }), 0, 4.6, -4.0);
+put(box(15, 6, 0.3, 0x2c2470), 0, 3, -4.2); put(box(0.3, 6, 14, 0x281f66), -7.3, 3, 2.6); put(box(0.3, 6, 14, 0x281f66), 7.3, 3, 2.6);
+{ const gt = SFX.galaxyTex(); const gm = new THREE.MeshBasicMaterial({ map: gt, toneMapped: false });
+  const gw = put(new THREE.Mesh(new THREE.PlaneGeometry(14, 6), gm), 7.14, 3, 2.6); gw.rotation.y = -Math.PI / 2;
+  const gt2 = gt.clone(); gt2.needsUpdate = true; gt2.repeat.set(0.35, 1); gt2.offset.set(0.62, 0); gt2.wrapS = THREE.RepeatWrapping;
+  put(new THREE.Mesh(new THREE.PlaneGeometry(2.7, 6), new THREE.MeshBasicMaterial({ map: gt2, toneMapped: false })), 5.95, 3, -4.04); }
+for (let i = 0; i < 4; i++) put(box(1.15, 3, 0.08, i % 2 ? 0x5a3fc0 : 0x6c4fe0, { emissive: i % 2 ? 0x1c0f60 : 0x26157a, emissiveIntensity: 0.9 }), -4.4 + i * 1.27, 2.1, -3.98);
+put(box(15, 0.07, 0.07, 0xffcf3f, { emissive: 0xffcf3f }), 0, 0.35, -4.0); put(box(15, 0.06, 0.06, 0x7fe9ff, { emissive: 0x4cc9f0, emissiveIntensity: 2 }), 0, 4.6, -4.0); put(box(0.06, 0.06, 14, 0x7fe9ff, { emissive: 0x4cc9f0, emissiveIntensity: 2 }), -7.1, 4.6, 2.6);
 const sign = put(signPlane('ON AIR', '#ff2a40', '#ffffff', 2.2, 0.7), 0, 4.0, -3.9); put(box(2.4, 0.9, 0.12, 0x8a1220), 0, 4.0, -3.98);
-const screenMat = new THREE.MeshBasicMaterial({ map: gradTex('#1fb6a8', '#2a6bd9', '#7a3fd9') });
-put(box(3.5, 2.1, 0.12, 0x15151c), 3, 2.25, -3.98); put(new THREE.Mesh(new THREE.PlaneGeometry(3.3, 1.9), screenMat), 3, 2.25, -3.91);
+const screenMat = new THREE.MeshBasicMaterial({ map: SFX.fluidTex(), toneMapped: false });
+put(box(3.5, 2.1, 0.12, 0x2a2b30, { rough: 0.35, metal: 0.6 }), 3, 2.25, -3.98); put(new THREE.Mesh(new THREE.PlaneGeometry(3.38, 1.98), screenMat), 3, 2.25, -3.91);
 put(box(13, 0.14, 0.14, 0x1c1c22), 0, 5.2, -0.5); put(box(13, 0.14, 0.14, 0x1c1c22), 0, 5.2, 0.1);
 for (let i = 0; i < 14; i++) { const b = box(0.06, 0.06, 0.62, 0x1c1c22); b.rotation.y = i % 2 ? 0.7 : -0.7; put(b, -6 + i * 0.92, 5.2, -0.2); }
-[-4, -1.2, 1.6, 4.4].forEach((x, i) => { const c = cyl(0.14, 0.2, 0.36, 0x222228); c.rotation.x = 0.5; put(c, x, 4.95, -0.2); const col = [0xffcf3f, 0xff4d6d, 0x4cc9f0, 0x3ddc97][i]; put(sph(0.12, col, { emissive: col, emissiveIntensity: 2 }), x, 4.8, -0.12); });
+[-4.2, -1.4, 1.4, 4.2].forEach((x, i) => { const c = cyl(0.16, 0.22, 0.4, 0x16161a, { metal: 0.6, rough: 0.4 }); c.rotation.x = 0.5; put(c, x, 4.95, -0.2); const col = [0xff4fa8, 0x22d3ee, 0x34f59a, 0xa855f7][i]; put(sph(0.13, col, { emissive: col, emissiveIntensity: 4 }), x, 4.8, -0.12); });
 // sponsor desk + product
 const DESK = { x: -2.5, z: -2 };
-put(slab(3.3, 0.12, 1.25, 0.18, 0xf6efe2), DESK.x, 1.06, DESK.z).castShadow = true; put(slab(3.0, 0.9, 0.16, 0.06, 0xe0563b), DESK.x, 0.94, DESK.z + 0.5).castShadow = true;
-put(slab(0.16, 0.9, 1.0, 0.06, 0xc9432c), DESK.x - 1.45, 0.94, DESK.z); put(slab(0.16, 0.9, 1.0, 0.06, 0xc9432c), DESK.x + 1.45, 0.94, DESK.z);
+{ const gl = (c) => new THREE.MeshPhysicalMaterial({ color: c, roughness: 0.28, metalness: 0.05, clearcoat: 1, clearcoatRoughness: 0.08 });
+  const top = put(slab(3.3, 0.12, 1.25, 0.18, 0xf6efe2), DESK.x, 1.06, DESK.z); top.castShadow = true; top.material = gl(0xf6efe2);
+  const front = put(slab(3.0, 0.9, 0.16, 0.06, 0xe0563b), DESK.x, 0.94, DESK.z + 0.5); front.castShadow = true;
+  front.material = new THREE.MeshPhysicalMaterial({ map: SFX.carbonTex(), roughness: 0.32, metalness: 0.35, clearcoat: 1, clearcoatRoughness: 0.06 });
+  top.material = new THREE.MeshPhysicalMaterial({ map: SFX.carbonTex(), color: 0x9a9aa8, roughness: 0.3, metalness: 0.3, clearcoat: 1, clearcoatRoughness: 0.05 });
+  put(new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: SFX.emblemTex(), transparent: true, toneMapped: false })), DESK.x, 0.92, DESK.z + 0.585); }
+{ const cm = new THREE.MeshPhysicalMaterial({ map: SFX.carbonTex(), roughness: 0.32, metalness: 0.35, clearcoat: 1, clearcoatRoughness: 0.06 }); put(slab(0.16, 0.9, 1.0, 0.06, 0xc9432c), DESK.x - 1.45, 0.94, DESK.z).material = cm; put(slab(0.16, 0.9, 1.0, 0.06, 0xc9432c), DESK.x + 1.45, 0.94, DESK.z).material = cm; }
 put(box(2.4, 0.05, 0.03, 0xffcf3f, { emissive: 0xffcf3f }), DESK.x, 0.55, DESK.z + 0.6);
 put(cyl(0.09, 0.1, 0.03, 0x222222), DESK.x - 0.9, 1.08, DESK.z + 0.2); put(cyl(0.015, 0.015, 0.3, 0x222222), DESK.x - 0.9, 1.22, DESK.z + 0.2); put(cap(0.045, 0.08, 0x3a3a3a), DESK.x - 0.9, 1.42, DESK.z + 0.2);
 const PX = DESK.x + 0.8, PZ = DESK.z + 0.1;
@@ -214,16 +224,32 @@ put(box(0.9, 0.7, 0.7, 0xc98f4e), 6.5, 0.35, -2.4).castShadow = true; put(box(0.
 const crew = makeChar({ skin: 0, hairStyle: 0, hairColor: 2, top: 0, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, capColor: 1, acc: { cap: true } });
 crew.g.position.set(5.5, 0, -2.9); cur.add(crew.g);
 const SHOTS = [{ p: [DESK.x + 0.25, 1.62, 1.7], l: [DESK.x + 0.3, 1.2, DESK.z] }, { p: [IV.x, 1.5, 1.6], l: [IV.x, 1.05, IV.z] }, { p: [4.6, 1.62, 0.3], l: [6.1, 1.0, -3.2] }];
-const tripods = SHOTS.map((s, i) => { const tp = tripodCam(i + 1); tp.g.position.set(s.p[0], 0, s.p[2] + 0.55); tp.g.rotation.y = Math.atan2(-(s.l[0] - s.p[0]), -(s.l[2] - s.p[2])); cur.add(tp.g); return tp; });
+const tripods = SHOTS.map((s, i) => { const tp = SFX.broadcastCam(i + 1, SFX.lab(i + 1)); tp.g.position.set(s.p[0], 0, s.p[2] + 0.55); tp.g.rotation.y = Math.atan2(-(s.l[0] - s.p[0]), -(s.l[2] - s.p[2])); cur.add(tp.g); return tp; });
 const CON = { x: 0, z: 2.0 };
 put(slab(1.5, 0.1, 0.7, 0.08, 0x3a3a48), CON.x, 0.98, CON.z).castShadow = true; put(box(1.3, 0.9, 0.5, 0x2a2a36), CON.x, 0.45, CON.z).castShadow = true;
-const conBtns = [0, 1, 2].map((i) => put(box(0.2, 0.05, 0.2, 0x666666, { emissive: 0xffcf3f, emissiveIntensity: 0 }), CON.x - 0.4 + i * 0.4, 1.0, CON.z + 0.1));
+SFX.mixerTop(cur, CON.x, 1.03, CON.z - 0.02);
+const conBtns = [0, 1, 2].map((i) => put(box(0.12, 0.04, 0.09, 0x666666, { emissive: 0xffcf3f, emissiveIntensity: 0 }), CON.x - 0.55 + i * 0.16, 1.07, CON.z + 0.27));
 put(box(1.2, 0.5, 0.05, 0x111118), CON.x, 1.32, CON.z - 0.28).rotation.x = -0.2;
-const conScreen = put(new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.42), new THREE.MeshBasicMaterial({ color: 0x3ddc97 })), CON.x, 1.32, CON.z - 0.245); conScreen.rotation.x = -0.2;
+const conScreen = put(new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.42), new THREE.MeshBasicMaterial({ color: 0x3ddc97, map: SFX.monitorTex() })), CON.x, 1.32, CON.z - 0.245); conScreen.rotation.x = -0.2;
 const BRK = { x: -6.9, z: 1 };
 put(box(0.16, 0.9, 0.7, 0x8d99a6), -7.08, 1.45, BRK.z); const lever = put(box(0.08, 0.34, 0.1, 0xff3b4e), -6.97, 1.5, BRK.z);
 const bulb = put(new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 12), new THREE.MeshBasicMaterial({ color: 0x3ddc97 })), -6.98, 1.82, BRK.z); put(box(0.02, 0.2, 0.3, 0xffcf3f), -6.99, 1.15, BRK.z);
 const sbFaces = [softbox(-5.2, 1.2, 1.0), softbox(0.3, -3.3, 0), softbox(5.6, 1.6, -1.1)];
+{ // props corner (back right) and floor cables
+  const b1 = put(SFX.cardboard(0.8, 0.6, 0.6, 'FRAGILE'), 6.4, 0.3, -3.55); b1.rotation.y = 0.1;
+  put(SFX.cardboard(0.7, 0.5, 0.55, 'STUDIO'), 6.45, 0.85, -3.55).rotation.y = -0.15;
+  put(SFX.cardboard(0.55, 0.45, 0.5), 6.5, 1.32, -3.5).rotation.y = 0.2;
+  put(SFX.cardboard(0.75, 0.55, 0.6, 'GEAR'), 6.5, 0.275, -2.55).rotation.y = -0.1;
+  const cr = SFX.crate(0x2563eb); cr.position.set(6.45, 0, -1.8); cr.rotation.y = -0.3; cur.add(cr);
+  const cr2 = SFX.crate(0xd9d9de); cr2.position.set(6.4, 0.55, -2.55); cr2.scale.setScalar(0.8); cur.add(cr2);
+  const ch = SFX.chest(); ch.position.set(6.3, 0, -0.9); ch.rotation.y = -Math.PI / 2; cur.add(ch);
+  put(box(1.5, 0.06, 0.4, 0x2a2b32, { rough: 0.4, metal: 0.5 }), 5.1, 3.1, -3.85);
+  [[4.6, 0], [5.0, 2], [5.4, 4], [5.75, 6]].forEach(([fx, k]) => { const f = makeChar({ skin: k % 4, hairStyle: k % 3, hairColor: k % 5, top: k % 2, topColor: k % 7, bottom: 0, bottomColor: (k + 3) % 8, shoes: k % 5 }); f.g.scale.setScalar(0.17); f.g.position.set(fx, 3.13, -3.85); cur.add(f.g); });
+  SFX.cableTo(cur, [[SHOTS[0].p[0], SHOTS[0].p[2] + 0.55], [-1.5, 2.6], [CON.x - 0.6, CON.z + 0.4]]);
+  SFX.cableTo(cur, [[SHOTS[1].p[0], SHOTS[1].p[2] + 0.55], [1.8, 2.8], [CON.x + 0.6, CON.z + 0.4]]);
+  SFX.cableTo(cur, [[SHOTS[2].p[0], SHOTS[2].p[2] + 0.55], [3.6, 1.2], [2.2, 2.4], [CON.x + 0.7, CON.z + 0.1]]);
+  COLL.studio.push([6.45, -3.5, 0.55], [6.45, -2.55, 0.5], [6.45, -1.8, 0.45], [6.3, -0.9, 0.5]);
+}
 // exit door
 put(box(0.2, 2.6, 1.5, 0x23233a), 7.1, 1.3, 3.4); put(box(0.22, 2.3, 1.2, 0x4cc9f0, { emissive: 0x4cc9f0, emissiveIntensity: 0.5 }), 7.08, 1.2, 3.4);
 const exitSign = put(signPlane('EXIT', '#19a05e', '#ffffff', 0.9, 0.32, 256, 96, 'bold 70px system-ui'), 6.98, 2.85, 3.4); exitSign.rotation.y = -Math.PI / 2;
@@ -299,14 +325,19 @@ const sun = new THREE.DirectionalLight(0xffffff, 0); sun.castShadow = true; sun.
 Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: 1, far: 60 }); scene.add(sun); scene.add(sun.target);
 // atmosphere: volumetric light beams and floating dust in the studio
 const beamTex = (() => { const cv = document.createElement('canvas'); cv.width = 4; cv.height = 128; const x = cv.getContext('2d'); const g = x.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 4, 128); const tx = new THREE.CanvasTexture(cv); return tx; })();
-const beams = [[-4.2, -1.8, 0xb48cff], [-1.4, -2.4, 0xfff0cc], [1.4, -2.4, 0xfff0cc], [4.2, -1.8, 0x7fe0ff]].map(([x, z, c]) => {
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 1.3, 5.2, 32, 1, true), new THREE.MeshBasicMaterial({ color: c, map: beamTex, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+const beams = [[-4.2, -1.8, 0xff4fa8], [-1.4, -2.4, 0x22d3ee], [1.4, -2.4, 0x34f59a], [4.2, -1.8, 0xa855f7]].map(([x, z, c]) => {
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 1.3, 5.2, 32, 1, true), new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(c) }, uIntensity: { value: 0.5 } },
+    vertexShader: 'varying vec3 vN; varying vec3 vW; varying vec2 vUv; void main(){ vUv = uv; vN = normalize(mat3(modelMatrix) * normal); vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader: 'uniform vec3 uColor; uniform float uIntensity; varying vec3 vN; varying vec3 vW; varying vec2 vUv; void main(){ vec3 v = normalize(cameraPosition - vW); float edge = pow(abs(dot(normalize(vN), v)), 1.8); float fall = pow(vUv.y, 2.2); gl_FragColor = vec4(uColor * edge * fall * uIntensity, 1.0); }',
+    transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+  }));
   m.position.set(x, 3.0, z); m.rotation.z = x * 0.04; ZG.studio.add(m); return m;
 });
 const dust = (() => { const n = 260, pos = new Float32Array(n * 3); for (let i = 0; i < n; i++) { pos[i * 3] = (Math.random() - 0.5) * 13; pos[i * 3 + 1] = Math.random() * 5; pos[i * 3 + 2] = -3.4 + Math.random() * 8; }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   const pts = new THREE.Points(g, new THREE.PointsMaterial({ map: (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 32; const x = cv.getContext('2d'); const g = x.createRadialGradient(16, 16, 0, 16, 16, 16); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 32, 32); return new THREE.CanvasTexture(cv); })(), color: 0xfff4dd, size: 0.06, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })); ZG.studio.add(pts); return pts; })();
-function atmos(dt, tt) { const a = dust.geometry.attributes.position; for (let i = 0; i < a.count; i++) { let y = a.getY(i) + dt * 0.08; if (y > 5) y = 0; a.setY(i, y); a.setX(i, a.getX(i) + Math.sin(tt * 0.3 + i) * dt * 0.02); } a.needsUpdate = true; beams.forEach((b, i) => { b.material.opacity = (G.light ? 0.13 : 0.03) + Math.sin(tt * 0.8 + i) * 0.025; }); }
+function atmos(dt, tt) { const a = dust.geometry.attributes.position; for (let i = 0; i < a.count; i++) { let y = a.getY(i) + dt * 0.08; if (y > 5) y = 0; a.setY(i, y); a.setX(i, a.getX(i) + Math.sin(tt * 0.3 + i) * dt * 0.02); } a.needsUpdate = true; beams.forEach((b, i) => { b.material.uniforms.uIntensity.value = (G.light ? 0.55 : 0.12) + Math.sin(tt * 0.8 + i) * 0.08; }); }
 const CONF_N = 90; const confetti = []; const confCols = [0xff4d6d, 0xffd23f, 0x3ddc97, 0x4cc9f0, 0xb388ff, 0xff9f1c];
 for (let i = 0; i < CONF_N; i++) { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.14), new THREE.MeshBasicMaterial({ color: confCols[i % 6], side: THREE.DoubleSide })); m.visible = false; ZG.studio.add(m); confetti.push({ m, ty: 0, vy: 0 }); }
 const mess = { x: 0, z: 0 };
@@ -468,7 +499,8 @@ let pip = { x: 0, y: 0, w: 0, h: 0 };
 let composer = null, bloom = null;
 function setupFX() {
   if (cfg.quality === 'low') { composer = null; return; }
-  composer = new EffectComposer(renderer); composer.addPass(new RenderPass(scene, cam));
+  const rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: 4 });
+  composer = new EffectComposer(renderer, rt); composer.addPass(new RenderPass(scene, cam));
   bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 2.6); composer.addPass(bloom); composer.addPass(new OutputPass());
 }
 function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); } const r = $('pip').getBoundingClientRect(); pip = { x: r.left, y: h - r.bottom, w: r.width, h: r.height }; }
@@ -612,7 +644,7 @@ function frame(now) {
     player.g.position.set(0, 0, 3.3); player.g.rotation.y = Math.sin(tt * 0.7) * 0.9; player.legL.rotation.x = player.legR.rotation.x = player.armL.rotation.x = 0; player.armR.rotation.set(0, 0, 0);
     cam.position.set(0, 1.45, 6.9); cam.lookAt(0, 1.0, 3.3);
   } else {
-    cam.position.set(Math.sin(tt * 0.2) * 3.5, 4.4, 10.5); cam.lookAt(0.3, 1.2, -1.2);
+    cam.position.set(Math.sin(tt * 0.2) * 3.5, 4.4, 10.5); cam.lookAt(0.3, 1.2, -1.2); if (window.__shot) { cam.position.set(...window.__shot.p); cam.lookAt(...window.__shot.l); }
     player.g.position.set(0, 0, 3.3); player.g.rotation.y = Math.sin(tt * 0.6) * 0.5; player.armR.rotation.x = -2.6 + Math.sin(tt * 5) * 0.3; player.legL.rotation.x = player.legR.rotation.x = player.armL.rotation.x = 0;
   }
   // render: the creator shows the character in the top half only
