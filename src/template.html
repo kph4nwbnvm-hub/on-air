@@ -208,6 +208,14 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
 #sWho{display:block;color:#ffcf3f;font-size:15px;margin-bottom:4px;min-height:18px}
 #sText{font-size:18px;line-height:1.6;margin:0 0 12px;text-align:start}
 #story.black #sText{font-size:20px;color:#f1ecff}
+#iv{position:fixed;inset:auto 0 0 0;z-index:44;display:flex;justify-content:center;padding:14px}
+.ivbox{width:min(560px,100%);background:rgba(12,8,30,.94);border:1px solid rgba(127,233,255,.55);border-radius:20px;padding:14px 16px}
+#ivHint{margin:0 0 8px;font-size:14px;opacity:.85;text-align:center}
+#ivTrack{position:relative;height:54px;border-radius:14px;background:rgba(255,255,255,.08);overflow:hidden;direction:ltr}
+#ivZone{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);border:3px solid #3ddc97;border-radius:12px;background:rgba(61,220,151,.14)}
+#ivDot{position:absolute;top:50%;font-size:30px;transform:translate(-50%,-50%);left:50%}
+#ivQ{min-height:48px;margin:10px 0;font-size:16px;line-height:1.5;text-align:start}
+.ivrow{display:flex;align-items:center;gap:10px}.ivrow span{flex:1;font-size:13px;opacity:.85}.ivrow button{flex:0 0 96px;margin:0;font-size:26px}
 </style>
 </head>
 <body>
@@ -295,6 +303,10 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
   <div id="stSheet" hidden><div class="sh"><button id="shClose">✕</button><div id="shIc"></div><h3 id="shName"></h3><p id="shMeta"></p><p id="shUse"></p><p id="shGoal"></p><p id="shCompat" hidden></p><div id="shActs"></div></div></div>
 </section>
 <div id="gToast" hidden></div>
+<section id="iv" hidden>
+  <div class="ivbox"><p id="ivHint"></p><div id="ivTrack"><div id="ivZone"></div><div id="ivDot">🙂</div></div>
+    <p id="ivQ"></p><div class="ivrow"><span id="ivStat"></span><button id="ivGo" class="big">🎤</button></div></div>
+</section>
 <section id="story" hidden>
   <div class="sbox"><b id="sWho"></b><p id="sText"></p><button id="sNext" class="big" data-t="tu_next"></button></div>
 </section>

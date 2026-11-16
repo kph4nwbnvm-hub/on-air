@@ -32,7 +32,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.0';
+const VERSION = '1.4.1';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -494,6 +494,7 @@ interact('event', EX - 13.2, 0, 1.2, 'a_back', '🚪', roam, () => enterZone('st
 NPCS.forEach((n) => {
   const fx = n.x + Math.sin(n.face) * 1.1, fz = n.z + Math.cos(n.face) * 1.1;
   if (n.star) interact(n.zone, fx, fz, 1.3, 'a_interview', '🎤', () => roam() && !n.done, () => openQuestions(n.set, (q) => { n.done = true; const rw = q.v > 0 ? 60 : q.v === 0 ? 20 : 0; addCoins(rw); say(t(n.name) + ': ' + t(q.a), q.v > 0 ? 'ok' : q.v < 0 ? 'warn' : ''); $('coinBox').classList.remove('pop'); void $('coinBox').offsetWidth; if (rw) $('coinBox').classList.add('pop'); }));
+  else if (n.zone === 'street') interact(n.zone, fx, fz, 1.3, 'a_interview', '🎤', () => roam() && !ivOn && !storyOn, () => startInterview(n));
   else interact(n.zone, fx, fz, 1.3, 'a_talk', '💬', roam, () => { sfx.click(); say(t(n.name) + ': ' + t(n.lines[n.i++ % n.lines.length])); });
 });
 function currentAction() {
@@ -669,7 +670,39 @@ function storyNext() {
   speak(t(st.k), st.who ? t(st.who) : 'guest');
 }
 function startStory() { storyOn = true; SI = -1; G.on = false; G.zone = 'studio'; syncScene(); storyNext(); }
-$('sNext').onclick = () => { sfx.click(); storyNext(); };
+$('sNext').onclick = () => { sfx.click(); if (dq) dlgNext(); else storyNext(); };
+
+// ───────── street interviews: keep the person in frame while the primitive camera shakes ─────────
+let ivOn = false, ivT = 0, ivPos = 0.5, ivStep = 0, ivHits = 0, ivNpc = null, ivZoneW = 0.24, ivSpeed = 2.2, dq = null;
+const gearLv = (fam) => Math.max(0, ...(cs.S.equip.equip || []).filter((id) => id.startsWith('equip.' + fam + '.')).map((id) => +id.split('.')[2]));
+// small dialogue queue shown in the story box: [{who, k}], then done()
+function dlg(lines, done) { dq = { lines, i: -1, done }; dlgNext(); }
+function dlgNext() { const d = dq; d.i++; const l = d.lines[d.i]; const box = $('story');
+  if (!l) { box.hidden = true; dq = null; d.done && d.done(); return; }
+  box.hidden = false; box.classList.remove('black'); $('sWho').textContent = l.who ? (l.raw ? l.who : t(l.who)) : ''; $('sText').textContent = t(l.k); $('sNext').textContent = t('tu_next'); speak(t(l.k), l.who || 'guest'); }
+function startInterview(n) {
+  ivNpc = n; ivOn = true; G.asking = true;
+  if (!store.get('story4_done', false)) dlg([{ who: 'sn_me', k: 's4a' }, { who: t(n.name), raw: true, k: 's4b' }, { k: 's4c' }], openIv); else openIv();
+}
+function openIv() {
+  const cam = Math.max(1, gearLv('cam')); ivZoneW = Math.min(0.6, 0.2 + cam * 0.028); ivSpeed = Math.max(0.8, 1.9 - cam * 0.08); ivStep = 0; ivHits = 0; ivT = Math.random() * 6;
+  $('ivZone').style.width = (ivZoneW * 100) + '%'; $('ivHint').textContent = t('iv_keep'); $('ivQ').textContent = t('iq1'); ivStat(); $('iv').hidden = false;
+}
+function ivStat() { const mic = Math.max(1, gearLv('mic')); $('ivStat').textContent = t('iv_q') + ': ' + Math.round((ivHits / 3) * 100) + '%  ·  ' + t('iv_noise') + ': ' + Math.max(0, 70 - mic * 5) + '%'; }
+function ivTick(dt) { if ($('iv').hidden) return; ivT += dt * ivSpeed; ivPos = 0.5 + Math.sin(ivT) * 0.36 + Math.sin(ivT * 2.7) * 0.1; $('ivDot').style.left = (Math.min(0.97, Math.max(0.03, ivPos)) * 100) + '%'; }
+$('ivGo').onclick = () => {
+  if ($('iv').hidden) return; const hit = Math.abs(ivPos - 0.5) < ivZoneW / 2; if (hit) { ivHits++; sfx.good(); } else sfx.bad();
+  ivStep++; $('ivQ').textContent = (hit ? '✅ ' : '📉 ') + t(ivNpc.name) + ': ' + t('ia' + ivStep); ivStat();
+  if (ivStep >= 3) { $('ivGo').disabled = true; setTimeout(finishIv, 1400); } else setTimeout(() => { if (!$('iv').hidden) $('ivQ').textContent = t('iq' + (ivStep + 1)); }, 1300);
+};
+function finishIv() {
+  $('ivGo').disabled = false; $('iv').hidden = true; const mic = Math.max(1, gearLv('mic'));
+  const q = Math.round(Math.min(100, (ivHits / 3) * 70 + Math.min(30, (gearLv('cam') + mic) * 1.0)));
+  const list = store.get('interviews', []); list.push({ q, at: Date.now(), who: ivNpc.name }); store.set('interviews', list.slice(-30));
+  const first = !store.get('story4_done', false); const xp = first ? 15 : 3 + Math.round(q / 20); const up = shop.addXp(xp); showLevel();
+  const end = () => { ivOn = false; G.asking = false; say(t('iv_saved').replace('{q}', q) + (up ? '  ⭐ ' + t('level_up') : ''), 'ok', true); };
+  if (first) { store.set('story4_done', true); dlg([{ who: 'sn_me', k: 's4d' }, { who: 'sn_saleh', k: 's4e' }, { k: 's4f' }], end); } else end();
+}
 
 // first-time guided tour: the camera flies to each part of the studio and explains it
 const TOUR = [
@@ -729,7 +762,7 @@ function frameBody(now) {
   gold.rotation.y = tt * 0.7; guest.head.rotation.y = Math.sin(tt * 0.8) * 0.25; guest.armR.rotation.x = -0.5 + Math.sin(tt * 2) * 0.12;
   crew.g.rotation.y = Math.sin(tt * 1.1) * 0.9 - 0.6; crew.armL.rotation.x = -1.2 + Math.sin(tt * 3) * 0.3; crew.armR.rotation.x = -1.0 + Math.cos(tt * 3) * 0.3;
   crowd.forEach((c, i) => { c.g.position.y = Math.abs(Math.sin(tt * 3 + i * 1.3)) * 0.12; c.armL.rotation.x = c.armR.rotation.x = -2.7 + Math.sin(tt * 6 + i) * 0.3; });
-  trophy.rotation.y = tt * 0.5; if (G.zone === 'studio') atmos(dt, tt); updateSign(tt);
+  trophy.rotation.y = tt * 0.5; if (G.zone === 'studio') atmos(dt, tt); updateSign(tt); ivTick(dt);
   NPCS.forEach((n, i) => { const d = Math.hypot(G.px - n.x, G.pz - n.z); const want = d < 3.5 && n.zone === G.zone ? Math.atan2(G.px - n.x, G.pz - n.z) : n.face; let dr = want - n.ch.g.rotation.y; while (dr > Math.PI) dr -= 6.283; while (dr < -Math.PI) dr += 6.283; n.ch.g.rotation.y += dr * Math.min(1, dt * 5); n.ch.armR.rotation.x = Math.sin(tt * 1.5 + i) * 0.12; n.ch.head.rotation.x = Math.sin(tt * 1.1 + i * 2) * 0.05; });
   IT.forEach((it, i) => { it.ring.visible = it.zone === G.zone && it.cond(); it.ring.material.opacity = 0.25 + Math.sin(tt * 3 + i) * 0.12; });
   confetti.forEach((c) => { if (c.m.visible && c.m.position.y > c.ty) { c.m.position.y = Math.max(c.ty, c.m.position.y - c.vy * dt); c.m.rotation.x += dt * 6; c.m.rotation.z += dt * 4; if (c.m.position.y === c.ty) c.m.rotation.set(-Math.PI / 2, 0, c.m.rotation.z); } });
@@ -779,7 +812,7 @@ function frame(now) {
 }
 
 // hook for automated checks only
-window.__onair = { sign, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { sign, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 setupFX(); applyLang(); syncScene(); show('menu'); resize();

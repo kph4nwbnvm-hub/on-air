@@ -8,6 +8,7 @@ import ST3, { KEYS3 } from './tr_store3.js';
 import TT, { KEYS_T } from './tr_tour.js';
 import TA, { KEYS_AD } from './tr_ads.js';
 import TS, { KEYS_S } from './tr_story.js';
+import TI, { KEYS_IV } from './tr_street.js';
 // The 53 languages of the Pi system, in the order the project owner supplied them.
 export const LANGS = [
   { code: 'ar', name: 'العربية', rtl: true }, { code: 'en', name: 'English' }, { code: 'af', name: 'Afrikaans' },
@@ -151,3 +152,4 @@ Object.entries(ST3).forEach(([k, arr]) => { const o = {}; KEYS3.forEach((key, i)
 Object.entries(TT).forEach(([k, arr]) => { const o = {}; KEYS_T.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TA).forEach(([k, arr]) => { const o = {}; KEYS_AD.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TS).forEach(([k, arr]) => { const o = {}; KEYS_S.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
+Object.entries(TI).forEach(([k, arr]) => { const o = {}; KEYS_IV.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
