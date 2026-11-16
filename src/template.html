@@ -233,6 +233,12 @@ button.locked{opacity:.45}
 @keyframes segw{from{filter:brightness(1)}to{filter:brightness(1.25)}}
 #hudStore{position:absolute;inset-inline-end:12px;top:44%;width:54px;height:54px;border-radius:50%;margin:0;padding:0;font-size:24px;background:rgba(20,14,48,.85);border:2px solid rgba(127,233,255,.6);z-index:6}
 #hudStore.locked{opacity:.4}
+#dress{position:fixed;inset:0;z-index:43;display:flex;align-items:center;justify-content:center;padding:14px;background:rgba(5,3,14,.6)}
+#drList{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-height:46vh;overflow:auto}
+#drList button{margin:0;padding:10px 4px;font-size:13px;min-height:74px;display:flex;flex-direction:column;align-items:center;gap:4px;border-radius:14px}
+#drList button span{font-size:26px}#drList button.sel{outline:3px solid #ffcf3f}
+#drList p{grid-column:1/-1;text-align:center;opacity:.85;margin:8px 0}
+.drall{display:flex;align-items:center;gap:8px;margin:12px 2px 4px;font-size:15px}.drall input{width:22px;height:22px}
 </style>
 </head>
 <body>
@@ -324,6 +330,11 @@ button.locked{opacity:.45}
 <section id="pc" hidden>
   <div class="pcbox"><div class="pchead"><b id="pcTitle"></b><button id="pcClose" class="ghost">✕</button></div><div id="pcList"></div>
     <button id="pcStore" class="big" data-t="pc_store"></button></div>
+</section>
+<section id="dress" hidden>
+  <div class="pcbox"><div class="pchead"><b id="drTitle"></b><button id="drClose" class="ghost">✕</button></div><div id="drList"></div>
+    <label class="drall"><input type="checkbox" id="drAll"><span id="drAllT"></span></label>
+    <button id="drStore" class="ghost"></button></div>
 </section>
 <section id="iv" hidden>
   <div class="ivbox"><p id="ivHint"></p><div id="ivTrack"><div id="ivZone"></div><div id="ivDot">🙂</div></div>

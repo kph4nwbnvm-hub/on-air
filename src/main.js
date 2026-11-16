@@ -33,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.12';
+const VERSION = '1.4.13';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -263,7 +263,8 @@ const chairHost = armchair(0x3554c9); chairHost.position.set(IV.x - 0.95, 0, IV.
 const chairGuest = armchair(0xd98a2b); chairGuest.position.set(IV.x + 0.95, 0, IV.z - 0.15); chairGuest.rotation.y = -0.45; cur.add(chairGuest);
 put(cyl(0.34, 0.34, 0.04, 0xf6efe2), IV.x, 0.62, IV.z + 0.35).castShadow = true; put(cyl(0.04, 0.04, 0.6, 0x222222), IV.x, 0.3, IV.z + 0.35); put(cyl(0.2, 0.22, 0.03, 0x222222), IV.x, 0.02, IV.z + 0.35);
 { const b = ADS.bottle('elva', 0.36); b.position.set(IV.x - 0.12, 0.64, IV.z + 0.33); b.rotation.y = -Math.PI / 2; cur.add(b); } put(cyl(0.05, 0.04, 0.12, 0xffffff), IV.x + 0.12, 0.7, IV.z + 0.4);
-const guest = makeChar(uni({ skin: 3, hairStyle: 1, hairColor: 0, beard: 1 }));
+const GUEST_AV = { skin: 3, hairStyle: 1, hairColor: 0, beard: 1 };
+const guest = makeChar(uni(GUEST_AV));
 sit(guest); guest.g.position.set(IV.x + 0.95, -0.14, IV.z - 0.05); guest.g.rotation.y = -0.45; cur.add(guest.g);
 put(sph(0.16, 0xffffff), IV.x + 1.75, 0.16, IV.z + 0.5).castShadow = true; plant(IV.x + 2.0, IV.z - 1.3); plant(DESK.x - 2.4, DESK.z - 1.2);
 // storage corner (camera 3)
@@ -271,6 +272,7 @@ put(box(1.7, 2.3, 0.5, 0x7a5a3a), 6.2, 1.15, -3.6).castShadow = true;
 for (let i = 0; i < 3; i++) put(box(1.6, 0.06, 0.54, 0x5a4028), 6.2, 0.55 + i * 0.7, -3.58);
 put(box(0.5, 0.4, 0.4, 0xd9a05b), 5.8, 0.8, -3.5); put(box(0.4, 0.5, 0.4, 0x4fb3d9), 6.6, 1.55, -3.5); put(box(0.6, 0.3, 0.4, 0xff4d6d), 6.3, 2.15, -3.5);
 put(box(0.9, 0.7, 0.7, 0xc98f4e), 6.5, 0.35, -2.4).castShadow = true; put(box(0.7, 0.5, 0.6, 0xb57f42), 6.5, 0.95, -2.4).castShadow = true;
+const CREW_AV = { skin: 0, hairStyle: 0, hairColor: 2 };
 const crew = makeChar(uni({ skin: 0, hairStyle: 0, hairColor: 2, top: 0, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, capColor: 1, acc: { cap: true } }));
 crew.g.position.set(5.5, 0, -2.9); cur.add(crew.g);
 const SHOTS = [{ p: [DESK.x + 0.25, 1.62, 1.7], l: [DESK.x + 0.3, 1.2, DESK.z] }, { p: [IV.x, 1.5, 1.6], l: [IV.x, 1.05, IV.z] }, { p: [4.6, 1.62, 0.3], l: [6.1, 1.0, -3.2] }];
@@ -384,8 +386,18 @@ function STAR_SETUP() { starS.set = [0, 1, 2].map((i) => ({ q: 'qs' + i, a: 'as'
 
 /* ---------- player, lights, confetti ---------- */
 // the player's own clothes stay plain until the studio reaches level 2
-const look = () => (shop.level < 2 ? uni(avatar) : avatar);
-let player = makeChar(look()); scene.add(player.g);
+// outfit cards map to looks the character model can show (colours and cut; not full 3D costumes yet)
+const OUTFIT = {
+  thobe: { top: 2, topColor: 6, bottom: 0, bottomColor: 6, shoes: 1 }, bisht: { top: 2, topColor: 10, bottom: 0, bottomColor: 6, shoes: 5 }, tux: { top: 2, topColor: 7, bottom: 0, bottomColor: 7, shoes: 1 },
+  astro: { top: 1, topColor: 6, bottom: 0, bottomColor: 11, shoes: 0 }, chef: { top: 0, topColor: 6, bottom: 0, bottomColor: 7, shoes: 0, acc: { cap: true }, capColor: 6 }, pilot: { top: 2, topColor: 0, bottom: 0, bottomColor: 7, shoes: 1, acc: { cap: true }, capColor: 7 },
+  sport: { top: 0, topColor: 2, bottom: 1, bottomColor: 6, shoes: 3 }, ninja: { top: 1, topColor: 7, bottom: 0, bottomColor: 7, shoes: 1 }, detective: { top: 2, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, acc: { glasses: true } },
+  wizard: { top: 1, topColor: 5, bottom: 0, bottomColor: 5, shoes: 5 }, cowboy: { top: 2, topColor: 4, bottom: 0, bottomColor: 0, shoes: 2, acc: { cap: true }, capColor: 4 }, diver: { top: 0, topColor: 9, bottom: 1, bottomColor: 9, shoes: 4 },
+  inventor: { top: 2, topColor: 6, bottom: 0, bottomColor: 0, shoes: 1, acc: { glasses: true } }, knight: { top: 2, topColor: 11, bottom: 0, bottomColor: 11, shoes: 5 },
+};
+const wear = (av, fam) => (fam && OUTFIT[fam] ? { ...av, ...OUTFIT[fam], acc: { ...(OUTFIT[fam].acc || {}) } } : uni(av));
+// the player wears the equipped outfit card; otherwise plain clothes until level 2
+const look = () => { const f = cs.equippedFam('skins'); return f && OUTFIT[f] ? wear(avatar, f) : shop.level < 2 ? uni(avatar) : avatar; };
+let player = makeChar(shop.level < 2 ? uni(avatar) : avatar); scene.add(player.g);
 function rebuildPlayer() { const pos = player.g.position.clone(), ry = player.g.rotation.y; scene.remove(player.g); player = makeChar(look()); player.g.position.copy(pos); player.g.rotation.y = ry; scene.add(player.g); }
 const amb = new THREE.HemisphereLight(0xdfe6ff, 0x3a3060, 0.9); scene.add(amb);
 const stageA = new THREE.PointLight(0xa463ff, 6, 12, 1.6); stageA.position.set(-5.5, 3.2, -2.5); scene.add(stageA);
@@ -666,7 +678,7 @@ $('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syn
 function gToast(msg) { const el = $('gToast'); el.textContent = msg; el.hidden = false; clearTimeout(gToast.h); gToast.h = setTimeout(() => { el.hidden = true; }, 2200); }
 const cs = makeStore({ store, t, getLang: () => lang, sfx, toast: gToast, $ });
 $('bStore').onclick = () => { sfx.click(); storeFrom = 'menu'; cs.closeSheet(); cs.render(); show('storeS'); };
-$('stBack').onclick = () => { sfx.click(); cs.closeSheet(); if (cs.needsReady()) { pcFromStore(); return; } if (storeFrom === 'hud') { storeFrom = 'menu'; storePause = false; show('hud'); resize(); syncScene(); } else show('menu'); };
+$('stBack').onclick = () => { sfx.click(); cs.closeSheet(); rebuildPlayer(); Object.keys(STAFF).forEach(restyle); if (cs.needsReady()) { pcFromStore(); return; } if (storeFrom === 'hud') { storeFrom = 'menu'; storePause = false; show('hud'); resize(); syncScene(); } else show('menu'); };
 
 // ───────── opening story (shown once per player, never repeated) ─────────
 // scenes 1–3: father's will → Uncle Saleh at the door → abandoned studio → cleaning. Later scenes hook in as their features land.
@@ -807,6 +819,30 @@ const UNLOCK = { bStore: () => pcS.gift || pcS.fixed || cs.S.tokens > 0, bChar: 
 function applyLocks() { Object.entries(UNLOCK).forEach(([id, ok]) => { $(id).classList.toggle('locked', !ok()); }); }
 setInterval(() => { const k = objKey(), el = $('objBar'); const on = !!k && !G.on && !storyOn && !ivOn && !$('hud').hidden && $('pc').hidden && $('story').hidden; el.hidden = !on; if (on) el.textContent = '🎯 ' + t(k); if (!$('menu').hidden) applyLocks(); $('hudStore').classList.toggle('locked', !UNLOCK.bStore()); $('hudStore').hidden = storyOn || ivOn; }, 500);
 
+// ───────── wardrobe: one studio outfit for the whole crew, or a different outfit per person ─────────
+const STAFF = { crew: { ch: crew, av: CREW_AV, post: null }, guest: { ch: guest, av: GUEST_AV, post: (c) => sit(c) } };
+const looks = store.get('looks', { all: null, crew: null, guest: null });
+function restyle(key) {
+  const st = STAFF[key], fam = looks[key] || looks.all; const n = makeChar(wear(st.av, cs.ownedFams('skins').includes(fam) ? fam : null)); if (st.post) st.post(n);
+  const o = st.ch.g, par = o.parent; n.g.position.copy(o.position); n.g.rotation.copy(o.rotation); n.g.scale.copy(o.scale); n.g.visible = o.visible; par.remove(o); par.add(n.g); Object.assign(st.ch, n);
+}
+let drKey = 'crew';
+function drBuild() {
+  $('drTitle').textContent = '👔 ' + t('dr_title'); const L = $('drList'); L.innerHTML = ''; const fams = cs.ownedFams('skins').filter((f) => OUTFIT[f]); const cur = looks[drKey] || looks.all;
+  const add = (icon, name, fam) => { const b = document.createElement('button'); b.className = 'ghost' + ((fam || null) === (cur || null) ? ' sel' : ''); b.innerHTML = '<span></span><b></b>'; b.children[0].textContent = icon; b.children[1].textContent = name;
+    b.onclick = () => { sfx.click(); if ($('drAll').checked) { looks.all = fam; looks.crew = null; looks.guest = null; Object.keys(STAFF).forEach(restyle); } else { looks[drKey] = fam; if (!fam && looks.all) looks[drKey] = null; restyle(drKey); } store.set('looks', looks); drBuild(); }; L.appendChild(b); };
+  add('👕', t('dr_plain'), null); fams.forEach((f) => { const i = cs.famInfo('skins', f); add(i.icon, i.name, f); });
+  if (!fams.length) { const p = document.createElement('p'); p.textContent = t('dr_none'); L.appendChild(p); }
+  $('drAllT').textContent = t('dr_all'); $('drStore').textContent = '🛍️ ' + t('pc_store');
+}
+function drOpen(key) { drKey = key; G.asking = true; $('drAll').checked = false; drBuild(); $('dress').hidden = false; }
+$('drClose').onclick = () => { sfx.click(); $('dress').hidden = true; G.asking = false; };
+$('drStore').onclick = () => { if (!UNLOCK.bStore()) { sfx.bad(); gToast(t('locked_hint')); return; } sfx.click(); $('dress').hidden = true; G.asking = false; storeFrom = 'hud'; cs.setCat('skins'); cs.closeSheet(); cs.render(); show('storeS'); };
+interact('studio', 5.5, -1.75, 1.1, 'a_dress', '👔', () => roam() && !storyOn && !ivOn, () => drOpen('crew'));
+interact('studio', IV.x + 0.95, IV.z + 1.25, 1.1, 'a_dress', '👔', () => roam() && !storyOn && !ivOn, () => drOpen('guest'));
+Object.keys(STAFF).forEach((k) => { if (looks[k] || looks.all) restyle(k); });
+rebuildPlayer();
+
 // first-time guided tour: the camera flies to each part of the studio and explains it
 const TOUR = [
   { p: [0.5, 3.4, 8.5], l: [0.5, 1.4, -1.5] }, { p: [DESK.x + 0.3, 2.2, DESK.z + 3.1], l: [DESK.x, 1.1, DESK.z] },
@@ -918,7 +954,7 @@ function frame(now) {
 }
 
 // hook for automated checks only
-window.__onair = { sign, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { sign, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 Object.keys(UNLOCK).forEach((id) => { const run = $(id).onclick; $(id).onclick = (e) => { if (!UNLOCK[id]()) { sfx.bad(); gToast(t('locked_hint')); return; } run(e); }; });

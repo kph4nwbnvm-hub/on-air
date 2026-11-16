@@ -1,5 +1,5 @@
 // App-token store: buy, equip, use, merge cards; smart browsing (category, rarity, search, sort); collections.
-import { CATS, CARDS, RARITY, EFFECTS, COLLECTIONS, card, value, priceOf, catOf, tierOf, isGear, buyable, info, note, MAX_LV, BUY_MAX } from './catalog.js';
+import { CATS, CARDS, RARITY, EFFECTS, COLLECTIONS, card, value, priceOf, catOf, tierOf, isGear, buyable, info, note, MAX_LV, BUY_MAX, FAMILIES } from './catalog.js';
 import { HUB_OF, supports, signalOf } from './levels.js';
 import { fmtTok } from './pricing.js';
 
@@ -174,8 +174,12 @@ export function makeStore(deps) {
   const give = (n) => { S.tokens = Math.round((S.tokens + n) * 1e7) / 1e7; save(); };
   const partId = (fam) => Object.keys(S.cards).filter((id) => id.startsWith('parts.' + fam + '.') && S.cards[id] > 0).sort((a, b) => +b.split('.')[2] - +a.split('.')[2])[0];
   const usePart = (fam) => { const id = partId(fam); if (!id) return 0; add(id, -1); save(); return +id.split('.')[2]; };
+  // wardrobe helpers: which outfit families the player owns, and their display info
+  const ownedFams = (cat) => [...new Set(Object.keys(S.cards).filter((id) => id.startsWith(cat + '.') && S.cards[id] > 0).map((id) => id.split('.')[1]))];
+  const famInfo = (cat, fam) => { const f = FAMILIES.find((x) => x.cat === cat && x.id === fam); return f ? { icon: f.icon, name: f.name[getLang()] || f.name.en } : null; };
+  const equippedFam = (cat) => { const id = (S.equip[cat] || [])[0]; return id ? id.split('.')[1] : null; };
   const setNeeds = (fn, go) => { needsFn = fn; needsGo = go; };
   const needsReady = () => { const nd = needsFn(); return nd.length > 0 && nd.every(ownsPart); };
   const setCat = (c) => { view.cat = c; view.rarity = 0; view.q = ''; view.limit = 60; };
-  return { S, bonuses, consumeBoosts, grantRandom, dropLevel, render, closeSheet, nameOf, give, partId, usePart, setCat, setNeeds, needsReady };
+  return { S, bonuses, consumeBoosts, grantRandom, dropLevel, render, closeSheet, nameOf, give, partId, usePart, setCat, setNeeds, needsReady, ownedFams, famInfo, equippedFam };
 }
