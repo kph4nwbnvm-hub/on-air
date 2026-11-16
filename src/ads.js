@@ -33,7 +33,8 @@ export const WORLD = {
 const AR_FONT = "'Tajawal','Noto Kufi Arabic','Noto Sans Arabic','Segoe UI',system-ui,sans-serif";
 const cnv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
 const rr = (x, X, Y, W, H, R) => { x.beginPath(); x.roundRect(X, Y, W, H, R); };
-const imgs = {};
+const imgs = {}; const TEXC = {}; const cached = (k, f) => TEXC[k] || (TEXC[k] = f());
+const MOB = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.userAgent);
 function img(key) { if (!imgs[key]) { const i = new Image(); i.src = IMG[key]; imgs[key] = i; } return imgs[key]; }
 function mk(c) { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
 // draw into a canvas texture; redraw once the logo image has decoded
@@ -49,20 +50,22 @@ function logo(x, key, cx, cy, maxW, maxH) {
 function wordmark(x, s, cx, cy, size) { x.fillStyle = s.ink; x.font = `900 ${size}px ${AR_FONT}`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(s.name, cx, cy); }
 
 // full-screen ad card for the wall screen (16:9)
-export function adCardTex(id) {
+export function adCardTex(id) { return cached('adCardTex' + id, () => _adCardTex(id)); }
+function _adCardTex(id) {
   const s = SPONSORS[id];
-  return live(1280, 720, (x, W, H) => {
+  return live(MOB ? 768 : 1280, MOB ? 432 : 720, (x, W, H) => { x.save(); x.scale(W / 1280, H / 720); W = 1280; H = 720;
     const g = x.createLinearGradient(0, 0, W, H); g.addColorStop(0, s.bg); g.addColorStop(1, '#ffffff'); x.fillStyle = g; x.fillRect(0, 0, W, H);
     x.fillStyle = s.accent; x.globalAlpha = 0.12; x.beginPath(); x.arc(W * 0.85, H * 0.2, 340, 0, 7); x.fill(); x.beginPath(); x.arc(W * 0.1, H * 0.95, 260, 0, 7); x.fill(); x.globalAlpha = 1;
     if (s.logo) logo(x, s.logo, W / 2, H * 0.38, W * 0.5, H * 0.42); else wordmark(x, s, W / 2, H * 0.38, 150);
     x.direction = 'rtl'; x.textAlign = 'center'; x.textBaseline = 'middle';
     x.fillStyle = s.ink; x.font = `800 64px ${AR_FONT}`; x.fillText(s.tag, W / 2, H * 0.72);
     x.fillStyle = s.accent; x.font = `600 36px ${AR_FONT}`; x.fillText(s.sub, W / 2, H * 0.84);
-    x.fillStyle = s.accent; x.fillRect(W / 2 - 60, H * 0.62, 120, 6);
+    x.fillStyle = s.accent; x.fillRect(W / 2 - 60, H * 0.62, 120, 6); x.restore();
   }, s.logo);
 }
 // "برعاية" plaque for the sponsor desk front (4:3)
-export function plaqueTex(id) {
+export function plaqueTex(id) { return cached('plaqueTex' + id, () => _plaqueTex(id)); }
+function _plaqueTex(id) {
   const s = SPONSORS[id];
   return live(512, 384, (x, W, H) => {
     x.fillStyle = 'rgba(0,0,0,.35)'; rr(x, 10, 14, W - 16, H - 18, 34); x.fill();
@@ -72,7 +75,8 @@ export function plaqueTex(id) {
   }, s.logo);
 }
 // bottle label band (wraps a cylinder)
-export function labelTex(id) {
+export function labelTex(id) { return cached('labelTex' + id, () => _labelTex(id)); }
+function _labelTex(id) {
   const s = SPONSORS[id];
   return live(1024, 256, (x, W, H) => {
     x.fillStyle = '#ffffff'; x.fillRect(0, 0, W, H); x.fillStyle = s.bg; x.fillRect(0, 0, W, H);
@@ -81,7 +85,8 @@ export function labelTex(id) {
   }, s.logo);
 }
 // shipping label for cardboard boxes
-export function boxTex(id) {
+export function boxTex(id) { return cached('boxTex' + id, () => _boxTex(id)); }
+function _boxTex(id) {
   const s = SPONSORS[id];
   return live(256, 256, (x, W, H) => {
     x.fillStyle = '#b98a55'; x.fillRect(0, 0, W, H);

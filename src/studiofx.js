@@ -7,8 +7,9 @@ const canvas = (w, h) => { const c = document.createElement('canvas'); c.width =
 const tex = (c, repeat) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...repeat); } return t; };
 let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
 
+const MOB = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.userAgent);
 export function galaxyTex() {
-  const [c, x] = canvas(2048, 1024);
+  const [c, x] = MOB ? canvas(1024, 512) : canvas(2048, 1024); if (MOB) x.scale(0.5, 0.5);
   const g = x.createLinearGradient(0, 0, 2048, 1024); g.addColorStop(0, '#07051a'); g.addColorStop(0.5, '#120a35'); g.addColorStop(1, '#05040f'); x.fillStyle = g; x.fillRect(0, 0, 2048, 1024);
   // nebula clouds
   for (let i = 0; i < 70; i++) {
