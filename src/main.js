@@ -21,7 +21,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.3.2';
+const VERSION = '1.3.3';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -97,6 +97,8 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 const pixelRatio = () => (cfg.quality === 'low' ? Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.25 : 1) : Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.5 : 2));
 renderer.setPixelRatio(pixelRatio());
 renderer.shadowMap.enabled = !store.get('gpu_lost', false); renderer.shadowMap.type = IS_MOBILE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+// surface shader compile/link failures on screen (phones hide the console)
+renderer.debug.onShaderError = (gl, program, vs, fs) => { const log = (gl.getProgramInfoLog(program) || '') + ' ' + (gl.getShaderInfoLog(fs) || '') + ' ' + (gl.getShaderInfoLog(vs) || ''); try { showDiag('SHADER ' + log.trim().slice(0, 220)); errShown = 99; } catch (_) {} };
 // if the phone's GPU drops the WebGL context (black screen), fall back to the light pipeline and reload once
 canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault(); store.set('gpu_lost', true); store.set('quality', 'low'); try { showDiag('GPU context lost — reloading in light mode'); } catch (_) {}
