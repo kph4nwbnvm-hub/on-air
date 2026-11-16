@@ -10,6 +10,7 @@ import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from '
 import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL, isExclusive, EXCLUSIVE } from './shop.js';
 import { makeStore, TOKEN } from './store.js';
 import * as SFX from './studiofx.js';
+import * as ADS from './ads.js';
 import { preview as dailyPreview, claim as dailyClaim, rewardFor, isBig, CYCLE } from './daily.js';
 
 /* ---------- storage, i18n, sound ---------- */
@@ -181,6 +182,9 @@ for (let i = 0; i < 4; i++) put(box(1.15, 3, 0.08, i % 2 ? 0x5a3fc0 : 0x6c4fe0, 
 put(box(15, 0.07, 0.07, 0xffcf3f, { emissive: 0xffcf3f }), 0, 0.35, -4.0); put(box(15, 0.06, 0.06, 0x7fe9ff, { emissive: 0x4cc9f0, emissiveIntensity: 2 }), 0, 4.6, -4.0); put(box(0.06, 0.06, 14, 0x7fe9ff, { emissive: 0x4cc9f0, emissiveIntensity: 2 }), -7.1, 4.6, 2.6);
 const sign = put(signPlane('ON AIR', '#ff2a40', '#ffffff', 2.2, 0.7), 0, 4.0, -3.9); put(box(2.4, 0.9, 0.12, 0x8a1220), 0, 4.0, -3.98);
 const screenMat = new THREE.MeshBasicMaterial({ map: SFX.fluidTex(), toneMapped: false });
+// wall screen ad rotation — Naif's own companies only
+const SCREEN_LIST = [screenMat.map, ADS.adCardTex('ccmedia'), ADS.adCardTex('cc'), ADS.adCardTex('elva')]; let screenI = 0;
+setInterval(() => { screenI = (screenI + 1) % SCREEN_LIST.length; screenMat.map = SCREEN_LIST[screenI]; screenMat.needsUpdate = true; }, 9000);
 put(box(3.5, 2.1, 0.12, 0x2a2b30, { rough: 0.35, metal: 0.6 }), 3, 2.25, -3.98); put(new THREE.Mesh(new THREE.PlaneGeometry(3.38, 1.98), screenMat), 3, 2.25, -3.91);
 put(box(13, 0.14, 0.14, 0x1c1c22), 0, 5.2, -0.5); put(box(13, 0.14, 0.14, 0x1c1c22), 0, 5.2, 0.1);
 for (let i = 0; i < 14; i++) { const b = box(0.06, 0.06, 0.62, 0x1c1c22); b.rotation.y = i % 2 ? 0.7 : -0.7; put(b, -6 + i * 0.92, 5.2, -0.2); }
@@ -192,16 +196,14 @@ const DESK = { x: -2.5, z: -2 };
   const front = put(slab(3.0, 0.9, 0.16, 0.06, 0xe0563b), DESK.x, 0.94, DESK.z + 0.5); front.castShadow = true;
   front.material = new THREE.MeshPhysicalMaterial({ map: SFX.carbonTex(), roughness: 0.32, metalness: 0.35, clearcoat: 1, clearcoatRoughness: 0.06 });
   top.material = new THREE.MeshPhysicalMaterial({ map: SFX.carbonTex(), color: 0x9a9aa8, roughness: 0.3, metalness: 0.3, clearcoat: 1, clearcoatRoughness: 0.05 });
-  put(new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.62), new THREE.MeshBasicMaterial({ map: SFX.emblemTex(), transparent: true, toneMapped: false })), DESK.x, 0.92, DESK.z + 0.585); }
+  put(new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.6), new THREE.MeshBasicMaterial({ map: ADS.plaqueTex('cc'), transparent: true, toneMapped: false })), DESK.x, 0.92, DESK.z + 0.69); }
 { const cm = new THREE.MeshPhysicalMaterial({ map: SFX.carbonTex(), roughness: 0.32, metalness: 0.35, clearcoat: 1, clearcoatRoughness: 0.06 }); put(slab(0.16, 0.9, 1.0, 0.06, 0xc9432c), DESK.x - 1.45, 0.94, DESK.z).material = cm; put(slab(0.16, 0.9, 1.0, 0.06, 0xc9432c), DESK.x + 1.45, 0.94, DESK.z).material = cm; }
 put(box(2.4, 0.05, 0.03, 0xffcf3f, { emissive: 0xffcf3f }), DESK.x, 0.55, DESK.z + 0.6);
 put(cyl(0.09, 0.1, 0.03, 0x222222), DESK.x - 0.9, 1.08, DESK.z + 0.2); put(cyl(0.015, 0.015, 0.3, 0x222222), DESK.x - 0.9, 1.22, DESK.z + 0.2); put(cap(0.045, 0.08, 0x3a3a3a), DESK.x - 0.9, 1.42, DESK.z + 0.2);
 const PX = DESK.x + 0.8, PZ = DESK.z + 0.1;
 put(cyl(0.36, 0.4, 0.07, 0xffffff), PX, 1.1, PZ).castShadow = true;
 const gold = new THREE.Group(); const GM = { emissive: 0x9a6a00, emissiveIntensity: 0.5 };
-put(slab(0.44, 0.46, 0.44, 0.06, 0xf5c542, GM), 0, 0.46, 0, gold); put(slab(0.48, 0.1, 0.48, 0.06, 0xffe08a, GM), 0, 0.58, 0, gold);
-put(box(0.09, 0.6, 0.46, 0xd9342b), 0, 0.3, 0, gold); put(box(0.46, 0.6, 0.09, 0xd9342b), 0, 0.3, 0, gold);
-[-1, 1].forEach((s) => { const b = tor(0.08, 0.03, 0xd9342b); b.position.set(0.08 * s, 0.64, 0); b.rotation.y = -0.6 * s; gold.add(b); });
+[[-0.11, 0.06], [0.11, 0.06], [0, -0.1]].forEach(([bx, bz]) => { const b = ADS.bottle('elva', 0.42); b.position.set(bx, 0, bz); b.rotation.y = 0.4; gold.add(b); });
 put(shadow(gold), PX, 1.14, PZ);
 const cleaner = new THREE.Group();
 put(cyl(0.17, 0.19, 0.42, 0x2fbf71), 0, 0.21, 0, cleaner); put(cyl(0.07, 0.17, 0.12, 0x2fbf71), 0, 0.48, 0, cleaner); put(cyl(0.06, 0.06, 0.1, 0xffffff), 0, 0.58, 0, cleaner);
@@ -212,7 +214,7 @@ const IV = { x: 3, z: -2 };
 const chairHost = armchair(0x3554c9); chairHost.position.set(IV.x - 0.95, 0, IV.z - 0.15); chairHost.rotation.y = 0.45; cur.add(chairHost);
 const chairGuest = armchair(0xd98a2b); chairGuest.position.set(IV.x + 0.95, 0, IV.z - 0.15); chairGuest.rotation.y = -0.45; cur.add(chairGuest);
 put(cyl(0.34, 0.34, 0.04, 0xf6efe2), IV.x, 0.62, IV.z + 0.35).castShadow = true; put(cyl(0.04, 0.04, 0.6, 0x222222), IV.x, 0.3, IV.z + 0.35); put(cyl(0.2, 0.22, 0.03, 0x222222), IV.x, 0.02, IV.z + 0.35);
-put(cyl(0.05, 0.04, 0.12, 0xffffff), IV.x - 0.1, 0.7, IV.z + 0.35); put(cyl(0.05, 0.04, 0.12, 0xffffff), IV.x + 0.12, 0.7, IV.z + 0.4);
+{ const b = ADS.bottle('elva', 0.24); b.position.set(IV.x - 0.12, 0.64, IV.z + 0.33); b.rotation.y = 0.6; cur.add(b); } put(cyl(0.05, 0.04, 0.12, 0xffffff), IV.x + 0.12, 0.7, IV.z + 0.4);
 const guest = makeChar({ skin: 3, hairStyle: 1, hairColor: 0, beard: 1, top: 0, topColor: 2, bottom: 1, bottomColor: 6, shoes: 3 });
 sit(guest); guest.g.position.set(IV.x + 0.95, -0.14, IV.z - 0.05); guest.g.rotation.y = -0.45; cur.add(guest.g);
 put(sph(0.16, 0xffffff), IV.x + 1.75, 0.16, IV.z + 0.5).castShadow = true; plant(IV.x + 2.0, IV.z - 1.3); plant(DESK.x - 2.4, DESK.z - 1.2);
@@ -236,10 +238,10 @@ put(box(0.16, 0.9, 0.7, 0x8d99a6), -7.08, 1.45, BRK.z); const lever = put(box(0.
 const bulb = put(new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 12), new THREE.MeshBasicMaterial({ color: 0x3ddc97 })), -6.98, 1.82, BRK.z); put(box(0.02, 0.2, 0.3, 0xffcf3f), -6.99, 1.15, BRK.z);
 const sbFaces = [softbox(-5.2, 1.2, 1.0), softbox(0.3, -3.3, 0), softbox(5.6, 1.6, -1.1)];
 { // props corner (back right) and floor cables
-  const b1 = put(SFX.cardboard(0.8, 0.6, 0.6, 'FRAGILE'), 6.4, 0.3, -3.55); b1.rotation.y = 0.1;
-  put(SFX.cardboard(0.7, 0.5, 0.55, 'STUDIO'), 6.45, 0.85, -3.55).rotation.y = -0.15;
+  const b1 = put(SFX.cardboard(0.8, 0.6, 0.6, 'FRAGILE'), 6.4, 0.3, -3.55); b1.rotation.y = 0.1; b1.material.map = ADS.boxTex('lslco');
+  { const b2 = put(SFX.cardboard(0.7, 0.5, 0.55, 'STUDIO'), 6.45, 0.85, -3.55); b2.rotation.y = -0.15; b2.material.map = ADS.boxTex('lslco'); }
   put(SFX.cardboard(0.55, 0.45, 0.5), 6.5, 1.32, -3.5).rotation.y = 0.2;
-  put(SFX.cardboard(0.75, 0.55, 0.6, 'GEAR'), 6.5, 0.275, -2.55).rotation.y = -0.1;
+  { const b4 = put(SFX.cardboard(0.75, 0.55, 0.6, 'GEAR'), 6.5, 0.275, -2.55); b4.rotation.y = -0.1; b4.material.map = ADS.boxTex('lslco'); }
   const cr = SFX.crate(0x2563eb); cr.position.set(6.45, 0, -1.8); cr.rotation.y = -0.3; cur.add(cr);
   const cr2 = SFX.crate(0xd9d9de); cr2.position.set(6.4, 0.55, -2.55); cr2.scale.setScalar(0.8); cur.add(cr2);
   const ch = SFX.chest(); ch.position.set(6.3, 0, -0.9); ch.rotation.y = -Math.PI / 2; cur.add(ch);
