@@ -34,7 +34,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.15';
+const VERSION = '1.4.16';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -505,6 +505,7 @@ function endRound() {
   if (pass && chDone < CH.length) { chDone++; store.set('ch', chDone); chMsg = chDone < CH.length ? '🎯 ' + t('ch_next').replace('{n}', chDone + 1) : '🏆 ' + t('ch_done'); }
   addCoins(Math.round(coins * coinsX)); (pass ? sfx.win : sfx.lose)(); buzz(pass ? [60, 40, 120] : 200);
   stats.rounds++; if (pass) stats.wins++; stats.best = Math.max(stats.best, Math.round(trust * 100)); store.set('stats', stats);
+  if (trust > 0) { const clips = store.get('interviews', []); clips.push({ q: Math.round(trust * 100), at: Date.now(), clip: true }); store.set('interviews', clips.slice(-30)); }
   const xp = Math.round(roundXp(trust, pass) * (1 + BN.xp / 100)), up = shop.addXp(xp); showLevel();
   let drop = null; if (Math.random() * 100 < 4 + BN.luck) drop = cs.grantRandom(cs.dropLevel(trust)); cs.consumeBoosts();
   $('rXp').textContent = '+' + xp + ' ' + t('xp') + ' · ' + t('lvl') + ' ' + shop.level; $('rUp').hidden = !up && !drop && !chMsg; $('rUp').textContent = [chMsg, up ? '⭐ ' + t('level_up') : '', drop ? '🎁 ' + t('st_drop') + ': ' + drop.fam.icon + ' ' + cs.nameOf(drop) : ''].filter(Boolean).join('  ·  ');
@@ -807,10 +808,14 @@ function pubBuild() {
   const head = document.createElement('div'); head.className = 'pubhead';
   Object.keys(PLAT).forEach((k) => { const c = document.createElement('div'); c.innerHTML = '<i>' + PLAT[k].ic + '</i><b></b><span></span>'; c.querySelector('b').textContent = platName(k); c.querySelector('span').textContent = '👥 ' + fans[k] + ' ' + t('pub_fans'); head.appendChild(c); });
   L.appendChild(head);
+  // followers pay a small income once a day
+  { const tot = fans.shoofni + fans.laqta + fans.sada, day = new Date().toISOString().slice(0, 10), paid = store.get('fan_pay', '') === day, n = Math.floor(tot / 2);
+    const b = document.createElement('button'); b.className = paid || n < 1 ? 'ghost pubpay' : 'big pubpay'; b.disabled = paid || n < 1; b.textContent = '💰 ' + t('pub_income') + (paid ? ' ✅' : ' · 🪙 +' + n);
+    b.onclick = () => { store.set('fan_pay', day); addCoins(n); sfx.win(); gToast('💰 🪙 +' + n); pubBuild(); }; L.appendChild(b); }
   const list = store.get('interviews', []);
   if (!list.length) { const e = document.createElement('p'); e.className = 'pubempty'; e.textContent = '🎤 ' + t('pub_empty'); L.appendChild(e); return; }
   list.slice().reverse().forEach((iv) => {
-    const row = document.createElement('div'); row.className = 'pcrow'; const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = '🎤 ' + (iv.who || '') + ' · ' + t('pub_q') + ' ' + Math.round(iv.q) + '%'; row.appendChild(nm);
+    const row = document.createElement('div'); row.className = 'pcrow'; const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = (iv.clip ? '🎥 ' + t('pub_clip') : '🎤 ' + (iv.who || '')) + ' · ' + t('pub_q') + ' ' + Math.round(iv.q) + '%'; row.appendChild(nm);
     Object.keys(PLAT).forEach((k) => { const b = document.createElement('button'); const done = iv.pub && iv.pub[k]; b.className = done ? 'ghost' : 'big'; b.textContent = done ? '✅' : PLAT[k].ic; b.disabled = !!done;
       b.onclick = () => { const f = Math.max(1, Math.round((iv.q / 10) * PLAT[k].fans)), c = Math.max(1, Math.round(iv.q * PLAT[k].coin)); iv.pub = { ...(iv.pub || {}), [k]: true }; store.set('interviews', list);
         fans[k] += f; store.set('fans', fans); addCoins(c); const up = shop.addXp(2); showLevel(); sfx.good(); gToast(PLAT[k].ic + ' ' + platName(k) + ' · 👥 +' + f + ' · 🪙 +' + c); if (up) say('⭐ ' + t('level_up'), 'ok', true); pubBuild(); };
