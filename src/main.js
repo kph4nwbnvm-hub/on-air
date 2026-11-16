@@ -33,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.8';
+const VERSION = '1.4.9';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -875,9 +875,12 @@ function frameBody(now) {
       const late = G.pranks.find((p) => p.fixed === null && !p.told && G.time - p.at > 6 && isActive(p.k)); if (late) { late.told = true; say(t('sp_' + late.k), 'warn'); }
       const tr = trustNow(); $('timer').textContent = fmt(ROUND - G.time + 0.99); $('trustFill').style.width = Math.round(tr) + '%'; $('trustFill').className = tr >= PASS * 100 ? '' : 'low';
       $('trustPct').textContent = Math.round(tr) + '%'; $('live').className = allGood() ? 'live' : 'live off';
-      $('segName').textContent = t(seg() === 0 ? 'seg1' : 'seg2') + ' · ' + t('need') + ' ' + (needCam() + 1);
+      { // say exactly what is wrong right now and where to fix it, so the player knows why trust is dropping
+        const bad = ['product', 'light', 'confetti', 'camera'].find(isActive), FIX = { product: ['📦', 'a_product'], camera: ['🎥', 'a_console'], light: ['💡', 'a_light'], confetti: ['🧹', 'a_clean'] };
+        const el = $('segName'); el.classList.toggle('warn', !!bad);
+        el.textContent = bad ? '⚠️ ' + t('p_' + bad) + '  ➜  ' + FIX[bad][0] + ' ' + t(FIX[bad][1]) : '✅ ' + t(seg() === 0 ? 'seg1' : 'seg2') + ' · ' + t('need') + ' ' + (needCam() + 1); }
       $('pipLabel').textContent = t('feed') + ' · ' + t('cam') + ' ' + (G.feed + 1); $('pip').className = G.feed === needCam() || G.grace > 0 ? '' : 'wrong';
-    } else $('segName').textContent = t('z_' + G.zone);
+    } else { $('segName').classList.remove('warn'); $('segName').textContent = t('z_' + G.zone); }
     movePlayer(dt); followCam(dt);
     const a = currentAction();
     if (a !== lastAct || a === 'clean') { lastAct = a; const b = $('actBtn'); b.hidden = !a; if (a === 'clean') { $('actIcon').textContent = '🧹'; $('actLabel').textContent = t('a_clean') + ' ×' + G.mess; } else if (a) { $('actIcon').textContent = a === itCon && !G.on ? '🔴' : a.icon; $('actLabel').textContent = t(a === itCon && !G.on ? 'a_start' : a.key); } }
