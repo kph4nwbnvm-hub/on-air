@@ -21,7 +21,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.3.0';
+const VERSION = '1.3.2';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -96,10 +96,10 @@ const canvas = $('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 const pixelRatio = () => (cfg.quality === 'low' ? Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.25 : 1) : Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.5 : 2));
 renderer.setPixelRatio(pixelRatio());
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = IS_MOBILE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled = !store.get('gpu_lost', false); renderer.shadowMap.type = IS_MOBILE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 // if the phone's GPU drops the WebGL context (black screen), fall back to the light pipeline and reload once
 canvas.addEventListener('webglcontextlost', (e) => {
-  e.preventDefault(); store.set('gpu_lost', true); store.set('quality', 'low');
+  e.preventDefault(); store.set('gpu_lost', true); store.set('quality', 'low'); try { showDiag('GPU context lost — reloading in light mode'); } catch (_) {}
   const last = store.get('gpu_reload', 0); if (Date.now() - last > 60000) { store.set('gpu_reload', Date.now()); setTimeout(() => location.reload(), 400); }
 }, false);
 renderer.toneMapping = THREE.NeutralToneMapping; renderer.toneMappingExposure = 1.0;
@@ -507,7 +507,7 @@ function followCam(dt) {
 let pip = { x: 0, y: 0, w: 0, h: 0 };
 let composer = null, bloom = null;
 function setupFX() {
-  if (cfg.quality === 'low') { composer = null; return; }
+  if (cfg.quality === 'low' || IS_MOBILE) { composer = null; return; }
   const rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: IS_MOBILE ? 0 : 4 });
   composer = new EffectComposer(renderer, rt); composer.addPass(new RenderPass(scene, cam));
   bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 2.6); composer.addPass(bloom); composer.addPass(new OutputPass());
@@ -642,7 +642,7 @@ $('bHome').onclick = () => { if (G.on) return; G.zone = 'studio'; syncScene(); s
 
 /* ---------- loop ---------- */
 let last = performance.now(), tt = 0, lastAct = 0;
-function frame(now) {
+function frameBody(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now; tt += dt; const w = window.innerWidth, h = window.innerHeight;
   gold.rotation.y = tt * 0.7; guest.head.rotation.y = Math.sin(tt * 0.8) * 0.25; guest.armR.rotation.x = -0.5 + Math.sin(tt * 2) * 0.12;
   crew.g.rotation.y = Math.sin(tt * 1.1) * 0.9 - 0.6; crew.armL.rotation.x = -1.2 + Math.sin(tt * 3) * 0.3; crew.armR.rotation.x = -1.0 + Math.cos(tt * 3) * 0.3;
@@ -687,6 +687,12 @@ function frame(now) {
     renderer.setScissorTest(true); renderer.setScissor(pip.x, pip.y, pip.w, pip.h); renderer.setViewport(pip.x, pip.y, pip.w, pip.h);
     IT.forEach((it) => { it.ring.visible = false; }); renderer.render(scene, feedCam); renderer.setScissorTest(false);
   }
+}
+// never let one bad frame kill the render loop; show the error so a phone screenshot tells us what broke
+let errShown = 0;
+function showDiag(msg) { let d = document.getElementById('diag'); if (!d) { d = document.createElement('div'); d.id = 'diag'; d.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99;max-width:70vw;font:11px/1.3 monospace;color:#ff8080;background:rgba(0,0,0,.6);padding:4px 6px;border-radius:6px;direction:ltr;text-align:left;pointer-events:none'; document.body.appendChild(d); } d.textContent = VERSION + ' · ' + msg; }
+function frame(now) {
+  try { frameBody(now); } catch (e) { if (errShown++ < 3) { console.error(e); showDiag('ERR ' + (e && e.message ? e.message : e)); } }
   requestAnimationFrame(frame);
 }
 
@@ -696,4 +702,5 @@ window.__onair = { PiState, G, IT, NPCS, act, startRound, endRound, firePrank, e
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 setupFX(); applyLang(); syncScene(); show('menu'); resize();
 if (!store.get('tour_done', false)) setTimeout(startTour, 600);
+showDiag(IS_MOBILE ? 'mobile · ' + cfg.quality : cfg.quality); setTimeout(() => { const d = document.getElementById('diag'); if (d && !errShown) d.remove(); }, 6000);
 requestAnimationFrame(frame);
