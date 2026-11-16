@@ -224,6 +224,8 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
 .pcrow .st.bad{color:#ff8a8a}.pcrow .st.ok{color:#7be3a8}
 .pcrow button{flex:0 0 auto;margin:0;padding:8px 14px;font-size:14px;width:auto;min-height:0}
 #pcStore{margin-top:12px}
+#objBar{position:absolute;top:156px;inset-inline:12px;z-index:5;background:rgba(255,207,63,.95);color:#231a00;font-weight:800;font-size:14px;padding:8px 12px;border-radius:14px;text-align:center;pointer-events:none}
+button.locked{opacity:.45}
 </style>
 </head>
 <body>
@@ -344,6 +346,7 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
     <div class="trust"><small><span data-t="trust"></span><span id="trustPct">100%</span></small><div class="bar"><div id="trustFill"></div></div></div>
     <span id="timer">3:00</span>
   </div>
+  <div id="objBar" hidden></div>
   <div id="leftcol"><div id="segName"></div><div id="bubble" class="bubble"></div></div>
   <div id="pip"><div id="pipFlash"></div><div id="pipLabel"></div></div>
   <div id="joy"><div id="knob"></div></div>

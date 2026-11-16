@@ -33,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.5';
+const VERSION = '1.4.6';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -515,7 +515,7 @@ function openQuestions(set, onPick) {
 const roam = () => !G.on;
 interact('studio', PX, PZ + 1.25, 1.15, 'a_product', '📦', () => G.on, () => { const was = isActive('product'); G.product = !G.product; if (G.product) markFixed('product'); else if (!was && seg() === 0) selfPrank('product'); });
 const itCon = interact('studio', CON.x, CON.z + 0.95, 1.15, 'a_console', '🎥', () => true, () => {
-  if (!G.on) { startRound(); return; }
+  if (!G.on) { if (!pcS.fixed) { sfx.bad(); say('🎯 ' + t(objKey() || 'locked_hint'), 'warn', true); return; } startRound(); return; }
   const was = isActive('camera'); G.feed = (G.feed + 1) % 3; G.grace = 0; flashPip(); if (!isActive('camera')) markFixed('camera'); else if (!was) selfPrank('camera');
 });
 interact('studio', BRK.x + 0.75, BRK.z, 1.15, 'a_light', '💡', () => true, () => { G.light = !G.light; if (G.on) { if (G.light) markFixed('light'); else selfPrank('light'); } });
@@ -792,6 +792,12 @@ interact('studio', PCX + 1.15, PCZ, 1.25, 'a_pc', '🖥️', () => roam() && !st
   if (!pcS.seen) { pcS.seen = true; pcSave(); G.asking = true; dlg([{ who: 'sn_me', k: 's5a' }, { who: 'sn_saleh', k: 's5b' }], pcOpen); } else pcOpen();
 });
 
+// ───────── simple start: features unlock step by step, with one clear objective on screen ─────────
+const objKey = () => (!store.get('story_done', false) ? '' : !store.get('story4_done', false) ? 'obj_iv' : !pcS.fixed ? 'obj_pc' : chDone === 0 ? 'obj_live' : '');
+const UNLOCK = { bStore: () => pcS.gift || pcS.fixed || cs.S.tokens > 0, bChar: () => shop.level >= 2, bProfile: () => store.get('story4_done', false) };
+function applyLocks() { Object.entries(UNLOCK).forEach(([id, ok]) => { $(id).classList.toggle('locked', !ok()); }); }
+setInterval(() => { const k = objKey(), el = $('objBar'); const on = !!k && !G.on && !storyOn && !ivOn && !$('hud').hidden && $('pc').hidden && $('story').hidden; el.hidden = !on; if (on) el.textContent = '🎯 ' + t(k); if (!$('menu').hidden) applyLocks(); }, 500);
+
 // first-time guided tour: the camera flies to each part of the studio and explains it
 const TOUR = [
   { p: [0.5, 3.4, 8.5], l: [0.5, 1.4, -1.5] }, { p: [DESK.x + 0.3, 2.2, DESK.z + 3.1], l: [DESK.x, 1.1, DESK.z] },
@@ -903,6 +909,8 @@ function frame(now) {
 window.__onair = { sign, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
+Object.keys(UNLOCK).forEach((id) => { const run = $(id).onclick; $(id).onclick = (e) => { if (!UNLOCK[id]()) { sfx.bad(); gToast(t('locked_hint')); return; } run(e); }; });
+applyLocks();
 setupFX(); applyLang(); syncScene(); show('menu'); resize();
 if (!store.get('story_done', false)) setTimeout(() => { afterCreator = true; G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }, 400);
 showDiag(IS_MOBILE ? 'mobile · ' + cfg.quality : cfg.quality); setTimeout(() => { const d = document.getElementById('diag'); if (d && !errShown) d.remove(); }, 6000);
