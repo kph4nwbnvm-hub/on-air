@@ -216,6 +216,14 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
 #ivDot{position:absolute;top:50%;font-size:30px;transform:translate(-50%,-50%);left:50%}
 #ivQ{min-height:48px;margin:10px 0;font-size:16px;line-height:1.5;text-align:start}
 .ivrow{display:flex;align-items:center;gap:10px}.ivrow span{flex:1;font-size:13px;opacity:.85}.ivrow button{flex:0 0 96px;margin:0;font-size:26px}
+#pc{position:fixed;inset:0;z-index:43;display:flex;align-items:center;justify-content:center;padding:14px;background:rgba(5,3,14,.6)}
+.pcbox{width:min(520px,100%);background:#0f0b24;border:1px solid rgba(127,233,255,.5);border-radius:20px;padding:14px 16px}
+.pchead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}.pchead b{font-size:18px}.pchead button{width:36px;height:36px;margin:0;padding:0;border-radius:12px;flex:0 0 36px}
+.pcrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid rgba(255,255,255,.08)}
+.pcrow .ic{font-size:24px;flex:0 0 32px;text-align:center}.pcrow .nm{flex:1;font-size:15px}.pcrow .st{font-size:13px;opacity:.9}
+.pcrow .st.bad{color:#ff8a8a}.pcrow .st.ok{color:#7be3a8}
+.pcrow button{flex:0 0 auto;margin:0;padding:8px 14px;font-size:14px;width:auto;min-height:0}
+#pcStore{margin-top:12px}
 </style>
 </head>
 <body>
@@ -303,6 +311,10 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
   <div id="stSheet" hidden><div class="sh"><button id="shClose">✕</button><div id="shIc"></div><h3 id="shName"></h3><p id="shMeta"></p><p id="shUse"></p><p id="shGoal"></p><p id="shCompat" hidden></p><div id="shActs"></div></div></div>
 </section>
 <div id="gToast" hidden></div>
+<section id="pc" hidden>
+  <div class="pcbox"><div class="pchead"><b id="pcTitle"></b><button id="pcClose" class="ghost">✕</button></div><div id="pcList"></div>
+    <button id="pcStore" class="big" data-t="pc_store"></button></div>
+</section>
 <section id="iv" hidden>
   <div class="ivbox"><p id="ivHint"></p><div id="ivTrack"><div id="ivZone"></div><div id="ivDot">🙂</div></div>
     <p id="ivQ"></p><div class="ivrow"><span id="ivStat"></span><button id="ivGo" class="big">🎤</button></div></div>

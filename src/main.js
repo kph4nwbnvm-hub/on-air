@@ -9,6 +9,7 @@ import { piSignIn, PiState } from './pi.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
 import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL, isExclusive, EXCLUSIVE } from './shop.js';
 import { makeStore, TOKEN } from './store.js';
+import { tokenPrice } from './pricing.js';
 import * as SFX from './studiofx.js';
 import * as ADS from './ads.js';
 import { preview as dailyPreview, claim as dailyClaim, rewardFor, isBig, CYCLE } from './daily.js';
@@ -32,7 +33,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.4.1';
+const VERSION = '1.4.2';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -630,8 +631,8 @@ $('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syn
 // app-token store
 function gToast(msg) { const el = $('gToast'); el.textContent = msg; el.hidden = false; clearTimeout(gToast.h); gToast.h = setTimeout(() => { el.hidden = true; }, 2200); }
 const cs = makeStore({ store, t, getLang: () => lang, sfx, toast: gToast, $ });
-$('bStore').onclick = () => { sfx.click(); cs.closeSheet(); cs.render(); show('storeS'); };
-$('stBack').onclick = () => { sfx.click(); cs.closeSheet(); show('menu'); };
+$('bStore').onclick = () => { sfx.click(); storeFrom = 'menu'; cs.closeSheet(); cs.render(); show('storeS'); };
+$('stBack').onclick = () => { sfx.click(); cs.closeSheet(); if (storeFrom === 'hud') { storeFrom = 'menu'; show('hud'); resize(); } else show('menu'); };
 
 // ───────── opening story (shown once per player, never repeated) ─────────
 // scenes 1–3: father's will → Uncle Saleh at the door → abandoned studio → cleaning. Later scenes hook in as their features land.
@@ -703,6 +704,59 @@ function finishIv() {
   const end = () => { ivOn = false; G.asking = false; say(t('iv_saved').replace('{q}', q) + (up ? '  ⭐ ' + t('level_up') : ''), 'ok', true); };
   if (first) { store.set('story4_done', true); dlg([{ who: 'sn_me', k: 's4d' }, { who: 'sn_saleh', k: 's4e' }, { k: 's4f' }], end); } else end();
 }
+
+// ───────── father's broken office PC: the player diagnoses it, buys the parts in the store and installs them ─────────
+const PCX = -5.7, PCZ = 3.6;
+const pcScreenM = new THREE.MeshBasicMaterial({ color: 0x0a0a10, toneMapped: false });
+{ const g = new THREE.Group(); g.position.set(PCX, 0, PCZ); g.rotation.y = Math.PI / 2; ZG.studio.add(g);
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a2e, roughness: 0.8 }), grey = new THREE.MeshStandardMaterial({ color: 0xcfc9b8, roughness: 0.7 }), dark = new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.6 });
+  const add = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); o.castShadow = true; g.add(o); return o; };
+  add(new THREE.BoxGeometry(1.5, 0.07, 0.75), wood, 0, 0.78, 0); [[-0.68, -0.3], [0.68, -0.3], [-0.68, 0.3], [0.68, 0.3]].forEach(([x, z]) => add(new THREE.BoxGeometry(0.07, 0.78, 0.07), wood, x, 0.39, z));
+  add(new THREE.BoxGeometry(0.62, 0.46, 0.4), grey, -0.1, 1.1, -0.1); add(new THREE.BoxGeometry(0.3, 0.08, 0.28), grey, -0.1, 0.84, -0.1);
+  const scr = add(new THREE.PlaneGeometry(0.5, 0.36), pcScreenM, -0.1, 1.11, 0.105); scr.castShadow = false;
+  add(new THREE.BoxGeometry(0.22, 0.5, 0.5), grey, 0.5, 1.06, -0.05); add(new THREE.BoxGeometry(0.5, 0.03, 0.18), dark, -0.12, 0.83, 0.24);
+  COLL.studio.push([PCX, PCZ, 0.75]); }
+const PC_ALL = ['psu', 'board', 'ram', 'disk', 'fan'], PC_BAD = ['psu', 'ram', 'fan'], PC_ICON = { psu: '🔌', board: '🟩', ram: '🧠', disk: '💽', fan: '🌀' };
+const pcS = store.get('pc', { seen: false, checked: {}, installed: {}, gift: false, fixed: false });
+const pcSave = () => store.set('pc', pcS);
+const pcLit = () => { pcScreenM.color.set(pcS.fixed ? 0x2f7bff : 0x0a0a10); };
+pcLit();
+let storeFrom = 'menu';
+function pcOpen() { G.asking = true; pcBuild(); $('pc').hidden = false; }
+function pcClose() { $('pc').hidden = true; G.asking = false; }
+function pcBuild() {
+  $('pcTitle').textContent = '🖥️ ' + t('pc_title'); const L = $('pcList'); L.innerHTML = '';
+  PC_ALL.forEach((k) => {
+    const row = document.createElement('div'); row.className = 'pcrow'; const bad = PC_BAD.includes(k), chk = pcS.checked[k], inst = pcS.installed[k];
+    const mk = (cls, txt) => { const e = document.createElement('span'); e.className = cls; e.textContent = txt; row.appendChild(e); return e; };
+    const btn = (txt, fn) => { const b = document.createElement('button'); b.className = 'big'; b.textContent = txt; b.onclick = fn; row.appendChild(b); };
+    mk('ic', PC_ICON[k]); mk('nm', t('p_' + k));
+    if (!chk) btn(t('pc_check'), () => { pcS.checked[k] = true; pcSave(); bad ? sfx.bad() : sfx.good(); pcBuild(); pcAfterCheck(); });
+    else if (!bad) mk('st ok', '✅ ' + t('pc_ok'));
+    else if (inst) mk('st ok', '✅ ' + t('pc_installed'));
+    else if (cs.partId(k)) { mk('st bad', '❌ ' + t('pc_bad')); btn(t('pc_install'), () => { if (cs.usePart(k)) { pcS.installed[k] = true; pcSave(); sfx.fix(); pcBuild(); pcAfterInstall(); } }); }
+    else mk('st bad', '❌ ' + t('pc_bad') + ' · ' + t('pc_need'));
+    L.appendChild(row);
+  });
+  $('pcStore').hidden = !PC_ALL.every((k) => pcS.checked[k]) || pcS.fixed; $('pcStore').textContent = '🛍️ ' + t('pc_store');
+}
+// once everything is diagnosed, Uncle Saleh hands over exactly the price of the broken parts (level 1 each)
+function pcAfterCheck() {
+  if (pcS.gift || !PC_ALL.every((k) => pcS.checked[k])) return;
+  pcS.gift = true; pcSave(); const n = Math.round(tokenPrice(1) * PC_BAD.length * 1e7) / 1e7; cs.give(n);
+  $('pc').hidden = true; dlg([{ who: 'sn_saleh', k: 'pc_gift' }], () => { gToast('💠 +' + n); sfx.win(); pcBuild(); $('pc').hidden = false; });
+}
+function pcAfterInstall() {
+  if (pcS.fixed || !PC_BAD.every((k) => pcS.installed[k])) return;
+  pcS.fixed = true; pcSave(); pcLit(); $('pc').hidden = true; const up = shop.addXp(20); showLevel(); sfx.win();
+  dlg([{ k: 'pc_boot' }, { k: 'pc_done' }], () => { G.asking = false; if (up) say('⭐ ' + t('level_up'), 'ok', true); });
+}
+$('pcClose').onclick = () => { sfx.click(); pcClose(); };
+$('pcStore').onclick = () => { sfx.click(); $('pc').hidden = true; G.asking = false; storeFrom = 'hud'; cs.setCat('parts'); cs.closeSheet(); cs.render(); show('storeS'); };
+interact('studio', PCX + 1.15, PCZ, 1.25, 'a_pc', '🖥️', () => roam() && !storyOn && !ivOn, () => {
+  if (pcS.fixed) { say('🖥️ ' + t('pc_boot'), 'ok'); return; }
+  if (!pcS.seen) { pcS.seen = true; pcSave(); G.asking = true; dlg([{ who: 'sn_me', k: 's5a' }, { who: 'sn_saleh', k: 's5b' }], pcOpen); } else pcOpen();
+});
 
 // first-time guided tour: the camera flies to each part of the studio and explains it
 const TOUR = [
@@ -812,7 +866,7 @@ function frame(now) {
 }
 
 // hook for automated checks only
-window.__onair = { sign, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { sign, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 setupFX(); applyLang(); syncScene(); show('menu'); resize();

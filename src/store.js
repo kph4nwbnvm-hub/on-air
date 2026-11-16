@@ -19,7 +19,7 @@ export function makeStore(deps) {
   const equipped = () => Object.values(S.equip).flat();
   const isEquipped = (id) => equipped().includes(id);
   const fmtEff = (k, v) => { const s = t('e_' + k); return v < 0 ? s.replace('+{v}', String(v)).replace('{v}', String(v)) : s.replace('{v}', v); };
-  const famName = (c) => c.fam.name[getLang()] || c.fam.name.en;
+  const famName = (c) => (c.fam.cat === 'parts' ? t('p_' + c.fam.id) : c.fam.name[getLang()] || c.fam.name.en);
   const nameOf = (c) => { const i = info(c); const st = getLang() === 'ar' ? i.ar : i.en; return i.full ? st : famName(c) + ' · ' + st; };
   const color = (c) => RARITY[tierOf(c.r) - 1].color;
   // starter gear: level-1 broadcast kit with its flaws, so players feel every upgrade
@@ -164,5 +164,10 @@ export function makeStore(deps) {
   const TEST_GRANT = 5000;
   $('stTest').onclick = () => { S.tokens += TEST_GRANT; save(); sfx.win(); render(); };
 
-  return { S, bonuses, consumeBoosts, grantRandom, dropLevel, render, closeSheet, nameOf };
+  // office-PC helpers: starter money for parts, check/consume an owned part, jump to a category
+  const give = (n) => { S.tokens = Math.round((S.tokens + n) * 1e7) / 1e7; save(); };
+  const partId = (fam) => Object.keys(S.cards).filter((id) => id.startsWith('parts.' + fam + '.') && S.cards[id] > 0).sort((a, b) => +b.split('.')[2] - +a.split('.')[2])[0];
+  const usePart = (fam) => { const id = partId(fam); if (!id) return 0; add(id, -1); save(); return +id.split('.')[2]; };
+  const setCat = (c) => { view.cat = c; view.rarity = 0; view.q = ''; view.limit = 60; };
+  return { S, bonuses, consumeBoosts, grantRandom, dropLevel, render, closeSheet, nameOf, give, partId, usePart, setCat };
 }

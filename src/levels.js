@@ -105,7 +105,7 @@ export const FAM_TRACK = {
   'decor.neon': ['decolight', 'lights'], 'decor.led': ['decolight', 'lights'], 'decor.lantern': ['decolight', 'lights'], 'decor.disco': ['stagefx', 'lights'],
   'fx.entrance': ['stagefx', 'lights'], 'fx.sparkle': ['stagefx', 'lights'], 'fx.bolt': ['stagefx', 'lights'],
 };
-const CAT_TRACK = { gifts: 'show', skins: 'outfit', machines: 'appliance', furniture: 'craft', decor: 'craft', vehicles: 'vehicle', pets: 'pet', accs: 'craft', fx: 'show', boosts: 'potency', sets: 'backdrop', estate: 'estate', cables: 'cable', equip: 'device' };
+const CAT_TRACK = { gifts: 'show', skins: 'outfit', machines: 'appliance', furniture: 'craft', decor: 'craft', vehicles: 'vehicle', pets: 'pet', accs: 'craft', fx: 'show', boosts: 'potency', sets: 'backdrop', estate: 'estate', cables: 'cable', parts: 'device', equip: 'device' };
 
 export function trackOf(cat, fam) { const ft = FAM_TRACK[cat + '.' + fam]; return ft ? ft[0] : CAT_TRACK[cat]; }
 export function signalOf(cat, fam) { const ft = FAM_TRACK[cat + '.' + fam]; if (ft) return ft[1]; if (cat === 'sets') return 'video'; return null; }

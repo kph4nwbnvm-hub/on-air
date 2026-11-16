@@ -29,6 +29,7 @@ export const EFFECTS = {
 export const CATS = [
   { id: 'equip', icon: '🎥', kind: 'equip', slots: 8 },
   { id: 'cables', icon: '🔌', kind: 'own' },
+  { id: 'parts', icon: '🧩', kind: 'own' },
   { id: 'gifts', icon: '🎁', kind: 'use' },
   { id: 'skins', icon: '👔', kind: 'equip', slots: 1 },
   { id: 'machines', icon: '⚙️', kind: 'equip', slots: 2 },
@@ -55,6 +56,8 @@ const F = [
   ['equip', 'switcher', '🔀', 'coins', 'مبدّل الكاميرات', 'Video switcher'], ['equip', 'radio', '📻', 'fix', 'لاسلكي الطاقم', 'Crew radio'],
   ['equip', 'lightdesk', '🎚️', 'style', 'طاولة الإضاءة', 'Lighting console'],
   // cables and connectors (owned, not equipped): a device works only with a hub that supports its connector and the matching cable
+  // computer parts (owned; installed into the office PC)
+  ['parts', 'psu', '🔌', 'fix', 'مزوّد الطاقة', 'Power supply'], ['parts', 'board', '🟩', 'fix', 'اللوحة الأم', 'Motherboard'], ['parts', 'ram', '🧠', 'fix', 'الذاكرة (RAM)', 'Memory (RAM)'], ['parts', 'disk', '💽', 'fix', 'القرص الصلب', 'Hard drive'], ['parts', 'fan', '🌀', 'fix', 'مروحة التبريد', 'Cooling fan'],
   ['cables', 'rca', '🔴', 'fix', 'كيبل RCA (صورة تناظرية)', 'RCA cable (analogue video)'], ['cables', 'trs', '🎧', 'fix', 'كيبل TRS (صوت تناظري)', 'TRS cable (analogue audio)'],
   ['cables', 'xlr', '🎤', 'fix', 'كيبل XLR (صوت احترافي)', 'XLR cable (pro audio)'], ['cables', 'sdi', '📡', 'fix', 'كيبل SDI (فيديو بث)', 'SDI cable (broadcast video)'],
   ['cables', 'hdmi', '📺', 'fix', 'كيبل HDMI', 'HDMI cable'], ['cables', 'dmx', '💡', 'fix', 'كيبل DMX (تحكم إضاءة)', 'DMX cable (lighting control)'],
