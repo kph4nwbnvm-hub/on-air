@@ -21,7 +21,7 @@ const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.us
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
-const VERSION = '1.3.5';
+const VERSION = '1.3.6';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -284,7 +284,22 @@ put(box(40, 0.14, 5.2, 0xd8d2c4), SX, 0.07, -5.6).receiveShadow = true; put(box(
 for (let i = -6; i <= 6; i++) put(box(1.6, 0.02, 0.18, 0xffffff), SX + i * 3, 0.02, 1.6);
 building(SX, -10.2, 9, 6.5, 0x7a57e6, 0xbfe3ff); building(SX - 10.5, -10.2, 9, 5, 0xffcf3f, 0xffffff); building(SX + 10.5, -10.2, 9, 7.5, 0x4cc9f0, 0xfff3b0);
 put(box(1.7, 2.7, 0.2, 0x23233a), SX, 1.35, -8.15); put(box(1.4, 2.4, 0.1, 0xff8a3d, { emissive: 0xff8a3d, emissiveIntensity: 0.3 }), SX, 1.25, -8.08);
-put(signPlane('STUDIO', '#ff2a40', '#ffffff', 3.2, 0.9), SX, 3.3, -8.1);
+// storefront: the game's own logo sign (waves + red dot + «على الهوا» / ON AIR STUDIO)
+function logoSignTex() {
+  const W = 1024, H = 300, cv = document.createElement('canvas'); cv.width = W; cv.height = H; const x = cv.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#3a2a7a'); g.addColorStop(1, '#1a1440'); x.fillStyle = g; x.beginPath(); x.roundRect(0, 0, W, H, 46); x.fill();
+  x.strokeStyle = '#ffcf3f'; x.lineWidth = 8; x.beginPath(); x.roundRect(10, 10, W - 20, H - 20, 38); x.stroke();
+  const cx = 160, cy = 190; x.strokeStyle = '#ffcf3f'; x.lineCap = 'round'; x.lineWidth = 18;
+  [44, 82, 120].forEach((r) => { x.beginPath(); x.arc(cx, cy, r, -Math.PI * 0.78, -Math.PI * 0.22); x.stroke(); });
+  x.fillStyle = '#ff2a40'; x.beginPath(); x.arc(cx, cy, 22, 0, 7); x.fill();
+  x.fillStyle = '#ff2a40'; x.beginPath(); x.roundRect(310, 52, 670, 140, 30); x.fill();
+  x.fillStyle = '#ffffff'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.direction = 'rtl';
+  x.font = "900 104px 'Tajawal','Noto Kufi Arabic','Noto Sans Arabic',system-ui"; x.fillText('على الهوا', 645, 126);
+  x.direction = 'ltr'; x.fillStyle = '#ffcf3f'; x.font = '800 52px system-ui, sans-serif'; x.fillText('ON AIR STUDIO', 645, 245);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
+}
+put(box(3.9, 1.25, 0.14, 0x15102e), SX, 3.35, -8.16);
+put(new THREE.Mesh(new THREE.PlaneGeometry(3.8, 1.11), new THREE.MeshBasicMaterial({ map: logoSignTex(), transparent: true, toneMapped: false })), SX, 3.35, -8.08);
 put(box(4, 0.12, 1.4, 0xd9342b), SX - 10.5, 2.7, -7.6); put(signPlane('SHAWARMA', '#ffffff', '#d9342b', 3.4, 0.7, 640, 130, 'bold 90px system-ui'), SX - 10.5, 3.3, -8.15);
 [-12, -4, 4, 12].forEach((dx) => tree(SX + dx, 7.4));
 [-7, 0, 7].forEach((dx) => { put(cyl(0.07, 0.09, 3.6, 0x30303a), SX + dx, 1.8, -3.5).castShadow = true; put(box(0.9, 0.08, 0.14, 0x30303a), SX + dx + 0.4, 3.6, -3.5); put(sph(0.16, 0xfff3b0, { emissive: 0xfff3b0 }), SX + dx + 0.8, 3.5, -3.5); });
