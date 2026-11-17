@@ -20,7 +20,7 @@ let enabled = true, maxNear = 8, nearDist = 22;
 
 export const realReady = () => A.ready;
 export const realDebug = () => ({ ready: A.ready, failed: A.failed, n: LIST.length, withReal: LIST.filter((c) => c.real).length, shown: LIST.filter((c) => c.real && c.real.root.visible).length, clips: Object.keys(A.clips), det: LIST.map((c) => { c.g.getWorldPosition(tmp); let vis = true; for (let o = c.g; o; o = o.parent) if (!o.visible) { vis = false; break; } return [Math.round(tmp.x), Math.round(tmp.z), vis, c.real && c.real.root.visible, c.real && +c.real.root.scale.x.toFixed(2), c.simple && c.simple.length, c.real && c.real.cur]; }) });
-export function setRealEnabled(on) { enabled = on; if (!on) LIST.forEach((c) => showSimple(c, true)); }
+export function setRealEnabled(on) { enabled = on; if (!on) { unveil(); LIST.forEach((c) => showSimple(c, true)); } }
 export function setRealBudget(n, dist) { maxNear = n; nearDist = dist; }
 
 function load(loader, name) { return new Promise((res, rej) => loader.load(BASE + name + '.glb', res, undefined, rej)); }
@@ -31,8 +31,8 @@ export async function loadReal() {
     A.male = m.scene; prepBody(A.male); if (f) { A.female = f.scene; prepBody(A.female); A.female.traverse((o) => { if (o.userData.body) o.userData.female = true; }); }
     [...a.animations, ...b.animations].forEach((c) => { A.clips[c.name] = c; });
     for (const h of [...new Set([...HAIR.map((x) => x.g).filter(Boolean), 'hair_beard'])]) { try { A.hair[h] = (await load(L, h)).scene; } catch (_) {} }
-    A.ready = true; LIST.forEach((c) => { try { attach(c); } catch (e) { console.warn('attach failed', e && e.message, e && e.stack && e.stack.split('\n')[1]); } });
-  } catch (e) { A.failed = true; console.warn('real chars unavailable', e); }
+    A.ready = true; veil = false; VEILED.forEach((c) => c.g.children.forEach((o) => { o.userData.veiled = false; })); VEILED.clear(); LIST.forEach((c) => { try { attach(c); } catch (e) { console.warn('attach failed', e && e.message, e && e.stack && e.stack.split('\n')[1]); } });
+  } catch (e) { A.failed = true; unveil(); console.warn('real chars unavailable', e); }
 }
 
 // region of each vertex from its strongest bone: 0 skin, 1 top, 2 bottom, 3 shoes, 4 forearm, 5 calf, 6 neck
@@ -157,7 +157,14 @@ function build(av) {
 }
 
 // register every simple character; the realistic body is attached once the assets are loaded
-export function register(c, av, opts = {}) { if (opts.skip) return c; c.av = av; c.ropts = opts; c.real = null; if (!LIST.includes(c)) LIST.push(c); if (A.ready) attach(c); return c; }
+// while the realistic models are still loading, the simple stand-ins stay hidden so players never see one style swap to the other;
+// if loading fails (or takes over 15 s) the simple ones come back
+let veil = true; const VEILED = new Set();
+function unveil() { veil = false; VEILED.forEach((c) => { if (!c.real) c.g.children.forEach((o) => { if (o.userData.veiled) { o.visible = true; o.userData.veiled = false; } }); }); VEILED.clear(); }
+setTimeout(() => { if (!A.ready) unveil(); }, 15000);
+export function register(c, av, opts = {}) { if (opts.skip) return c; c.av = av; c.ropts = opts; c.real = null; if (!LIST.includes(c)) LIST.push(c);
+  if (A.ready) attach(c); else if (veil && enabled && !A.failed && c.g) { c.g.children.forEach((o) => { if (o.visible) { o.visible = false; o.userData.veiled = true; } }); VEILED.add(c); }
+  return c; }
 function attach(c) {
   if (c.real || !c.g) return;
   const r = build(c.av || {}); c.real = r;

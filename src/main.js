@@ -40,10 +40,11 @@ let soundOn = store.get('sound', true);
 const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
 // phones default to the light pipeline; a previous GPU crash forces it
 const cfg = { real: store.get('real', true), voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
+setRealEnabled(cfg.real); // before any character is made, so stand-ins are only hidden when realistic ones are coming
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.9.2';
+const VERSION = '1.9.3';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -117,7 +118,7 @@ function speak(text, who) {
 /* ---------- renderer ---------- */
 const canvas = $('c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-const pixelRatio = () => (cfg.quality === 'low' ? Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.6 : 1) : Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.5 : 2));
+const pixelRatio = () => (cfg.quality === 'low' ? Math.min(window.devicePixelRatio || 1, 1) : Math.min(window.devicePixelRatio || 1, IS_MOBILE ? 1.5 : 2));
 renderer.setPixelRatio(pixelRatio());
 renderer.shadowMap.enabled = !store.get('gpu_lost', false); renderer.shadowMap.type = IS_MOBILE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
 // surface shader compile/link failures on screen (phones hide the console)
@@ -1296,5 +1297,6 @@ resize();
 showDiag(IS_MOBILE ? 'mobile · ' + cfg.quality : cfg.quality); setTimeout(() => { const d = document.getElementById('diag'); if (d && !errShown) d.remove(); }, 6000);
 requestAnimationFrame(frame);
 // realistic characters load after the game is up, so the first screen never waits for them
-setTimeout(() => { loadCars(); loadKit(ZG.street); }, 700);
-if (cfg.real) setTimeout(() => { if (IS_MOBILE) setRealBudget(10, 40); else setRealBudget(14, 50); loadReal(); }, 1200);
+let cityOn = false; const cityLoad = () => { if (cityOn) return; cityOn = true; loadCars(); loadKit(ZG.street); }; // city models load on the first visit to the street (less GPU memory in the studio)
+setInterval(() => { if (G.zone === 'street') cityLoad(); }, 500);
+if (cfg.real) setTimeout(() => { if (IS_MOBILE) setRealBudget(store.get('gpu_lost', false) ? 6 : 9, 40); else setRealBudget(14, 50); loadReal(); }, 1200);
