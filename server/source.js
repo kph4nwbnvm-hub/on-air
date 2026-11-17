@@ -1,4 +1,5 @@
-// On Air Studio — small Pi server (Cloudflare Worker).
+// On Air Studio — game server (Cloudflare Worker + one Durable Object with SQLite storage).
+// Routes: A2U test rewards, cloud save, used market between players, anonymous play analytics.
 // Job now: Testnet App-to-User (A2U) test rewards, required by Pi before a Mainnet app wallet.
 // Secrets are added by the owner in the Cloudflare dashboard only — never in this code:
 //   PI_API_KEY      : the Testnet app's API key (Pi Developer Portal)
@@ -154,6 +155,78 @@ async function reward(req, env) {
   return { ok: true, username: user.username, amount: REWARD, txid };
 }
 
+
+// ---------- game data: one Durable Object holds the market, saves and analytics in SQLite ----------
+const TOK = 1000; const MINING_PI = Array.from({ length: 15 }, (_, i) => Math.round(0.1 * Math.pow(25, i / 14) * 1000) / 1000);
+const USD_BAND = Array.from({ length: 15 }, (_, i) => Math.round(0.5 * Math.pow(15, i / 14) * 100) / 100); const PI_USD = 0.0634;
+const tokenPrice = (r) => Math.min(MINING_PI[r - 1] * TOK, (USD_BAND[r - 1] / PI_USD) * TOK);
+export class Hub {
+  constructor(state) {
+    this.sql = state.storage.sql;
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS listings(lid INTEGER PRIMARY KEY AUTOINCREMENT, seller TEXT, card TEXT, life INTEGER, price REAL, ts INTEGER, buyer TEXT, sold_ts INTEGER, collected INTEGER DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS saves(uid TEXT PRIMARY KEY, data TEXT, ts INTEGER);
+      CREATE TABLE IF NOT EXISTS events(day TEXT, e TEXT, lang TEXT, n INTEGER, PRIMARY KEY(day, e, lang));
+      CREATE TABLE IF NOT EXISTS players(pid TEXT PRIMARY KEY, first INTEGER, last INTEGER, lang TEXT, rounds INTEGER DEFAULT 0);`);
+  }
+  async fetch(req) {
+    const u = new URL(req.url); const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {}; const uid = req.headers.get('x-uid'); const q = (s, ...a) => [...this.sql.exec(s, ...a)];
+    const J = (o, st = 200) => new Response(JSON.stringify(o), { status: st, headers: { 'Content-Type': 'application/json' } });
+    switch (u.pathname) {
+      case '/market/list': {
+        const m = /^([a-z]+)\.([a-z0-9]+)\.(\d{1,2})$/.exec(body.card || ''); const life = Math.round(+body.life); const price = +body.price;
+        if (!m || !(life > 0 && life <= 100) || !(price > 0)) return J({ ok: false, error: 'bad_listing' }, 400);
+        const r = +m[3]; if (r < 1 || r > 12) return J({ ok: false, error: 'bad_level' }, 400);
+        const cap = tokenPrice(r) * (life / 100) * 0.6 * 1.2 * 1.001; if (price > cap) return J({ ok: false, error: 'over_cap', cap }, 400);
+        if (q('SELECT COUNT(*) n FROM listings WHERE seller=? AND buyer IS NULL', uid)[0].n >= 20) return J({ ok: false, error: 'too_many' }, 400);
+        this.sql.exec('INSERT INTO listings(seller, card, life, price, ts) VALUES(?,?,?,?,?)', uid, body.card, life, price, Date.now());
+        return J({ ok: true, lid: q('SELECT last_insert_rowid() id')[0].id });
+      }
+      case '/market/browse': return J({ ok: true, items: q('SELECT lid, card, life, price, ts, seller FROM listings WHERE buyer IS NULL ORDER BY ts DESC LIMIT 80').map((x) => ({ lid: x.lid, card: x.card, life: x.life, price: x.price, mine: x.seller === uid })) });
+      case '/market/buy': {
+        const L = q('SELECT * FROM listings WHERE lid=?', +body.lid)[0];
+        if (!L || L.buyer) return J({ ok: false, error: 'gone' }, 409); if (L.seller === uid) return J({ ok: false, error: 'own' }, 400);
+        this.sql.exec('UPDATE listings SET buyer=?, sold_ts=? WHERE lid=? AND buyer IS NULL', uid, Date.now(), L.lid);
+        return J({ ok: true, card: L.card, life: L.life, price: L.price });
+      }
+      case '/market/collect': {
+        const S = q('SELECT lid, price FROM listings WHERE seller=? AND buyer IS NOT NULL AND collected=0', uid);
+        S.forEach((x) => this.sql.exec('UPDATE listings SET collected=1 WHERE lid=?', x.lid));
+        return J({ ok: true, total: S.reduce((a, x) => a + x.price, 0), ids: S.map((x) => x.lid) });
+      }
+      case '/save': { const data = JSON.stringify(body.data || {}); if (data.length > 300000) return J({ ok: false, error: 'too_big' }, 413);
+        this.sql.exec('INSERT INTO saves(uid, data, ts) VALUES(?,?,?) ON CONFLICT(uid) DO UPDATE SET data=excluded.data, ts=excluded.ts', uid, data, Date.now()); return J({ ok: true, ts: Date.now() }); }
+      case '/load': { const r = q('SELECT data, ts FROM saves WHERE uid=?', uid)[0]; return J({ ok: true, data: r ? JSON.parse(r.data) : null, ts: r ? r.ts : 0 }); }
+      case '/ev': {
+        const pid = String(body.pid || '').slice(0, 64); const lang = String(body.lang || '').slice(0, 8); const day = new Date().toISOString().slice(0, 10);
+        if (!pid) return J({ ok: false }, 400);
+        this.sql.exec('INSERT INTO players(pid, first, last, lang) VALUES(?,?,?,?) ON CONFLICT(pid) DO UPDATE SET last=excluded.last, lang=excluded.lang', pid, Date.now(), Date.now(), lang);
+        (Array.isArray(body.events) ? body.events.slice(0, 50) : []).forEach((e) => { const k = String(e).slice(0, 24); if (!/^[a-z_0-9]+$/.test(k)) return;
+          this.sql.exec('INSERT INTO events(day, e, lang, n) VALUES(?,?,?,1) ON CONFLICT(day, e, lang) DO UPDATE SET n=n+1', day, k, lang);
+          if (k === 'round') this.sql.exec('UPDATE players SET rounds=rounds+1 WHERE pid=?', pid); });
+        return J({ ok: true });
+      }
+      case '/stats': {
+        const now = Date.now(), D = 86400000;
+        return J({ ok: true, at: now,
+          players: q('SELECT COUNT(*) n FROM players')[0].n, active1d: q('SELECT COUNT(*) n FROM players WHERE last>?', now - D)[0].n, active7d: q('SELECT COUNT(*) n FROM players WHERE last>?', now - 7 * D)[0].n,
+          new1d: q('SELECT COUNT(*) n FROM players WHERE first>?', now - D)[0].n, rounds: q('SELECT COALESCE(SUM(rounds),0) n FROM players')[0].n,
+          langs: q('SELECT lang, COUNT(*) n FROM players GROUP BY lang ORDER BY n DESC'), days: q('SELECT day, e, SUM(n) n FROM events WHERE day>=? GROUP BY day, e ORDER BY day', new Date(now - 14 * D).toISOString().slice(0, 10)),
+          market: q('SELECT COUNT(*) listed, SUM(CASE WHEN buyer IS NOT NULL THEN 1 ELSE 0 END) sold FROM listings')[0], saves: q('SELECT COUNT(*) n FROM saves')[0].n });
+      }
+    }
+    return J({ ok: false, error: 'not_found' }, 404);
+  }
+}
+const hub = (env) => env.HUB.get(env.HUB.idFromName('main'));
+// routes that need the player's identity: the Pi access token is checked with Pi, and the Pi uid is passed on
+async function toHub(req, env, path, needUser) {
+  const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+  let uid = ''; if (needUser && env.DEV_UID) uid = env.DEV_UID + (body.as || ''); /* local tests only, never set in production */ else if (needUser) { if (!body.accessToken) throw new Fail('missing_access_token', 401); uid = (await me(body.accessToken)).uid; }
+  delete body.accessToken;
+  const r = await hub(env).fetch('https://hub' + path, { method: req.method, headers: { 'x-uid': uid, 'Content-Type': 'application/json' }, body: req.method === 'POST' ? JSON.stringify(body) : undefined });
+  return new Response(await r.text(), { status: r.status, headers: { 'Content-Type': 'application/json', ...cors(req) } });
+}
+
 export default {
   async fetch(req, env) {
     if (req.method === 'OPTIONS') return new Response(null, { headers: cors(req) });
@@ -166,6 +239,10 @@ export default {
         return json(req, { ok: true, service: 'on-air-pi', api_key_set: !!env.PI_API_KEY, app_wallet: address, v: 2 });
       }
       if (req.method === 'POST' && path === '/a2u/reward') return json(req, await reward(req, env));
+      if (['/market/list', '/market/buy', '/market/collect', '/save', '/load'].includes(path) && req.method === 'POST') return await toHub(req, env, path, true);
+      if (path === '/market/browse' && req.method === 'POST') return await toHub(req, env, path, true);
+      if (path === '/ev' && req.method === 'POST') return await toHub(req, env, path, false);
+      if (path === '/stats' && req.method === 'GET') return await toHub(req, env, path, false);
       return json(req, { ok: false, error: 'not_found' }, 404);
     } catch (e) {
       const f = e instanceof Fail ? e : new Fail('server_error', 500, { detail: String((e && e.message) || e).slice(0, 200) });

@@ -1,9 +1,11 @@
 {
-  // On Air Studio Pi server. Secrets (PI_API_KEY, APP_WALLET_SEED) are set in the Cloudflare dashboard only.
+  // On Air Studio game server. Secrets (PI_API_KEY, APP_WALLET_SEED) are set in the Cloudflare dashboard only.
   "name": "on-air-pi",
   "main": "worker.js",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
   "no_bundle": true,
-  "workers_dev": true
+  "workers_dev": true,
+  "durable_objects": { "bindings": [{ "name": "HUB", "class_name": "Hub" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Hub"] }]
 }
