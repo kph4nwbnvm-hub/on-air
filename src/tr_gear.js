@@ -2,4 +2,6 @@
 import { addGear } from './gearnames.js';
 import zhHans from './tr_gear_zh-Hans.js';
 import es from './tr_gear_es.js';
-addGear('zh-Hans', zhHans); addGear('es', es);
+import fr from './tr_gear_fr.js';
+import hi from './tr_gear_hi.js';
+addGear('zh-Hans', zhHans); addGear('es', es); addGear('fr', fr); addGear('hi', hi);
