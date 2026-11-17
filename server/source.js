@@ -166,7 +166,8 @@ export class Hub {
     this.sql.exec(`CREATE TABLE IF NOT EXISTS listings(lid INTEGER PRIMARY KEY AUTOINCREMENT, seller TEXT, card TEXT, life INTEGER, price REAL, ts INTEGER, buyer TEXT, sold_ts INTEGER, collected INTEGER DEFAULT 0);
       CREATE TABLE IF NOT EXISTS saves(uid TEXT PRIMARY KEY, data TEXT, ts INTEGER);
       CREATE TABLE IF NOT EXISTS events(day TEXT, e TEXT, lang TEXT, n INTEGER, PRIMARY KEY(day, e, lang));
-      CREATE TABLE IF NOT EXISTS players(pid TEXT PRIMARY KEY, first INTEGER, last INTEGER, lang TEXT, rounds INTEGER DEFAULT 0);`);
+      CREATE TABLE IF NOT EXISTS players(pid TEXT PRIMARY KEY, first INTEGER, last INTEGER, lang TEXT, rounds INTEGER DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS pays(id TEXT PRIMARY KEY, uid TEXT, amount REAL, tokens INTEGER, txid TEXT, ts INTEGER);`);
   }
   async fetch(req) {
     const u = new URL(req.url); const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {}; const uid = req.headers.get('x-uid'); const q = (s, ...a) => [...this.sql.exec(s, ...a)];
@@ -195,6 +196,10 @@ export class Hub {
       }
       case '/save': { const data = JSON.stringify(body.data || {}); if (data.length > 300000) return J({ ok: false, error: 'too_big' }, 413);
         this.sql.exec('INSERT INTO saves(uid, data, ts) VALUES(?,?,?) ON CONFLICT(uid) DO UPDATE SET data=excluded.data, ts=excluded.ts', uid, data, Date.now()); return J({ ok: true, ts: Date.now() }); }
+      case '/pay/record': { // credit once per completed payment
+        if (q('SELECT id FROM pays WHERE id=?', body.id)[0]) return J({ ok: true, dup: true, tokens: 0 });
+        this.sql.exec('INSERT INTO pays(id, uid, amount, tokens, txid, ts) VALUES(?,?,?,?,?,?)', body.id, uid, body.amount, body.tokens, body.txid, Date.now()); return J({ ok: true, tokens: body.tokens });
+      }
       case '/load': { const r = q('SELECT data, ts FROM saves WHERE uid=?', uid)[0]; return J({ ok: true, data: r ? JSON.parse(r.data) : null, ts: r ? r.ts : 0 }); }
       case '/ev': {
         const pid = String(body.pid || '').slice(0, 64); const lang = String(body.lang || '').slice(0, 8); const day = new Date().toISOString().slice(0, 10);
@@ -216,6 +221,27 @@ export class Hub {
     }
     return J({ ok: false, error: 'not_found' }, 404);
   }
+}
+
+// ---------- Pi payments (user to app): token packs paid in Pi; the server approves and completes, then credits once ----------
+const PACKS = [0.1, 0.2, 0.4, 1, 2.5];
+async function payApprove(req, env) {
+  const { accessToken, paymentId } = await req.json().catch(() => ({})); if (!accessToken || !paymentId) throw new Fail('missing_fields');
+  const user = await me(accessToken); const p = await pi(env, '/payments/' + encodeURIComponent(paymentId));
+  if (p.user_uid !== user.uid) throw new Fail('not_your_payment', 403);
+  if (!PACKS.includes(+p.amount)) throw new Fail('bad_amount');
+  if (!(p.status && p.status.developer_approved)) await pi(env, '/payments/' + encodeURIComponent(paymentId) + '/approve', 'POST');
+  return { ok: true };
+}
+async function payComplete(req, env) {
+  const { accessToken, paymentId, txid } = await req.json().catch(() => ({})); if (!accessToken || !paymentId || !txid) throw new Fail('missing_fields');
+  const user = await me(accessToken); const p = await pi(env, '/payments/' + encodeURIComponent(paymentId));
+  if (p.user_uid !== user.uid) throw new Fail('not_your_payment', 403);
+  if (!PACKS.includes(+p.amount)) throw new Fail('bad_amount');
+  if (!(p.status && p.status.developer_completed)) await pi(env, '/payments/' + encodeURIComponent(paymentId) + '/complete', 'POST', { txid });
+  const tokens = Math.round(+p.amount * 1000);
+  const r = await hub(env).fetch('https://hub/pay/record', { method: 'POST', headers: { 'x-uid': user.uid, 'Content-Type': 'application/json' }, body: JSON.stringify({ id: paymentId, amount: +p.amount, tokens, txid }) });
+  const d = await r.json(); return { ok: true, tokens: d.tokens, dup: !!d.dup };
 }
 const hub = (env) => env.HUB.get(env.HUB.idFromName('main'));
 // routes that need the player's identity: the Pi access token is checked with Pi, and the Pi uid is passed on
@@ -241,6 +267,8 @@ export default {
       if (req.method === 'POST' && path === '/a2u/reward') return json(req, await reward(req, env));
       if (['/market/list', '/market/buy', '/market/collect', '/save', '/load'].includes(path) && req.method === 'POST') return await toHub(req, env, path, true);
       if (path === '/market/browse' && req.method === 'POST') return await toHub(req, env, path, true);
+      if (path === '/pay/approve' && req.method === 'POST') return json(req, await payApprove(req, env));
+      if (path === '/pay/complete' && req.method === 'POST') return json(req, await payComplete(req, env));
       if (path === '/ev' && req.method === 'POST') return await toHub(req, env, path, false);
       if (path === '/stats' && req.method === 'GET') return await toHub(req, env, path, false);
       return json(req, { ok: false, error: 'not_found' }, 404);

@@ -19,7 +19,29 @@ function sdkReady(ms) {
 const timeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))]);
 
 // Payments are not used yet; when they are, an incomplete payment found at sign-in is handled here.
-function onIncompletePaymentFound(payment) { PiState.incompletePayment = payment || null; }
+function onIncompletePaymentFound(payment) {
+  PiState.incompletePayment = payment || null;
+  // a token pack paid earlier but not finished (app closed mid-way): finish it now and credit it once
+  const txid = payment && payment.transaction && payment.transaction.txid;
+  if (txid) setTimeout(() => serverPay('/pay/complete', { paymentId: payment.identifier, txid }).then((r) => { if (r && r.ok && r.tokens && PiState.onTokens) PiState.onTokens(r.tokens); }), 3000);
+}
+async function serverPay(path, body) {
+  try { const r = await timeout(fetch(A2U_URL + path, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ ...body, accessToken: PiState.accessToken }) }), 30000); return await r.json(); } catch (e) { return null; }
+}
+// buy a token pack with Pi (user-to-app payment): Pi shows its own confirmation; the game server approves and completes it
+export function payTokens(amount) {
+  return new Promise((resolve) => {
+    if (!window.Pi || !PiState.accessToken) return resolve({ ok: false, error: 'not_signed_in' });
+    try {
+      window.Pi.createPayment({ amount, memo: 'On Air Studio tokens', metadata: { kind: 'tokens', amount } }, {
+        onReadyForServerApproval: (paymentId) => { serverPay('/pay/approve', { paymentId }); },
+        onReadyForServerCompletion: async (paymentId, txid) => { const r = await serverPay('/pay/complete', { paymentId, txid }); resolve(r && r.ok ? { ok: true, tokens: r.tokens } : { ok: false, error: (r && r.error) || 'server' }); },
+        onCancel: () => resolve({ ok: false, error: 'cancelled' }),
+        onError: (err) => resolve({ ok: false, error: String((err && err.message) || err) }),
+      });
+    } catch (e) { resolve({ ok: false, error: String(e.message || e) }); }
+  });
+}
 
 async function exchangeToken(accessToken) {
   const res = await timeout(fetch(APP_STUDIO_LOGIN, {

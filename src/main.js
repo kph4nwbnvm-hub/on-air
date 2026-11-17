@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { LANGS, STR } from './i18n.js';
-import { piSignIn, PiState, claimTestReward } from './pi.js';
+import { piSignIn, PiState, claimTestReward, payTokens } from './pi.js';
 import { makeLife, LIFE_SHOPS, personName } from './life.js';
 import { makeGuide } from './guide.js';
 import { makeVoices, MY_VOICES, COUNTRIES, flagOf, countryName } from './voices.js';
@@ -48,7 +48,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.10.0';
+const VERSION = '1.10.1';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -1225,8 +1225,22 @@ function buildProfile() {
 $('pName').addEventListener('change', () => { const v = $('pName').value.replace(/[<>]/g, '').trim().slice(0, 16); $('pName').value = v; store.set('name', v); });
 // features that need the hosting server: the buttons are in place, and for now they answer with a small "coming soon" note
 function soonNote() { const n = $('soonNote'); n.textContent = '🚧 Coming Soon'; n.hidden = false; sfx.click(); clearTimeout(soonNote.h); soonNote.h = setTimeout(() => { n.hidden = true; }, 1800); }
-function syncSoon() { document.querySelectorAll('button.soon').forEach((b) => { b.textContent = b.dataset.ic + ' ' + t(b.dataset.soon); b.onclick = soonNote; }); }
+function syncSoon() { document.querySelectorAll('button.soon').forEach((b) => { b.textContent = b.dataset.ic + ' ' + t(b.dataset.soon); b.onclick = b.id === 'stTopup' ? openTopup : soonNote; }); }
 const confirmRestore = { armed: false };
+// token packs paid in Pi (Testnet: Test-Pi). The server approves, completes and credits each payment once.
+const PI_PACKS = [0.1, 0.2, 0.4, 1, 2.5];
+const PI_LIVE = /kph4nwbnvm-hub|localhost|127\.0\.0\.1/.test(location.hostname); // Mainnet payments open once the Mainnet app key is on the server
+PiState.onTokens = (n) => { cs.give(n); gToast('💠 ' + t('tp_ok').replace('{v}', n.toLocaleString('en-US'))); if (!$('storeS').hidden) cs.render(); };
+function openTopup() {
+  if (!PI_LIVE) { soonNote(); return; }
+  if (!PiState.accessToken) { sfx.bad(); gToast('π ' + t('cl_need_pi')); return; }
+  const sh = $('stSheet'); sh.hidden = false; sh.style.setProperty('--rc', '#ffcf3f'); $('shIc').textContent = 'π'; $('shName').textContent = t('sv_topup'); $('shMeta').textContent = t('tp_note'); $('shUse').textContent = ''; $('shGoal').textContent = ''; $('shCompat').hidden = true;
+  const acts = $('shActs'); acts.innerHTML = '';
+  PI_PACKS.forEach((a) => { const b = document.createElement('button'); b.className = 'big'; b.textContent = 'π ' + a + '  →  💠 ' + (a * 1000).toLocaleString('en-US');
+    b.onclick = async () => { sfx.click(); acts.querySelectorAll('button').forEach((x) => { x.disabled = true; }); const r = await payTokens(a); acts.querySelectorAll('button').forEach((x) => { x.disabled = false; });
+      if (r.ok) { if (r.tokens) PiState.onTokens(r.tokens); ev('pay'); sh.hidden = true; } else if (r.error !== 'cancelled') { sfx.bad(); gToast('⚠️ ' + t('tp_fail') + ' (' + r.error + ')'); } };
+    acts.appendChild(b); });
+}
 function buildSettings() {
   const rows = $('setRows'); rows.innerHTML = '';
   const row = (icon, label, val, fn) => { const b = document.createElement('button'); b.className = 'srow'; b.innerHTML = '<span></span><span></span>'; b.children[0].textContent = icon + ' ' + label; b.children[1].textContent = val; b.onclick = () => { fn(); sfx.click(); buildSettings(); }; rows.appendChild(b); };
