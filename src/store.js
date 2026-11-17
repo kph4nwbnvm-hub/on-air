@@ -8,14 +8,17 @@ import { fmtTok } from './pricing.js';
 export const TOKEN = '💠';
 
 export function makeStore(deps) {
-  const { store, t, getLang, sfx, toast, $ } = deps;
+  const { store, t, getLang, sfx, toast, $ } = deps; const onEv = (e) => deps.onEvent && deps.onEvent(e);
   const S = {
     tokens: store.get('tok', 0),
     cards: store.get('cards', {}),
     equip: store.get('equip', {}),
     boosts: store.get('boosts', []),
+    wear: store.get('wear', {}),     // rounds used by the equipped copy of each card
+    unused: store.get('unused', {}), // bought and never used: { id: { n, ts } } → can be returned within 7 days
+    listed: store.get('listed', []), // my used-market listings
   };
-  const save = () => { store.set('tok', S.tokens); store.set('cards', S.cards); store.set('equip', S.equip); store.set('boosts', S.boosts); };
+  const save = () => { store.set('tok', S.tokens); store.set('cards', S.cards); store.set('equip', S.equip); store.set('boosts', S.boosts); store.set('wear', S.wear); store.set('unused', S.unused); store.set('listed', S.listed); };
   const count = (id) => S.cards[id] || 0;
   const add = (id, n = 1) => { S.cards[id] = count(id) + n; if (S.cards[id] <= 0) delete S.cards[id]; };
   const equipped = () => Object.values(S.equip).flat();
@@ -43,10 +46,37 @@ export function makeStore(deps) {
   const CONN_NAME = { rca: 'RCA', trs: 'TRS', xlr: 'XLR', sdi: 'SDI', hdmi: 'HDMI', dmx: 'DMX', usbc: 'USB-C', ethernet: 'Ethernet', fiber: 'Fiber', wireless: 'Wireless' };
   const needText = (n) => n.kind === 'hub' ? t('st_needs_hub').replace('{hub}', famName(card('equip.' + n.hub + '.1'))).replace('{c}', CONN_NAME[n.conn]) : t('st_needs_cable').replace('{c}', CONN_NAME[n.conn]);
   const effText = (c) => fmtEff(c.fam.effect, value(c));
+  // ---- lifetime: every piece works for a number of broadcasts, then wears out like real gear ----
+  const WEARS = (cat) => !['use', 'future'].includes(catOf(cat).kind);
+  const lifeOf = (c) => 20 + c.r * 6; // broadcasts
+  const lifePct = (id) => { const c = card(id); if (!c || !WEARS(c.fam.cat)) return 100; return Math.max(0, Math.round(100 * (1 - (S.wear[id] || 0) / lifeOf(c)))); };
+  const wearMult = (id) => { const p = lifePct(id); return p <= 0 ? 0 : p <= 15 ? 0.35 : p <= 20 ? 0.6 : 1; };
+  const lifeBar = (p) => (p <= 0 ? '⛔ ' : p <= 15 ? '🟥 ' : p <= 20 ? '🟧 ' : '🟩 ') + p + '%';
+  // one broadcast done: every equipped piece (and the cables it uses) ages; a worn-out piece is swapped for a spare if there is one
+  function wearRound() {
+    const ids = new Set(equipped()); equipped().forEach((id) => { const conn = info(card(id) || {}).conn; if (conn) { const cid = Object.keys(S.cards).find((x) => x.startsWith('cables.' + conn + '.') && S.cards[x] > 0); if (cid) ids.add(cid); } });
+    const msgs = [];
+    ids.forEach((id) => { const c = card(id); if (!c || !WEARS(c.fam.cat)) return; const before = lifePct(id); S.wear[id] = (S.wear[id] || 0) + 1; const p = lifePct(id);
+      if (p <= 0) { if (count(id) > 1) { add(id, -1); S.wear[id] = 0; msgs.push('🔁 ' + nameOf(c) + ' — ' + t('st_spare')); } else if (before > 0) msgs.push('⛔ ' + nameOf(c) + ' — ' + t('st_broken')); else S.wear[id] = lifeOf(c); }
+      else if (p <= 15 && before > 15) msgs.push('🟥 ' + nameOf(c) + ' — ' + t('st_fault2'));
+      else if (p <= 20 && before > 20) msgs.push('🟧 ' + nameOf(c) + ' — ' + t('st_fault1')); });
+    save(); return msgs;
+  }
+  // during a broadcast an aged piece can fail for a moment: returns a message, or '' when all is fine
+  function faultCheck() {
+    const weak = equipped().filter((id) => lifePct(id) <= 20); if (!weak.length) return '';
+    const id = weak[Math.floor(Math.random() * weak.length)]; const p = lifePct(id); if (Math.random() > (p <= 15 ? 0.6 : 0.3)) return '';
+    return (p <= 0 ? '⛔ ' : '⚠️ ') + nameOf(card(id)) + ' — ' + t(p <= 0 ? 'st_broken' : p <= 15 ? 'st_fault2' : 'st_fault1');
+  }
+  const markUsed = (id) => { if (S.unused[id]) { delete S.unused[id]; } };
+  const refundable = (id) => { const u = S.unused[id]; return !!u && u.n > 0 && count(id) > 0 && Date.now() - u.ts < 7 * 86400000 && !isEquipped(id); };
+  // used value: the new price, scaled by the life left and a 40% second-hand cut; a listing may ask at most 20% more
+  const usedValue = (id) => { const c = card(id); return Math.max(0.0001, Math.round(priceOf(c) * (lifePct(id) / 100) * 0.6 * 1e4) / 1e4); };
+  const usedCap = (id) => Math.round(usedValue(id) * 1.2 * 1e4) / 1e4;
 
   function bonuses() {
     const b = Object.fromEntries(Object.keys(EFFECTS).map((k) => [k, 0]));
-    [...equipped(), ...S.boosts].forEach((id) => { const c = card(id); if (!c || catOf(c.fam.cat).kind === 'future') return; const v = value(c); if (v > 0 && !compat(c).ok) return; b[c.fam.effect] += v; });
+    [...equipped(), ...S.boosts].forEach((id) => { const c = card(id); if (!c || catOf(c.fam.cat).kind === 'future') return; let v = value(c); if (v > 0 && !compat(c).ok) return; if (v > 0) v *= wearMult(id); b[c.fam.effect] += v; });
     const fams = new Set(equipped().map((id) => { const [c, f] = id.split('.'); return c + '.' + f; }));
     COLLECTIONS.forEach((col) => { if (col.fams.every((f) => fams.has(f))) Object.entries(col.bonus).forEach(([k, v]) => { b[k] += v; }); });
     Object.keys(b).forEach((k) => { b[k] = Math.max(-EFFECTS[k].cap / 3, Math.min(b[k], EFFECTS[k].cap)); });
@@ -67,7 +97,7 @@ export function makeStore(deps) {
   function chips() {
     const row = $('stCats'); row.innerHTML = '';
     const mk = (id, label) => { const b = document.createElement('button'); b.textContent = label; if (view.cat === id) b.className = 'sel'; b.onclick = () => { view.cat = id; view.limit = 60; sfx.click(); render(); }; row.appendChild(b); };
-    mk('all', '🗂️ ' + t('st_all')); mk('owned', '🎒 ' + t('st_owned')); mk('equipped', '✅ ' + t('st_equipped'));
+    mk('all', '🗂️ ' + t('st_all')); mk('owned', '🎒 ' + t('st_owned')); mk('equipped', '✅ ' + t('st_equipped')); mk('used', '♻️ ' + t('st_used'));
     CATS.forEach((c) => mk(c.id, c.icon + ' ' + t('c_' + c.id)));
     const rr = $('stRar'); rr.innerHTML = '';
     [0, 1, 2, 3, 4, 5].forEach((r) => { const b = document.createElement('button'); b.textContent = r ? t('r' + r) + ' ' + ((r - 1) * 3 + 1) + '–' + r * 3 : t('st_all'); if (r) b.style.borderColor = RARITY[r - 1].color; if (view.rarity === r) b.className = 'sel'; b.onclick = () => { view.rarity = r; view.limit = 60; sfx.click(); render(); }; rr.appendChild(b); });
@@ -77,7 +107,7 @@ export function makeStore(deps) {
   function list() {
     const q = view.q.trim().toLowerCase(); const lang = getLang();
     let L = CARDS.filter((c) => {
-      if (view.cat === 'owned' && !count(c.id)) return false;
+      if (view.cat === 'used') return false; if (view.cat === 'owned' && !count(c.id)) return false;
       if (view.cat === 'equipped' && !isEquipped(c.id)) return false;
       if (!['all', 'owned', 'equipped'].includes(view.cat) && c.fam.cat !== view.cat) return false;
       if (view.rarity && tierOf(c.r) !== view.rarity) return false;
@@ -99,6 +129,7 @@ export function makeStore(deps) {
     if (count(c.id) && !compat(c).ok) el.classList.add('bad');
     const n = count(c.id); if (n) { const k = document.createElement('i'); k.className = 'cnt'; k.textContent = '×' + n; el.appendChild(k); }
     if (isEquipped(c.id)) el.classList.add('on');
+    if (count(c.id) && S.wear[c.id]) { const lp = lifePct(c.id); const w = document.createElement('i'); w.className = 'life' + (lp <= 20 ? ' low' : ''); w.textContent = lifeBar(lp); el.appendChild(w); }
     el.onclick = () => { sfx.click(); openSheet(c.id); };
     return el;
   }
@@ -124,7 +155,7 @@ export function makeStore(deps) {
     chips(); $('stTok').textContent = TOKEN + ' ' + fmtTok(S.tokens); renderBonuses(); renderCollections();
     const nd = needsFn(), nb = $('stNeed'); nb.hidden = !nd.length; const ready = nd.length && nd.every(ownsPart); nb.classList.toggle('go', !!ready); nb.onclick = ready && needsGo ? () => needsGo() : null;
     if (nd.length) nb.textContent = ready ? '✅ ' + t('obj_pc2') + '  ▶' : '🖥️ ' + t('pc_title') + ' — ' + t('pc_need') + ':  ' + nd.map((f) => (ownsPart(f) ? '✅ ' : '❌ ') + t('p_' + f)).join('  ·  ');
-    const g = $('stGrid'); g.innerHTML = ''; const L = list();
+    const g = $('stGrid'); g.innerHTML = ''; if (view.cat === 'used') { $('stMore').hidden = true; renderUsed(g); return; } const L = list();
     if (!L.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = t('st_empty'); g.appendChild(p); }
     L.slice(0, view.limit).forEach((c) => g.appendChild(tile(c)));
     $('stMore').hidden = L.length <= view.limit; $('stMore').textContent = '⬇ ' + (L.length - view.limit);
@@ -144,23 +175,73 @@ export function makeStore(deps) {
     if (!buyable(c)) { const p = document.createElement('p'); p.className = 'earn'; p.textContent = '🏆 ' + t('st_earn_only'); acts.appendChild(p); }
     else btn(t('st_buy') + '  ' + TOKEN + ' ' + fmtTok(priceOf(c)), 'big' + (S.tokens < priceOf(c) ? ' poor' : ''), () => {
       if (S.tokens < priceOf(c)) { sfx.bad(); toast(t('st_no_tokens')); return; }
-      S.tokens = Math.round((S.tokens - priceOf(c)) * 1e7) / 1e7; add(id); save(); sfx.win(); toast('🎉 ' + t('st_bought')); render();
+      S.tokens = Math.round((S.tokens - priceOf(c)) * 1e7) / 1e7; add(id); const u = S.unused[id] || { n: 0, ts: 0 }; S.unused[id] = { n: u.n + 1, ts: Date.now() }; save(); sfx.win(); toast('🎉 ' + t('st_bought')); onEv('buy'); render();
     });
     if (n && cat.kind === 'equip') {
       if (isEquipped(id)) btn(t('st_unequip'), 'ghost', () => { S.equip[cat.id] = (S.equip[cat.id] || []).filter((x) => x !== id); save(); sfx.click(); render(); });
       else btn(t('st_equip'), 'ghost', () => {
         const slot = S.equip[cat.id] || []; if (slot.length >= cat.slots) { sfx.bad(); toast(t('st_slots')); return; }
-        S.equip[cat.id] = [...slot, id]; save(); sfx.win(); render();
+        S.equip[cat.id] = [...slot, id]; markUsed(id); save(); sfx.win(); onEv('equip'); render();
       });
     }
     if (n && cat.kind === 'use') btn(t('st_use'), 'ghost', () => {
-      if (isEquippedBoost(id)) return; add(id, -1); S.boosts.push(id); save(); sfx.win(); toast('⚡ ' + t('st_active')); render();
+      if (isEquippedBoost(id)) return; add(id, -1); markUsed(id); S.boosts.push(id); save(); sfx.win(); toast('⚡ ' + t('st_active')); render();
     });
     if (n >= 3 && c.r < MAX_LV) btn(t('st_merge'), 'ghost merge', () => {
-      add(id, -3); if (!count(id)) S.equip[cat.id] = (S.equip[cat.id] || []).filter((x) => x !== id);
+      markUsed(id); add(id, -3); if (!count(id)) S.equip[cat.id] = (S.equip[cat.id] || []).filter((x) => x !== id);
       add(`${c.fam.cat}.${c.fam.id}.${c.r + 1}`); save(); sfx.win(); toast('✨ ' + t('st_merged')); openSheet(`${c.fam.cat}.${c.fam.id}.${c.r + 1}`); render();
     });
+    // lifetime of the owned piece
+    if (n && WEARS(c.fam.cat)) { const lp = lifePct(id); const p = document.createElement('p'); p.className = 'earn'; p.textContent = '🔧 ' + t('st_life') + ': ' + lifeBar(lp) + ' · ' + Math.max(0, lifeOf(c) - (S.wear[id] || 0)) + '/' + lifeOf(c) + ' ' + t('st_rounds') + (lp <= 20 ? ' · ' + t(lp <= 0 ? 'st_broken' : lp <= 15 ? 'st_fault2' : 'st_fault1') : ''); acts.appendChild(p); }
+    // links to the matching hub and cable, and to the full working set
+    if (inf.conn) {
+      cp.need.forEach((nd) => { const tid = nd.kind === 'hub' ? hubFor(nd.hub, nd.conn) : 'cables.' + nd.conn + '.1'; if (!tid) return; const tc = card(tid);
+        btn('🔗 ' + t('st_goto') + ': ' + tc.fam.icon + ' ' + nameOf(tc), 'ghost link', () => { sfx.click(); openSheet(tid); }); });
+      const set = setFor(c); if (set.length > 1) btn('📦 ' + t('st_fullset') + ' (' + set.length + ')', 'ghost link', () => { sfx.click(); openSet(c); });
+    }
+    if (refundable(id)) btn('↩️ ' + t('st_return') + '  ' + TOKEN + ' ' + fmtTok(priceOf(c)), 'ghost', () => {
+      const u = S.unused[id]; add(id, -1); u.n--; if (u.n <= 0) delete S.unused[id]; S.tokens = Math.round((S.tokens + priceOf(c)) * 1e7) / 1e7; save(); sfx.good(); toast('↩️ ' + t('st_returned')); render();
+    });
+    if (n && !isEquipped(id) && buyable(c) && catOf(c.fam.cat).kind !== 'use') btn('🏷️ ' + t('st_sell'), 'ghost', () => { sfx.click(); openSell(id); });
   }
+  // the lowest hub level that takes this connector
+  function hubFor(hub, conn) { for (let lv = 1; lv <= BUY_MAX; lv++) if (supports(hub, lv, conn)) return 'equip.' + hub + '.' + lv; return null; }
+  // everything a device needs to work: the device, a hub that supports its connector, and the cable
+  function setFor(c) { const inf = info(c); const sig = signalOf(c.fam.cat, c.fam.id); if (!sig || !inf.conn) return [c.id]; const hub = HUB_OF[sig]; const out = [c.id];
+    if (!(hubLevel(hub) && supports(hub, hubLevel(hub), inf.conn)) && !(c.fam.cat === 'equip' && c.fam.id === hub)) { const h = hubFor(hub, inf.conn); if (h) out.push(h); }
+    if (!ownsCable(inf.conn)) out.push('cables.' + inf.conn + '.1'); return out; }
+  function openSet(c) {
+    const ids = setFor(c); const acts = $('shActs'); acts.innerHTML = ''; const toBuy = ids.filter((x) => !count(x)); const total = toBuy.reduce((a, x) => a + priceOf(card(x)), 0);
+    const h = document.createElement('p'); h.className = 'earn'; h.textContent = '📦 ' + t('st_fullset_h'); acts.appendChild(h);
+    ids.forEach((x) => { const xc = card(x); const b = document.createElement('button'); b.className = 'ghost link'; b.textContent = xc.fam.icon + ' ' + nameOf(xc) + '  ' + TOKEN + ' ' + fmtTok(priceOf(xc)) + (count(x) ? '  ✅' : ''); b.onclick = () => openSheet(x); acts.appendChild(b); });
+    if (!toBuy.length) return; const all = document.createElement('button'); all.className = 'big' + (S.tokens < total ? ' poor' : ''); all.textContent = t('st_buyset') + '  ' + TOKEN + ' ' + fmtTok(total);
+    all.onclick = () => { if (S.tokens < total) { sfx.bad(); toast(t('st_no_tokens')); return; } toBuy.forEach((x) => { S.tokens = Math.round((S.tokens - priceOf(card(x))) * 1e7) / 1e7; add(x); const u = S.unused[x] || { n: 0, ts: 0 }; S.unused[x] = { n: u.n + 1, ts: Date.now() }; }); save(); sfx.win(); toast('🎉 ' + t('st_bought')); onEv('buy'); openSheet(c.id); render(); };
+    acts.appendChild(all);
+  }
+  // sell a used piece on the players' market: the price can go up to 20% above its estimated used value
+  function openSell(id) {
+    const c = card(id); const acts = $('shActs'); acts.innerHTML = ''; const est = usedValue(id), cap = usedCap(id);
+    const h = document.createElement('p'); h.className = 'earn'; h.textContent = '🏷️ ' + t('st_sell_h').replace('{l}', lifePct(id) + '%').replace('{v}', fmtTok(est)).replace('{m}', fmtTok(cap)); acts.appendChild(h);
+    const r = document.createElement('input'); r.type = 'range'; r.min = Math.round(est * 0.5 * 1e4); r.max = Math.round(cap * 1e4); r.value = Math.round(est * 1e4); r.className = 'sellr'; acts.appendChild(r);
+    const go = document.createElement('button'); go.className = 'big'; const lbl = () => { go.textContent = t('st_list') + '  ' + TOKEN + ' ' + fmtTok(+r.value / 1e4); }; lbl(); r.oninput = lbl;
+    go.onclick = async () => { const price = Math.min(cap, +r.value / 1e4); const ok = await market.list(id, lifePct(id), price); if (!ok) { sfx.bad(); toast('🌐 ' + t('st_market_off')); return; } add(id, -1); delete S.wear[id]; markUsed(id); S.listed.push({ id, price, life: lifePct(id), ts: Date.now(), lid: ok }); save(); sfx.win(); toast('🏷️ ' + t('st_listed')); closeSheet(); render(); };
+    acts.appendChild(go);
+  }
+  // used market (other players' listings) — served by the game server
+  const market = deps.market || { list: async () => null, browse: async () => [], buy: async () => null };
+  async function renderUsed(g) {
+    const p = document.createElement('p'); p.className = 'empty'; p.textContent = '⏳'; g.appendChild(p);
+    const L = await market.browse(); g.innerHTML = '';
+    const head = document.createElement('p'); head.className = 'colh'; head.textContent = '♻️ ' + t('st_used_h'); g.appendChild(head);
+    if (!L) { const e = document.createElement('p'); e.className = 'empty'; e.textContent = '🌐 ' + t('st_market_off'); g.appendChild(e); return; }
+    if (!L.length) { const e = document.createElement('p'); e.className = 'empty'; e.textContent = t('st_used_none'); g.appendChild(e); }
+    L.forEach((it) => { const c = card(it.card); if (!c) return; const el = tile(c); el.onclick = null; el.children[3].textContent = '🔧 ' + lifeBar(it.life) + (it.mine ? ' · ' + t('st_mine') : ''); el.children[4].textContent = TOKEN + ' ' + fmtTok(it.price);
+      el.onclick = async () => { if (it.mine) return; if (S.tokens < it.price) { sfx.bad(); toast(t('st_no_tokens')); return; } const ok = await market.buy(it.lid); if (!ok) { sfx.bad(); toast('🌐 ' + t('st_market_off')); return; }
+        S.tokens = Math.round((S.tokens - it.price) * 1e7) / 1e7; add(it.card); S.wear[it.card] = Math.round(lifeOf(c) * (1 - it.life / 100)); save(); sfx.win(); toast('🎉 ' + t('st_bought')); render(); };
+      g.appendChild(el); });
+  }
+  // credits from my listings that other players bought
+  async function collectSales() { const got = await market.collect?.(); if (got && got.total > 0) { S.tokens = Math.round((S.tokens + got.total) * 1e7) / 1e7; S.listed = S.listed.filter((x) => !got.ids.includes(x.lid)); save(); toast('💰 ' + t('st_sold').replace('{v}', fmtTok(got.total))); } }
   const isEquippedBoost = (id) => false;
   function closeSheet() { sheetId = null; $('stSheet').hidden = true; }
 
@@ -185,5 +266,5 @@ export function makeStore(deps) {
   const setNeeds = (fn, go) => { needsFn = fn; needsGo = go; };
   const needsReady = () => { const nd = needsFn(); return nd.length > 0 && nd.every(ownsPart); };
   const setCat = (c) => { view.cat = c; view.rarity = 0; view.q = ''; view.limit = 60; };
-  return { S, bonuses, consumeBoosts, grantRandom, dropLevel, render, closeSheet, nameOf, give, partId, usePart, setCat, setNeeds, needsReady, ownedFams, famInfo, equippedFam };
+  return { S, wearRound, faultCheck, collectSales, lifePct, bonuses, consumeBoosts, grantRandom, dropLevel, render, closeSheet, nameOf, give, partId, usePart, setCat, setNeeds, needsReady, ownedFams, famInfo, equippedFam };
 }

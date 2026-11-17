@@ -257,6 +257,28 @@ button.soon{opacity:.85}button.soon::after{content:" 🔒";font-size:.8em}
   [dir=rtl] #creator{align-items:flex-start}
   #objBar{top:calc(62px + env(safe-area-inset-top));inset-inline:auto;left:50%;transform:translateX(-50%);width:min(56%,520px)}
 }
+
+#needs{display:flex;gap:5px;align-items:center;background:rgba(10,8,25,.72);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:4px 7px;color:#fff;font:inherit;cursor:pointer}
+#needs span{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:13px;line-height:1}
+#needs b{display:block;width:20px;height:4px;border-radius:2px;background:rgba(255,255,255,.18);overflow:hidden}
+#needs u{display:block;height:100%;background:#4cd18a;text-decoration:none}
+#needs span.low u{background:#ffb020}#needs span.crit u{background:#ff4d4d}#needs span.crit i{animation:blink .8s infinite}
+@keyframes blink{50%{opacity:.25}}
+#guide{text-align:start;pointer-events:auto;align-self:stretch;max-width:520px;background:rgba(10,8,25,.86);border:1px solid rgba(255,207,63,.45);border-radius:14px;padding:6px 10px;color:#fff;z-index:6;font-size:14px}
+#guide .gobj{background:rgba(255,207,63,.95);color:#231a00;font-weight:800;border-radius:9px;padding:5px 9px;margin:-1px -4px 6px}
+#guide .ghd{all:unset;display:block;width:100%;cursor:pointer;font-weight:700;line-height:1.35}
+#guide ul{list-style:none;margin:6px 0;padding:0}#guide li{padding:3px 0;opacity:.85}#guide li.cur{opacity:1;color:#ffcf3f;font-weight:700}
+#guide .gstop{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:10px;padding:5px 10px;font:inherit;font-size:13px}
+#fadeNight{position:fixed;inset:0;background:#05040d;opacity:0;pointer-events:none;z-index:50}
+#fadeNight.go{animation:night 2.2s ease}
+@keyframes night{0%{opacity:0}35%{opacity:1}65%{opacity:1}100%{opacity:0}}
+.pnote{font-size:13px;opacity:.85;margin:6px 0 4px;line-height:1.45}
+.pcrow.bad .nm b{color:#ff8a8a}
+.card .life{position:absolute;left:6px;bottom:30px;font-size:10px;font-style:normal;opacity:.9}.card .life.low{color:#ffb020}
+#shActs .link{font-size:13px}.sellr{width:100%;margin:8px 0}
+.vchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.vchips button{padding:6px 10px;border-radius:10px;font-size:13px}.vchips button.sel{outline:2px solid #ffcf3f}
+#pNat{width:100%;padding:8px;border-radius:10px;font:inherit;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.2)}
+#pNat option{color:#000}
 </style>
 </head>
 <body>
@@ -286,6 +308,8 @@ button.soon{opacity:.85}button.soon::after{content:" 🔒";font-size:.8em}
     <div id="pLvl"></div>
     <div class="xp"><div id="pXp"></div></div>
     <div id="pStats"></div>
+    <label class="fld"><small data-t="p_nat"></small><select id="pNat"></select></label>
+    <div class="fld"><small data-t="p_voice"></small><div id="pVoice" class="vchips"></div></div>
     <button id="bProfBack" class="ghost" data-t="back"></button>
   </div>
 </section>
@@ -379,15 +403,16 @@ button.soon{opacity:.85}button.soon::after{content:" 🔒";font-size:.8em}
   </div>
 </div>
 
+<div id="fadeNight"></div>
 <section id="hud" class="screen" hidden>
-  <div id="roamBar"><button id="bHome">☰</button><span id="piUser" hidden></span><span id="lvlBox"></span><span id="coinBox">🪙 <b id="coinN">0</b></span></div>
+  <div id="roamBar"><button id="bHome">☰</button><span id="piUser" hidden></span><span id="lvlBox"></span><span id="coinBox">🪙 <b id="coinN">0</b></span><button id="needs" aria-label="needs"></button></div>
   <div class="top">
     <span id="live" class="live" data-t="live"></span>
     <div class="trust"><small><span data-t="trust"></span><span id="trustPct">100%</span></small><div class="bar"><div id="trustFill"></div></div></div>
     <span id="timer">3:00</span>
   </div>
   <div id="objBar" hidden></div>
-  <div id="leftcol"><div id="segName"></div><div id="bubble" class="bubble"></div></div>
+  <div id="leftcol"><div id="segName"></div><div id="guide" hidden></div><div id="bubble" class="bubble"></div></div>
   <div id="pip"><div id="pipFlash"></div><div id="pipLabel"></div></div>
   <button id="hudStore">🛍️</button>
   <div id="joy"><div id="knob"></div></div>

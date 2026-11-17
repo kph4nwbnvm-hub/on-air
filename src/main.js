@@ -6,6 +6,10 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { LANGS, STR } from './i18n.js';
 import { piSignIn, PiState, claimTestReward } from './pi.js';
+import { makeLife, LIFE_SHOPS, personName } from './life.js';
+import { makeGuide } from './guide.js';
+import { makeVoices, MY_VOICES, COUNTRIES, flagOf, countryName } from './voices.js';
+import { market, cloudSave, cloudLoad, restore, track, flush } from './net.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
 import { carModel, loadCars, loadKit, cityKit } from './city3d.js';
 import { woodTex, fabricTex, panelTex } from './tex.js';
@@ -44,7 +48,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.9.10';
+const VERSION = '1.10.0';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -104,14 +108,18 @@ function bestVoice() {
   });
   return best;
 }
+const VOX = makeVoices();
+// fixed cast: Uncle Saleh is an older man, the father an older man, the sponsor and director adults; the player picks their own voice
+['sn_saleh', 'sn_father'].forEach((k) => VOX.setProfile(k, { g: 'm', age: 'old' })); VOX.setProfile('sponsor', { g: 'm', age: 'adult' }); VOX.setProfile('host', { g: 'f', age: 'young' }); VOX.setProfile('guest', { g: 'm', age: 'adult' });
+const myVoice = () => { const v = MY_VOICES[store.get('myvoice', 1)] || MY_VOICES[1]; VOX.setProfile('sn_me', { g: v[0], age: 'young', tone: VOX.TONE[v[1]] }); };
 const VOICE_STYLE = [{ pitch: 0.82, rate: 0.98 }, { pitch: 1.08, rate: 1.04 }, { pitch: 0.95, rate: 1.0 }, { pitch: 1.2, rate: 1.06 }, { pitch: 0.9, rate: 1.02 }];
 function speak(text, who) {
   if (!soundOn || !cfg.voice || !window.speechSynthesis) return;
   try {
     const m = text.match(/^([^:：]{1,28})[:：]\s*/); const name = who || (m ? m[1] : 'guest'); const body = m ? text.slice(m[0].length) : text;
     const v = bestVoice(); if (!v && VOICES.length) return; // no voice for this language: stay silent rather than read it wrongly
-    let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) >>> 0; const st = VOICE_STYLE[h % VOICE_STYLE.length];
-    speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(body); u.lang = ttsLang(); if (v) u.voice = v; u.pitch = st.pitch; u.rate = st.rate; speechSynthesis.speak(u);
+    const base = ttsLang().toLowerCase().split('-')[0]; const same = VOICES.filter((x) => (x.lang || '').replace('_', '-').toLowerCase().split('-')[0] === base);
+    const st = VOX.pick(name, same, v); speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(body); u.lang = ttsLang(); if (st.voice) u.voice = st.voice; u.pitch = st.pitch; u.rate = st.rate; speechSynthesis.speak(u);
   } catch (e) {}
 }
 
@@ -228,9 +236,9 @@ const COLL = { studio: [], street: [], event: [] }; const RECTS = { studio: [], 
 const IT = []; // interactables
 function interact(zone, x, z, r, key, icon, cond, run) { const ringM = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.58, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, side: THREE.DoubleSide })); ringM.rotation.x = -Math.PI / 2; ringM.position.set(x, 0.035, z); ZG[zone].add(ringM); const it = { zone, x, z, r, key, icon, cond, run, ring: ringM }; IT.push(it); return it; }
 const NPCS = [];
-function npc(zone, x, z, face, av, name, lines) { const ch = mk(av); ch.g.position.set(x, 0, z); ch.g.rotation.y = face; ZG[zone].add(ch.g); COLL[zone].push([x, z, 0.4]); const n = { ch, x, z, face, name, lines, i: 0, zone, fem: !!(av.female || av.dress === 'abaya' || av.dress === 'hijab') }; NPCS.push(n); return n; }
+function npc(zone, x, z, face, av, name, lines) { const ch = mk(av); ch.g.position.set(x, 0, z); ch.g.rotation.y = face; ZG[zone].add(ch.g); COLL[zone].push([x, z, 0.4]); const fem = !!(av.female || av.dress === 'abaya' || av.dress === 'hijab'); const idx = NPCS.length; const kidish = name === 'n_kid'; const n = { ch, x, z, face, name, lines, i: 0, zone, fem, id: 'npc' + idx, pname: personName(idx * 5 + 3, fem), voice: { g: fem ? 'f' : 'm', age: kidish ? 'kid' : ['young', 'adult', 'adult', 'old'][idx % 4] } }; NPCS.push(n); return n; }
 // a character's title in the player's language, feminine where the language needs it
-const npcName = (n) => (n.fem && STR[lang] && STR[lang][n.name + 'F']) || t(n.name);
+const npcName = (n) => { const title = (n.fem && STR[lang] && STR[lang][n.name + 'F']) || t(n.name); const nm = n.pname ? n.pname + ' · ' + title : title; if (n.voice) VOX.setProfile(nm, n.voice); return nm; };
 
 // decor that appears as the studio grows: [minLevel, firstChild, endChild) of the studio group
 const STAGE_R = [];
@@ -464,6 +472,13 @@ function syncCity() { if (cityLang === lang) return; cityLang = lang; citySigns.
   shopFront(-40, 27, 15, 5, 0x4a6fd9, 0x2a3f8f, '🧥', () => t('sh_clothes'), () => { $('hudStore').onclick(); if (!$('storeS').hidden) { cs.setCat('skins'); cs.render(); } }, 'sh_clothes');
   shopFront(-20, 27, 15, 6.5, 0x2a2233, 0xd4af37, '✂️', () => t('sh_designer'), () => openPanel('designer'), 'sh_designer');
   adBuilding(0, 27, 15, 7, 0x5b3aa6, 'elva'); adBuilding(20, 27, 15, 7, 0x1f6fb2, 'lslco'); adBuilding(40, 27, 15, 7, 0xc46b78, 'ccmedia');
+  // life shops on the ground floors of the north row (supermarket, restaurant, pharmacy, barber, phones, furniture, real estate, bank)
+  [[-21, 'super'], [21, 'rest'], [-31.5, 'pharm'], [31.5, 'barber'], [-42, 'phone'], [42, 'furn'], [-52.5, 'estate'], [52.5, 'bank']].forEach(([dx, id]) => {
+    const sh = LIFE_SHOPS.find((x) => x.id === id), x = SX + dx; const nm = () => t('ls_' + id);
+    const sg = put(new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.15), new THREE.MeshBasicMaterial({ map: shopSignTex(sh.icon, nm(), sh.bg), transparent: true, toneMapped: false })), x, 3.05, -8.0);
+    citySigns.push({ m: sg, icon: sh.icon, name: nm, bg: sh.bg });
+    interact('street', x, -6.6, 1.25, 'ls_' + id, sh.icon, () => roam(), () => openPanel('ls:' + id));
+  });
   // street lamps and trees along the second street
   [-45, -30, -10, 10, 30, 45].forEach((dx) => { streetLamp(SX + dx, 20.2, 1); COLL.street.push([SX + dx, 20.2, 0.25]); });
   [-30, -10, 10, 30].forEach((dx) => { tree(SX + dx, 25.6); COLL.street.push([SX + dx, 25.6, 0.35]); }); [-34, -26, 22, 30, 38, 46].forEach((dx) => tree(SX + dx, 7.4));
@@ -629,7 +644,7 @@ function syncScene() {
 }
 function flashPip() { const f = $('pipFlash'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); }
 function say(text, kind, quiet) { const b = $('bubble'); b.textContent = text; b.className = 'bubble show ' + (kind || ''); clearTimeout(say.h); say.h = setTimeout(() => { b.className = 'bubble'; }, 5200); if (!quiet) speak(text); }
-function enterZone(z, x, zz, face) { G.zone = z; G.px = ZONES[z].ox + x; G.pz = zz; G.face = face; sfx.door(); syncScene(); snapCam = true; }
+function enterZone(z, x, zz, face) { if (z === 'street') ev('street'); G.zone = z; G.px = ZONES[z].ox + x; G.pz = zz; G.face = face; sfx.door(); syncScene(); snapCam = true; }
 
 /* ---------- round ---------- */
 function firePrank() {
@@ -646,20 +661,20 @@ function startRound() {
   confetti.forEach((c) => { c.m.visible = false; }); $('qSheet').hidden = true; show('hud'); syncScene(); resize(); snapCam = true; sfx.seg();
   const c = chNow(); PASS = c.pass; ROUND = c.t; SEG = ROUND / 2; G.next = ROUND <= 90 ? 5 : 9; const prev = chDone > 0 && chDone < CH.length ? CH[chDone - 1].k : null; const allK = ['product', 'camera', 'light', 'confetti'], kNow = c.k || allK, kPrev = chDone > 0 ? CH[chDone - 1].k || allK : []; const fresh = chDone < CH.length ? kNow.filter((k) => !kPrev.includes(k)) : [];
   say((chDone < CH.length ? '🎯 ' + t('ch_title').replace('{n}', chDone + 1) + ' · ' : '') + t('ch_goal').replace('{p}', Math.round(PASS * 100)) + (fresh.length ? ' · ' + t('ch_new') + ': ' + fresh.map((k) => t('p_' + k)).join(' + ') : ''), '', true);
-  G.bonus += cs.bonuses().trust + upg.desk * 3 + (cafe.on ? 5 : 0); if (cafe.on) { cafe.on = false; store.set('coffee', false); }
+  ev('live'); G.bonus += cs.bonuses().trust + upg.desk * 3 + (cafe.on ? 5 : 0) + life.roundBonus(); G.faultAt = 20 + Math.random() * 20; if (cafe.on) { cafe.on = false; store.set('coffee', false); }
 }
 function endRound() {
   G.on = false; G.asking = false; $('qSheet').hidden = true; const missed = Math.max(0, (SEG >= 75 ? 3 : SEG >= 45 ? 2 : 1) - G.asked.length); G.bonus -= missed * 6;
   const BN = cs.bonuses();
-  const trust = Math.max(0, Math.min(100, (G.good / ROUND) * 100 + G.bonus)) / 100; const pass = trust >= PASS; const coins = Math.round((pass ? 100 + trust * 150 : trust * 60) * (1 + BN.coins / 100));
+  const trust = Math.max(0, Math.min(100, (G.good / ROUND) * 100 + G.bonus)) / 100; const pass = trust >= PASS; const coins = Math.round((pass ? 100 + trust * 150 : trust * 60) * (1 + BN.coins / 100) * life.mult()); ev('round'); life.roundCost(); const wearMsgs = cs.wearRound();
   let chMsg = ''; const coinsX = (1 + Math.min(chDone, CH.length - 1) * 0.1) * (1 + skills.deals * 0.04) * (1 + (licence ? LIC[licence].ads : 0) / 100);
   if (pass && chDone < CH.length) { chDone++; store.set('ch', chDone); chMsg = chDone < CH.length ? '🎯 ' + t('ch_next').replace('{n}', chDone + 1) : '🏆 ' + t('ch_done'); }
   addCoins(Math.round(coins * coinsX)); (pass ? sfx.win : sfx.lose)(); buzz(pass ? [60, 40, 120] : 200);
   stats.rounds++; if (pass) stats.wins++; stats.best = Math.max(stats.best, Math.round(trust * 100)); store.set('stats', stats);
   if (trust > 0) { const clips = store.get('interviews', []); clips.push({ q: Math.round(trust * 100), at: Date.now(), clip: true }); store.set('interviews', clips.slice(-30)); }
-  const xp = Math.round(roundXp(trust, pass) * (1 + BN.xp / 100) * (1 + skills.learn * 0.05)), up = shop.addXp(xp); showLevel();
+  const xp = Math.round(roundXp(trust, pass) * (1 + BN.xp / 100) * (1 + skills.learn * 0.05) * life.mult()), up = shop.addXp(xp); showLevel();
   let drop = null; if (Math.random() * 100 < 4 + BN.luck) drop = cs.grantRandom(cs.dropLevel(trust)); cs.consumeBoosts();
-  $('rXp').textContent = '+' + xp + ' ' + t('xp') + ' · ' + t('lvl') + ' ' + shop.level; $('rUp').hidden = !up && !drop && !chMsg; $('rUp').textContent = [chMsg, up ? '⭐ ' + t('level_up') : '', drop ? '🎁 ' + t('st_drop') + ': ' + drop.fam.icon + ' ' + cs.nameOf(drop) : ''].filter(Boolean).join('  ·  ');
+  $('rXp').textContent = '+' + xp + ' ' + t('xp') + ' · ' + t('lvl') + ' ' + shop.level; $('rUp').hidden = !up && !drop && !chMsg && !wearMsgs.length; $('rUp').textContent = [...wearMsgs, chMsg, up ? '⭐ ' + t('level_up') : '', drop ? '🎁 ' + t('st_drop') + ': ' + drop.fam.icon + ' ' + cs.nameOf(drop) : ''].filter(Boolean).join('  ·  ');
   $('rTitle').textContent = t(pass ? 'r_pass' : 'r_fail'); $('rTitle').className = pass ? 'pass' : 'fail';
   $('rTrust').textContent = Math.round(trust * 100) + '%'; $('rAir').textContent = fmt(G.good) + ' / ' + fmt(ROUND); $('rCoins').textContent = '+' + Math.round(coins * coinsX);
   const line = t(trust >= 0.85 ? 'sp_end_great' : pass ? 'sp_end_ok' : 'sp_end_bad'); $('rSponsor').textContent = line; speak(line);
@@ -696,7 +711,7 @@ NPCS.forEach((n) => {
   const fx = n.x + Math.sin(n.face) * 1.1, fz = n.z + Math.cos(n.face) * 1.1;
   if (n.star) interact(n.zone, fx, fz, 1.3, 'a_interview', '🎤', () => roam() && !n.done, () => openQuestions(n.set, (q) => { n.done = true; const rw = q.v > 0 ? 60 : q.v === 0 ? 20 : 0; addCoins(rw); say(t(n.name) + ': ' + t(q.a), q.v > 0 ? 'ok' : q.v < 0 ? 'warn' : ''); $('coinBox').classList.remove('pop'); void $('coinBox').offsetWidth; if (rw) $('coinBox').classList.add('pop'); }));
   else if (n.zone === 'street') interact(n.zone, fx, fz, 1.3, 'a_interview', '🎤', () => roam() && !ivOn && !storyOn && !chase.on, () => startInterview(n));
-  else interact(n.zone, fx, fz, 1.3, 'a_talk', '💬', roam, () => { sfx.click(); say(npcName(n) + ': ' + t(n.lines[n.i++ % n.lines.length])); });
+  else interact(n.zone, fx, fz, 1.3, 'a_talk', '💬', roam, () => { sfx.click(); ev('talk'); life.met(n.id, n.pname || npcName(n), n.fem ? '👩' : '🧑'); say(npcName(n) + ': ' + t(n.lines[n.i++ % n.lines.length])); });
 });
 function currentAction() {
   if (G.asking) return null; let best = null, bd = 99;
@@ -739,7 +754,7 @@ function movePlayer(dt) {
   if (G.asking) turn = fwd = 0;
   if (Math.abs(turn) < 0.18) turn = 0; if (Math.abs(fwd) < 0.18) fwd = 0;
   turn = Math.max(-1, Math.min(1, turn)); fwd = Math.max(-1, Math.min(1, fwd));
-  G.face -= turn * 2.5 * dt; G.moving = fwd !== 0;
+  G.face -= turn * 2.5 * dt; G.moving = fwd !== 0; if (G.moving && !movePlayer.once) { movePlayer.once = true; ev("move"); }
   if (G.moving) { const sp = (fwd > 0 ? 4.0 : 2.2) * fwd * (1 + fit.lv * 0.06); G.px += Math.sin(G.face) * sp * dt; G.pz += Math.cos(G.face) * sp * dt; G.walk += dt * 11 * Math.abs(fwd); }
   const Z = ZONES[G.zone];
   COLL[G.zone].forEach(([x, z, r]) => { const dx = G.px - x, dz = G.pz - z, d = Math.hypot(dx, dz), R = r + 0.3; if (d < R && d > 0.0001) { G.px = x + (dx / d) * R; G.pz = z + (dz / d) * R; } });
@@ -831,7 +846,7 @@ function checkDaily() {
   $('dReward').textContent = '🪙 ' + rewardFor(p.day) + (p.day === CYCLE ? ' + 👑' : '');
   $('daily').hidden = false;
 }
-$('dClaim').onclick = () => {
+$('dClaim').onclick = () => { ev('daily');
   const r = dailyClaim(dailyState); $('daily').hidden = true; if (!r) return;
   dailyState = r.state; store.set('daily', dailyState); addCoins(r.coins); sfx.win();
   if ([7, 14, 21].includes(r.day)) cs.grantRandom(r.day === 21 ? 2 : 1);
@@ -841,14 +856,22 @@ $('dClaim').onclick = () => {
     $('dClaim').hidden = true; setTimeout(() => { $('daily').hidden = true; $('dClaim').hidden = false; }, 3500);
   }
 };
-function showPiUser() { const el = $('piUser'); el.hidden = !PiState.user; if (PiState.user) el.textContent = 'π ' + PiState.user; }
+function showPiUser() { const el = $('piUser'); const nat = store.get('nat', ''); el.hidden = !PiState.user && !nat; el.textContent = (nat ? flagOf(nat) + ' ' : '') + (PiState.user ? 'π ' + PiState.user : ''); }
 piSignIn().then(showPiUser); showLevel();
 $('bPlay').onclick = () => { sfx.click(); enterRoam(); }; $('bAgain').onclick = startRound; $('bMenu').onclick = enterRoam;
 $('bHow').onclick = () => show('how'); $('bHowBack').onclick = () => show('menu'); $('langBtn').onclick = () => { buildLangs(); show('langs'); }; $('bLangBack').onclick = () => { show('settings'); buildSettings(); };
 $('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }; $('bCharDone').onclick = () => { sfx.click(); stripUnowned(); store.set('avatar', avatar); rebuildPlayer(); if (afterCreator) { afterCreator = false; startStory(); } else show('menu'); };
 // app-token store
 function gToast(msg) { const el = $('gToast'); el.textContent = msg; el.hidden = false; clearTimeout(gToast.h); gToast.h = setTimeout(() => { el.hidden = true; }, 2200); }
-const cs = makeStore({ store, t, getLang: () => lang, sfx, toast: gToast, $ });
+const cs = makeStore({ store, t, getLang: () => lang, sfx, toast: gToast, $, market, onEvent: (e) => ev(e) });
+// event bus: the daily guide ticks off its steps, and anonymous counters go to the analytics dashboard
+function ev(e) { try { guide.hit(e); } catch (x) {} try { track(e); } catch (x) {} }
+const life = makeLife({ store, t, sfx, toast: gToast, $, getCoins: () => G.coins, addCoins: (n) => addCoins(n), onEvent: (e) => ev(e), fade: () => { const f = $('fadeNight'); if (f) { f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); } } });
+const guide = makeGuide({ store, t, sfx, toast: gToast, $, addCoins: (n) => addCoins(n), ready: () => store.get('story_done', false), visible: () => !$('hud').hidden && !G.on && !storyOn && !ivOn, objective: () => (objKey() ? '🎯 ' + t(objKey()) : '') });
+myVoice(); setInterval(() => { guide.paint(); }, 1500); life.paint();
+$('needs').onclick = () => { if (G.on || storyOn || ivOn || G.asking) return; openPanel('life'); };
+// automatic cloud backup every 5 minutes while signed in with Pi
+setInterval(async () => { if (PiState.accessToken && !G.on && document.visibilityState === 'visible') { if (await cloudSave()) store.set('cloud_at', Date.now()); } }, 300000); setTimeout(() => { track('open'); flush(lang); }, 4000);
 $('bStore').onclick = () => { sfx.click(); storeFrom = 'menu'; cs.closeSheet(); cs.render(); show('storeS'); };
 $('stBack').onclick = () => { sfx.click(); cs.closeSheet(); rebuildPlayer(); Object.keys(STAFF).forEach(restyle); applyRoom(); if (cs.needsReady()) { pcFromStore(); return; } if (storeFrom === 'hud') { storeFrom = 'menu'; storePause = false; show('hud'); resize(); syncScene(); } else show('menu'); };
 
@@ -886,7 +909,7 @@ function storyNext() {
   if (st.act === 'xp') { const up = shop.addXp(10); showLevel(); if (up) say('⭐ ' + t('level_up'), '', true); }
   box.hidden = false; box.classList.toggle('black', !!st.black);
   $('sWho').textContent = st.who ? t(st.who) : ''; $('sText').textContent = t(st.k); $('sNext').textContent = t('tu_next');
-  speak(t(st.k), st.who ? t(st.who) : 'guest');
+  speak(t(st.k), st.who || 'guest');
 }
 function startStory() { storyOn = true; SI = -1; G.on = false; G.zone = 'studio'; syncScene(); storyNext(); }
 $('sNext').onclick = () => { sfx.click(); if (dq) dlgNext(); else storyNext(); };
@@ -900,7 +923,7 @@ function dlgNext() { const d = dq; d.i++; const l = d.lines[d.i]; const box = $(
   if (!l) { box.hidden = true; dq = null; d.done && d.done(); return; }
   box.hidden = false; box.classList.remove('black'); $('sWho').textContent = l.who ? (l.raw ? l.who : t(l.who)) : ''; $('sText').textContent = t(l.k); $('sNext').textContent = t('tu_next'); speak(t(l.k), l.who || 'guest'); }
 function startInterview(n) {
-  ivNpc = n; ivOn = true; G.asking = true;
+  ivNpc = n; ivOn = true; G.asking = true; ev('interview'); ev('talk'); life.met(n.id, n.pname || npcName(n), n.fem ? '👩' : '🧑');
   if (!store.get('story4_done', false)) dlg([{ who: 'sn_me', k: 's4a' }, { who: npcName(n), raw: true, k: 's4b' }, { k: 's4c' }], openIv); else openIv();
 }
 function openIv() {
@@ -971,13 +994,13 @@ const pcLit = () => { pcScreenM.color.set(pcS.fixed ? 0x2f7bff : 0x0a0a10); try 
 pcLit();
 let storeFrom = 'menu', storePause = false;
 // store button inside play: opens the store any time; a running broadcast is paused while shopping
-$('hudStore').onclick = () => { if (!UNLOCK.bStore()) { sfx.bad(); gToast(t('locked_hint')); return; } if (storyOn || ivOn || G.asking) return; sfx.click(); storeFrom = 'hud'; storePause = G.on; cs.closeSheet(); cs.render(); $('storeS').hidden = false; $('hud').hidden = true; };
-function pcOpen() { G.asking = true; pcBuild(); $('pc').hidden = false; }
+$('hudStore').onclick = () => { if (!UNLOCK.bStore()) { sfx.bad(); gToast(t('locked_hint')); return; } if (storyOn || ivOn || G.asking) return; sfx.click(); ev('store'); cs.collectSales(); storeFrom = 'hud'; storePause = G.on; cs.closeSheet(); cs.render(); $('storeS').hidden = false; $('hud').hidden = true; };
+function pcOpen() { if (!panelMode) ev('pc'); G.asking = true; pcBuild(); $('pc').hidden = false; }
 function pcClose() { $('pc').hidden = true; G.asking = false; panelMode = null; }
 let panelMode = null; function openPanel(k) { sfx.click(); panelMode = k; pcOpen(); }
 function pcBuild() {
   if (panelMode === 'edit' && ed) return edBuild();
-  if (panelMode === 'cafe') return cafeBuild();
+  if (panelMode === 'cafe') return cafeBuild(); if (panelMode === 'life') { ev('life'); return life.buildMe(); } if (panelMode && panelMode.startsWith('ls:')) return life.buildShop(panelMode.slice(3));
   if (panelMode === 'gym') return gymBuild(); if (panelMode === 'designer') return designBuild();
   if (pcS.fixed) return pcTab === 'skills' ? skBuild() : pcTab === 'lab' ? labBuild() : pcTab === 'up' ? upBuild() : pubBuild();
   $('pcTitle').textContent = '🖥️ ' + t('pc_title'); const L = $('pcList'); L.innerHTML = '';
@@ -1014,7 +1037,7 @@ function pubBuild() {
     const row = document.createElement('div'); row.className = 'pcrow'; const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = (iv.clip ? '🎥 ' + t('pub_clip') : '🎤 ' + (iv.who ? t(iv.who) || iv.who : '')) + ' · ' + t('pub_q') + ' ' + Math.round(iv.q) + '%'; row.appendChild(nm);
     if (!iv.cut && !(iv.pub && Object.keys(iv.pub).length)) { const e = document.createElement('button'); e.className = 'ghost'; e.textContent = '✂️'; e.onclick = () => { sfx.click(); edOpen(iv, list); }; row.appendChild(e); }
     Object.keys(PLAT).forEach((k) => { const b = document.createElement('button'); const done = iv.pub && iv.pub[k]; b.className = done ? 'ghost' : 'big'; b.textContent = done ? '✅' : PLAT[k].ic; b.disabled = !!done;
-      b.onclick = () => { const f = Math.max(1, Math.round((iv.q / 10) * PLAT[k].fans * (1 + skills.charm * 0.1) * (1 + upg.pc * 0.2))), c = Math.max(1, Math.round(iv.q * PLAT[k].coin * (1 + skills.deals * 0.04) * (1 + upg.pc * 0.2))); iv.pub = { ...(iv.pub || {}), [k]: true }; store.set('interviews', list);
+      b.onclick = () => { ev('publish'); const f = Math.max(1, Math.round((iv.q / 10) * PLAT[k].fans * (1 + skills.charm * 0.1) * (1 + upg.pc * 0.2))), c = Math.max(1, Math.round(iv.q * PLAT[k].coin * (1 + skills.deals * 0.04) * (1 + upg.pc * 0.2))); iv.pub = { ...(iv.pub || {}), [k]: true }; store.set('interviews', list);
         fans[k] += f; store.set('fans', fans); addCoins(c); const up = shop.addXp(2); showLevel(); sfx.good(); gToast(PLAT[k].ic + ' ' + platName(k) + ' · 👥 +' + f + ' · 🪙 +' + c); if (up) say('⭐ ' + t('level_up'), 'ok', true); pubBuild(); };
       row.appendChild(b); });
     L.appendChild(row);
@@ -1033,7 +1056,7 @@ function skBuild() {
   Object.keys(SKILLS).forEach((k) => { const lv = skills[k], row = document.createElement('div'); row.className = 'pcrow';
     row.innerHTML = '<span class="ic"></span><span class="nm"><b></b><small></small></span>'; row.children[0].textContent = SKILLS[k][0]; row.querySelector('b').textContent = t('sk_' + k); row.querySelector('small').textContent = '●'.repeat(lv) + '○'.repeat(5 - lv) + '  ' + SKILLS[k][1](lv);
     const b = document.createElement('button'); if (lv >= 5) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { const cost = lv + 1; b.className = free >= cost ? 'big' : 'ghost'; b.disabled = free < cost; b.textContent = '⬆ 🔹' + cost;
-      b.onclick = () => { skills[k]++; store.set('skills', skills); sfx.win(); gToast(SKILLS[k][0] + ' ' + t('sk_' + k) + ' ' + SKILLS[k][1](skills[k])); skBuild(); }; }
+      b.onclick = () => { skills[k]++; store.set('skills', skills); ev('skill'); sfx.win(); gToast(SKILLS[k][0] + ' ' + t('sk_' + k) + ' ' + SKILLS[k][1](skills[k])); skBuild(); }; }
     row.appendChild(b); L.appendChild(row); });
   const h = document.createElement('p'); h.className = 'pubempty'; h.textContent = 'ℹ️ ' + t('sk_hint'); L.appendChild(h);
 }
@@ -1053,7 +1076,7 @@ function gymBuild() {
   const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p);
   row.innerHTML = '<span class="ic">🏃</span><span class="nm"><b></b><small></small></span>'; row.querySelector('b').textContent = '⚡ +' + lv * 6 + '%'; row.querySelector('small').textContent = '●'.repeat(lv) + '○'.repeat(5 - lv);
   const b = document.createElement('button'); if (lv >= 5) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { const cost = 150 * (lv + 1); b.className = G.coins >= cost ? 'big' : 'ghost'; b.disabled = G.coins < cost; b.textContent = '⬆ 🪙 ' + cost;
-    b.onclick = () => { addCoins(-cost); fit.lv++; store.set('fit', fit.lv); sfx.win(); gToast('🏃 ⚡ +' + fit.lv * 6 + '%'); gymBuild(); }; }
+    b.onclick = () => { addCoins(-cost); fit.lv++; store.set('fit', fit.lv); ev('gym'); sfx.win(); gToast('🏃 ⚡ +' + fit.lv * 6 + '%'); gymBuild(); }; }
   row.appendChild(b); L.appendChild(row);
 }
 // café: one coffee = +5 trust at the start of the next broadcast (one cup at a time)
@@ -1062,7 +1085,7 @@ function cafeBuild() {
   const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p);
   row.innerHTML = '<span class="ic">☕</span><span class="nm"><b></b><small></small></span>'; row.querySelector('b').textContent = '🔴 📈 +5'; row.querySelector('small').textContent = cafe.on ? '●' : '○';
   const b = document.createElement('button'); if (cafe.on) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { b.className = G.coins >= 25 ? 'big' : 'ghost'; b.disabled = G.coins < 25; b.textContent = '🪙 25';
-    b.onclick = () => { addCoins(-25); cafe.on = true; store.set('coffee', true); sfx.good(); gToast('☕ 📈 +5'); cafeBuild(); }; }
+    b.onclick = () => { addCoins(-25); cafe.on = true; store.set('coffee', true); life.coffee(); ev('cafe'); sfx.good(); gToast('☕ 📈 +5 · ⚡ +20'); cafeBuild(); }; }
   row.appendChild(b); L.appendChild(row);
 }
 // fashion designer: an expensive one-time fee unlocks a custom studio uniform — pick the top and bottom colours for the whole team
@@ -1120,7 +1143,7 @@ interact('studio', PCX + 1.15, PCZ, 1.25, 'a_pc', '🖥️', () => roam() && !st
 const objKey = () => (!store.get('story_done', false) ? '' : !store.get('story4_done', false) ? 'obj_iv' : !pcS.fixed ? (cs.needsReady() ? 'obj_pc2' : 'obj_pc') : chDone === 0 ? 'obj_live' : fans.shoofni + fans.laqta + fans.sada === 0 ? 'obj_pub' : skSpent() === 0 && skEarned() > 0 ? 'obj_skill' : licence < 1 ? 'obj_lic' : upg.room < 1 ? 'obj_grow' : '');
 const UNLOCK = { bStore: () => pcS.gift || pcS.fixed || cs.S.tokens > 0, bChar: () => shop.level >= 2, bProfile: () => store.get('story4_done', false) };
 function applyLocks() { Object.entries(UNLOCK).forEach(([id, ok]) => { $(id).classList.toggle('locked', !ok()); }); }
-setInterval(() => { const k = objKey(), el = $('objBar'); const on = !!k && !G.on && !storyOn && !ivOn && !$('hud').hidden && $('pc').hidden && $('story').hidden; el.hidden = !on; if (on) el.textContent = '🎯 ' + t(k); if (!$('menu').hidden) applyLocks(); $('hudStore').classList.toggle('locked', !UNLOCK.bStore()); $('hudStore').hidden = storyOn || ivOn; }, 500);
+setInterval(() => { const k = objKey(), el = $('objBar'); const on = !!k && !G.on && !storyOn && !ivOn && !$('hud').hidden && $('pc').hidden && $('story').hidden && $('guide').hidden; el.hidden = !on; if (on) el.textContent = '🎯 ' + t(k); if (!$('menu').hidden) applyLocks(); $('hudStore').classList.toggle('locked', !UNLOCK.bStore()); $('hudStore').hidden = storyOn || ivOn; }, 500);
 
 // ───────── wardrobe: one studio outfit for the whole crew, or a different outfit per person ─────────
 const STAFF = { crew: { ch: crew, av: CREW_AV, post: null, ropts: { anim: 'Idle_TalkingPhone_Loop' } }, guest: { ch: guest, av: GUEST_AV, post: (c) => sit(c), ropts: { anim: 'Sitting_Idle_Loop' } } };
@@ -1138,7 +1161,7 @@ function drBuild() {
   if (!fams.length) { const p = document.createElement('p'); p.textContent = t('dr_none'); L.appendChild(p); }
   $('drAllT').textContent = t('dr_all'); $('drStore').textContent = '🛍️ ' + t('pc_store');
 }
-function drOpen(key) { drKey = key; G.asking = true; $('drAll').checked = false; drBuild(); $('dress').hidden = false; }
+function drOpen(key) { ev('dress'); drKey = key; G.asking = true; $('drAll').checked = false; drBuild(); $('dress').hidden = false; }
 $('drClose').onclick = () => { sfx.click(); $('dress').hidden = true; G.asking = false; };
 $('drStore').onclick = () => { if (!UNLOCK.bStore()) { sfx.bad(); gToast(t('locked_hint')); return; } sfx.click(); $('dress').hidden = true; G.asking = false; storeFrom = 'hud'; cs.setCat('skins'); cs.closeSheet(); cs.render(); show('storeS'); };
 interact('studio', 5.5, -1.75, 1.1, 'a_dress', '👔', () => roam() && !storyOn && !ivOn, () => drOpen('crew'));
@@ -1185,6 +1208,12 @@ $('tSkip').onclick = () => endTour();
 function buildProfile() {
   const n = $('pName'); n.value = store.get('name', '') || PiState.user || ''; n.placeholder = PiState.user || t('p_guest');
   $('pPi').textContent = PiState.user ? 'π ' + PiState.user + ' · ' + t('p_pi_on') : t('p_pi_off');
+  { const sel = $('pNat'); sel.innerHTML = ''; const cur = store.get('nat', ''); const o0 = document.createElement('option'); o0.value = ''; o0.textContent = '🏳️ —'; sel.appendChild(o0);
+    COUNTRIES.map((cc) => [cc, countryName(cc, lang)]).sort((a, b) => a[1].localeCompare(b[1], lang)).forEach(([cc, nm]) => { const o = document.createElement('option'); o.value = cc; o.textContent = flagOf(cc) + ' ' + nm; sel.appendChild(o); });
+    sel.value = cur; sel.onchange = () => { store.set('nat', sel.value); sfx.click(); showPiUser(); };
+    const vb = $('pVoice'); vb.innerHTML = ''; const mine = store.get('myvoice', 1);
+    MY_VOICES.forEach(([g, tone], i) => { const b = document.createElement('button'); b.className = 'ghost' + (i === mine ? ' sel' : ''); b.textContent = (g === 'f' ? '👩 ' : '👨 ') + t('v_' + tone);
+      b.onclick = () => { store.set('myvoice', i); myVoice(); sfx.click(); speak(t('v_sample'), 'sn_me'); buildProfile(); }; vb.appendChild(b); }); }
   const lv = shop.level, a = xpFor(lv), b = xpFor(Math.min(MAX_LEVEL, lv + 1));
   $('pLvl').textContent = '⭐ ' + t('lvl') + ' ' + lv + '   🪙 ' + G.coins; $('pXp').style.width = (lv >= MAX_LEVEL ? 100 : Math.round(((shop.xp - a) / (b - a)) * 100)) + '%';
   const owned = store.get('owned', []).length, excl = EXCLUSIVE.filter((id) => shop.has(id)).length;
@@ -1197,13 +1226,21 @@ $('pName').addEventListener('change', () => { const v = $('pName').value.replace
 // features that need the hosting server: the buttons are in place, and for now they answer with a small "coming soon" note
 function soonNote() { const n = $('soonNote'); n.textContent = '🚧 Coming Soon'; n.hidden = false; sfx.click(); clearTimeout(soonNote.h); soonNote.h = setTimeout(() => { n.hidden = true; }, 1800); }
 function syncSoon() { document.querySelectorAll('button.soon').forEach((b) => { b.textContent = b.dataset.ic + ' ' + t(b.dataset.soon); b.onclick = soonNote; }); }
+const confirmRestore = { armed: false };
 function buildSettings() {
   const rows = $('setRows'); rows.innerHTML = '';
   const row = (icon, label, val, fn) => { const b = document.createElement('button'); b.className = 'srow'; b.innerHTML = '<span></span><span></span>'; b.children[0].textContent = icon + ' ' + label; b.children[1].textContent = val; b.onclick = () => { fn(); sfx.click(); buildSettings(); }; rows.appendChild(b); };
   row(soundOn ? '🔊' : '🔇', t('sound'), t(soundOn ? 'on' : 'off'), () => { soundOn = !soundOn; store.set('sound', soundOn); if (!soundOn && window.speechSynthesis) speechSynthesis.cancel(); });
   row('🗣️', t('s_voice'), t(cfg.voice ? 'on' : 'off'), () => { cfg.voice = !cfg.voice; store.set('voice', cfg.voice); if (!cfg.voice && window.speechSynthesis) speechSynthesis.cancel(); });
   row('📳', t('s_vibe'), t(cfg.vibe ? 'on' : 'off'), () => { cfg.vibe = !cfg.vibe; store.set('vibe', cfg.vibe); buzz(80); });
-  { const b = document.createElement('button'); b.className = 'srow'; b.innerHTML = '<span></span><span></span>'; b.children[0].textContent = '☁️ ' + t('sv_cloud'); b.children[1].textContent = '🔒 Coming Soon'; b.onclick = soonNote; rows.appendChild(b); }
+  { // cloud save: tied to the Pi account (needs Pi Browser sign-in)
+    const mkRow = (label, val, fn) => { const b = document.createElement('button'); b.className = 'srow'; b.innerHTML = '<span></span><span></span>'; b.children[0].textContent = label; b.children[1].textContent = val; b.onclick = fn; rows.appendChild(b); return b; };
+    const last = store.get('cloud_at', 0);
+    const sv = mkRow('☁️ ' + t('sv_cloud'), PiState.accessToken ? (last ? '✅ ' + new Date(last).toLocaleString(lang, { dateStyle: 'short', timeStyle: 'short' }) : '⬆') : '🔒 π', async () => {
+      if (!PiState.accessToken) { sfx.bad(); gToast('π ' + t('cl_need_pi')); return; } sv.children[1].textContent = '⏳'; const ok = await cloudSave(); if (ok) { store.set('cloud_at', Date.now()); sfx.win(); gToast('☁️ ' + t('cl_saved')); } else { sfx.bad(); gToast('🌐 ' + t('st_market_off')); } buildSettings(); });
+    if (PiState.accessToken) mkRow('⬇️ ' + t('cl_restore'), '', async () => { const r = await cloudLoad(); if (!r || !r.data) { sfx.bad(); gToast('☁️ ' + t('cl_none')); return; } if (!confirmRestore.armed) { confirmRestore.armed = true; gToast('⚠️ ' + t('cl_confirm')); setTimeout(() => { confirmRestore.armed = false; }, 4000); return; } if (restore(r.data)) { gToast('✅'); setTimeout(() => location.reload(), 600); } });
+    mkRow('📘 ' + t('s_guide'), t(guide.S.on ? 'on' : 'off'), () => { guide.setOn(!guide.S.on); sfx.click(); buildSettings(); });
+  }
   row('🧍', t('s_real'), t(cfg.real ? 'on' : 'off'), () => { cfg.real = !cfg.real; store.set('real', cfg.real); setRealEnabled(cfg.real); if (cfg.real) loadReal(); });
   row('🕹️', t('s_ctrl'), t(cfg.ctrl === 'free' ? 'ctrl_free' : 'ctrl_joy'), () => { cfg.ctrl = cfg.ctrl === 'free' ? 'joy' : 'free'; store.set('ctrl', cfg.ctrl); applyCtrl(); pad.style.left = pad.style.top = pad.style.bottom = ''; buildSettings(); });
   row('🖥️', t('s_quality'), t(cfg.quality === 'low' ? 'q_low' : 'q_high'), () => { cfg.quality = cfg.quality === 'low' ? 'high' : 'low'; store.set('quality', cfg.quality); renderer.setPixelRatio(pixelRatio()); setupFX(); resize(); });
@@ -1227,7 +1264,7 @@ $('bReset').onclick = () => {
   try { Object.keys(localStorage).filter((k) => k.startsWith('onair_') && k !== 'onair_lang').forEach((k) => localStorage.removeItem(k)); } catch (e) {}
   location.reload();
 };
-$('bProfile').onclick = () => { sfx.click(); buildProfile(); show('profile'); }; $('bProfBack').onclick = () => { $('pName').dispatchEvent(new Event('change')); show('menu'); };
+$('bProfile').onclick = () => { sfx.click(); ev('profile'); buildProfile(); show('profile'); }; $('bProfBack').onclick = () => { $('pName').dispatchEvent(new Event('change')); show('menu'); };
 $('bSettings').onclick = () => { sfx.click(); buildSettings(); show('settings'); }; $('bSetBack').onclick = () => show('menu');
 $('bHome').onclick = () => { if (G.on) return; G.zone = 'studio'; syncScene(); show('menu'); };
 
@@ -1244,11 +1281,13 @@ function frameBody(now) {
   confetti.forEach((c) => { if (c.m.visible && c.m.position.y > c.ty) { c.m.position.y = Math.max(c.ty, c.m.position.y - c.vy * dt); c.m.rotation.x += dt * 6; c.m.rotation.z += dt * 4; if (c.m.position.y === c.ty) c.m.rotation.set(-Math.PI / 2, 0, c.m.rotation.z); } });
 
   const playing = !$('hud').hidden, creating = !$('creator').hidden;
+  if (playing && !storyOn) life.tick(dt);
   if (playing) {
     if (G.on) {
       const wasSeg = seg(); if (!storePause) G.time += dt;
       if (wasSeg === 0 && seg() === 1) { G.grace = 8; G.next = Math.max(G.next, G.time + 9); sfx.seg(); say(t('sp_seg2')); syncScene(); }
       if (G.grace > 0) G.grace -= dt; if (G.askCd > 0) G.askCd -= dt;
+      if (!storePause && G.faultAt && G.time > G.faultAt) { G.faultAt = G.time + 25 + Math.random() * 20; const fm = cs.faultCheck(); if (fm) { G.bonus -= 2; say(fm, 'warn', true); sfx.bad(); } }
       if (allGood()) G.good += dt;
       if (G.time >= G.next && G.time < ROUND - 7 && !(G.time > SEG - 7 && G.time < SEG)) { firePrank(); const pace = (G.time < 60 ? 15 : G.time < 120 ? 12 : 9.5) * chNow().pace; G.next = G.time + pace * (0.75 + Math.random() * 0.5); }
       const late = G.pranks.find((p) => p.fixed === null && !p.told && G.time - p.at > 6 && isActive(p.k)); if (late) { late.told = true; say(t('sp_' + late.k), 'warn'); }
@@ -1310,7 +1349,7 @@ function frame(now) {
 }
 
 // hook for automated checks only
-window.__onair = { guest: () => guest, player: () => player, setAv: (c) => { Object.assign(avatar, c); rebuildPlayer(); }, realDebug, R: renderer, openPanel, sign, chase, startChase, cop, applyRoom, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { cs, life, guide, guest: () => guest, player: () => player, setAv: (c) => { Object.assign(avatar, c); rebuildPlayer(); }, realDebug, R: renderer, openPanel, sign, chase, startChase, cop, applyRoom, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 Object.keys(UNLOCK).forEach((id) => { const run = $(id).onclick; $(id).onclick = (e) => { if (!UNLOCK[id]()) { sfx.bad(); gToast(t('locked_hint')); return; } run(e); }; });
