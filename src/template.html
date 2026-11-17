@@ -24,6 +24,7 @@ button{font:inherit;color:#fff;border:0;border-radius:16px;cursor:pointer}
 .big:active,.ghost:active{transform:scale(.97)}
 /* HUD */
 #hud{display:block;padding:0;pointer-events:none}
+
 #boot{position:fixed;inset:0;z-index:9999;background:radial-gradient(circle at 50% 40%,#2c2470,#0d0a1f);display:flex;align-items:center;justify-content:center;transition:opacity .5s}
 #boot.gone{opacity:0;pointer-events:none}.bootIn{text-align:center}.bootLogo{font-size:56px}.bootName{font-size:26px;font-weight:800;color:#ffcf3f;margin:8px 0 18px}
 .bootBar{width:180px;height:6px;border-radius:3px;background:rgba(255,255,255,.15);overflow:hidden;margin:auto}.bootBar i{display:block;height:100%;width:40%;background:#ffcf3f;border-radius:3px;animation:bootL 1.2s ease-in-out infinite}
@@ -53,7 +54,8 @@ button{font:inherit;color:#fff;border:0;border-radius:16px;cursor:pointer}
 .bubble{background:#fff;color:#1b1430;border-radius:14px;padding:9px 12px;font-size:14px;font-weight:600;opacity:0;transform:translateY(-8px);transition:.25s;pointer-events:none;text-align:start}
 .bubble.show{opacity:1;transform:none}
 .bubble.warn{background:#ffe0d6}.bubble.ok{background:#d9ffe9}
-#joy{position:absolute;left:22px;bottom:26px;width:128px;height:128px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);touch-action:none}
+body.freeCtl #joy{opacity:0;transition:opacity .15s;pointer-events:none}body.freeCtl #joy.on{opacity:1}
+#joy{position:absolute;left:calc(22px + env(safe-area-inset-left));bottom:calc(26px + env(safe-area-inset-bottom));width:128px;height:128px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);touch-action:none}
 #knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:rgba(255,255,255,.85);pointer-events:none}
 #actBtn{position:absolute;right:22px;bottom:34px;width:112px;height:112px;border-radius:50%;background:#ffcf3f;color:#2a1c00;font-weight:800;font-size:13px;line-height:1.15;box-shadow:0 6px 20px rgba(0,0,0,.5);touch-action:none;padding:6px}
 #actBtn[hidden]{display:none}
@@ -249,6 +251,12 @@ button.locked{opacity:.45}
 .drall{display:flex;align-items:center;gap:8px;margin:12px 2px 4px;font-size:15px}.drall input{width:22px;height:22px}
 #soonNote{position:fixed;left:50%;bottom:12%;transform:translateX(-50%);z-index:99999;background:rgba(20,16,46,.96);color:#fff;border:2px solid #ffcf3f;border-radius:14px;padding:10px 18px;font-weight:700;font-size:15px;box-shadow:0 8px 24px rgba(0,0,0,.4);pointer-events:none;white-space:nowrap}
 button.soon{opacity:.85}button.soon::after{content:" 🔒";font-size:.8em}
+@media (orientation:landscape) and (max-height:600px){
+  #creator{justify-content:center;align-items:flex-end}
+  #crPanel{width:min(46%,460px);height:100%;max-width:none;border-radius:22px 0 0 22px;border-top:0;border-left:1px solid rgba(255,255,255,.2);padding-top:calc(12px + env(safe-area-inset-top));padding-bottom:calc(14px + env(safe-area-inset-bottom))}
+  [dir=rtl] #creator{align-items:flex-start}
+  #objBar{top:calc(62px + env(safe-area-inset-top));inset-inline:auto;left:50%;transform:translateX(-50%);width:min(56%,520px)}
+}
 </style>
 </head>
 <body>

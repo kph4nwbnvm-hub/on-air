@@ -44,7 +44,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.9.4';
+const VERSION = '1.9.5';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -721,6 +721,15 @@ pad.addEventListener('pointerdown', (e) => { joy.on = true; joy.id = e.pointerId
 pad.addEventListener('pointermove', (e) => { if (joy.on && e.pointerId === joy.id) moveJoy(e); });
 const endJoy = (e) => { if (e.pointerId === joy.id) { joy.on = false; joy.x = joy.y = 0; knob.style.transform = 'translate(0,0)'; } };
 pad.addEventListener('pointerup', endJoy); pad.addEventListener('pointercancel', endJoy);
+// free control: touch anywhere on the open game view and the stick appears under the finger
+cfg.ctrl = store.get('ctrl', 'joy'); const applyCtrl = () => document.body.classList.toggle('freeCtl', cfg.ctrl === 'free'); applyCtrl();
+canvas.addEventListener('pointerdown', (e) => {
+  if (cfg.ctrl !== 'free' || joy.on || $('hud').hidden || !$('story').hidden || G.asking) return;
+  joy.on = true; joy.id = e.pointerId; joy.cx = e.clientX; joy.cy = e.clientY; pad.style.left = (e.clientX - 64) + 'px'; pad.style.top = (e.clientY - 64) + 'px'; pad.style.bottom = 'auto'; pad.classList.add('on');
+  try { canvas.setPointerCapture(e.pointerId); } catch (x) {} });
+canvas.addEventListener('pointermove', (e) => { if (cfg.ctrl === 'free' && joy.on && e.pointerId === joy.id) moveJoy(e); });
+const endFree = (e) => { if (cfg.ctrl === 'free' && e.pointerId === joy.id) { endJoy(e); pad.classList.remove('on'); } };
+canvas.addEventListener('pointerup', endFree); canvas.addEventListener('pointercancel', endFree);
 function moveJoy(e) { let dx = e.clientX - joy.cx, dy = e.clientY - joy.cy; const m = Math.hypot(dx, dy), R = 46; if (m > R) { dx *= R / m; dy *= R / m; } joy.x = dx / R; joy.y = dy / R; knob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)'; }
 $('actBtn').addEventListener('pointerdown', (e) => { e.preventDefault(); act(); });
 
@@ -760,7 +769,7 @@ function setupFX() {
   bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 2.6); composer.addPass(bloom); composer.addPass(new OutputPass());
 }
 function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); } const r = $('pip').getBoundingClientRect(); pip = { x: r.left, y: h - r.bottom, w: r.width, h: r.height }; }
-window.addEventListener('resize', resize);
+window.addEventListener('resize', resize); window.addEventListener('orientationchange', () => { setTimeout(resize, 250); setTimeout(resize, 800); }); // phones report the new size a moment after turning
 function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator', 'profile', 'settings', 'storeS', 'tour'].forEach((s) => { $(s).hidden = s !== id; }); if (id === 'menu') checkDaily(); }
 function buildLangs() { const g = $('langGrid'); g.innerHTML = ''; LANGS.forEach((l) => { const b = document.createElement('button'); b.textContent = l.name; b.dir = l.rtl ? 'rtl' : 'ltr'; if (l.code === lang) b.className = 'sel'; b.onclick = () => { lang = l.code; store.set('lang', lang); applyLang(); show('settings'); buildSettings(); }; g.appendChild(b); }); }
 function enterRoam() { lastAct = 0; G.on = false; G.zone = 'studio'; G.px = 0; G.pz = 3.3; G.face = Math.PI; player.armR.rotation.set(0, 0, 0); show('hud'); resize(); syncScene(); snapCam = true; say(t('roam_hint'), '', true); }
@@ -1196,6 +1205,7 @@ function buildSettings() {
   row('📳', t('s_vibe'), t(cfg.vibe ? 'on' : 'off'), () => { cfg.vibe = !cfg.vibe; store.set('vibe', cfg.vibe); buzz(80); });
   { const b = document.createElement('button'); b.className = 'srow'; b.innerHTML = '<span></span><span></span>'; b.children[0].textContent = '☁️ ' + t('sv_cloud'); b.children[1].textContent = '🔒 Coming Soon'; b.onclick = soonNote; rows.appendChild(b); }
   row('🧍', t('s_real'), t(cfg.real ? 'on' : 'off'), () => { cfg.real = !cfg.real; store.set('real', cfg.real); setRealEnabled(cfg.real); if (cfg.real) loadReal(); });
+  row('🕹️', t('s_ctrl'), t(cfg.ctrl === 'free' ? 'ctrl_free' : 'ctrl_joy'), () => { cfg.ctrl = cfg.ctrl === 'free' ? 'joy' : 'free'; store.set('ctrl', cfg.ctrl); applyCtrl(); pad.style.left = pad.style.top = pad.style.bottom = ''; buildSettings(); });
   row('🖥️', t('s_quality'), t(cfg.quality === 'low' ? 'q_low' : 'q_high'), () => { cfg.quality = cfg.quality === 'low' ? 'high' : 'low'; store.set('quality', cfg.quality); renderer.setPixelRatio(pixelRatio()); setupFX(); resize(); });
   $('setVer').textContent = t('s_version') + ' ' + VERSION; const r = $('bReset'); r.classList.remove('armed'); r.textContent = t('s_reset');
 }
@@ -1245,18 +1255,21 @@ function frameBody(now) {
   } else if (creating) {
     player.g.position.set(0, 0, 3.3); player.g.rotation.y = Math.sin(tt * 0.7) * 0.9; player.legL.rotation.x = player.legR.rotation.x = player.armL.rotation.x = 0; player.armR.rotation.set(0, 0, 0);
     if (tab === 'face') { player.g.rotation.y *= 0.4; let hy = 1.62; if (player.real && player.real.root.visible) { if (!player.real.headB) player.real.root.traverse((o) => { if (o.isBone && /^head$/i.test(o.name)) player.real.headB = o; }); if (player.real.headB) { player.real.headB.getWorldPosition(hv); hy = hv.y + 0.07; } }
-      cam.position.set(0, hy + 0.08, 3.3 + 1.4); cam.lookAt(0, hy - 0.05, 3.3); } else { cam.position.set(0, 1.45, 6.9); cam.lookAt(0, 1.0, 3.3); }
+      const fx = 0; cam.position.set(fx, hy + 0.08, 3.3 + 1.4); cam.lookAt(fx, innerWidth > innerHeight ? hy - 0.02 : hy - 0.05, 3.3); }
+    else if (innerWidth > innerHeight) { cam.position.set(0, 1.2, 8.9); cam.lookAt(0, 0.92, 3.3); } // landscape: full-height view beside the panel
+    else { cam.position.set(0, 1.45, 6.9); cam.lookAt(0, 1.0, 3.3); }
   } else {
     if (tourI >= 0) { cam.position.lerp(tourCam.p, Math.min(1, dt * 2.2)); tourCam.l.lerp(tourCam.lt, Math.min(1, dt * 2.6)); cam.lookAt(tourCam.l); } else {
     cam.position.set(Math.sin(tt * 0.2) * 3.5, 4.4, 10.5); cam.lookAt(0.3, 1.2, -1.2); if (window.__shot) { cam.position.set(...window.__shot.p); cam.lookAt(...window.__shot.l); } }
     player.g.position.set(0, 0, 3.3); player.g.rotation.y = Math.sin(tt * 0.6) * 0.5; player.armR.rotation.x = -2.6 + Math.sin(tt * 5) * 0.3; player.legL.rotation.x = player.legR.rotation.x = player.armL.rotation.x = 0;
   }
   // render: the creator shows the character in the top half only
-  const vh = creating ? Math.round(h * 0.46) : h, vy = h - vh; const fov = creating ? 34 : w < h ? 72 : 58;
-  if (cam.aspect !== w / vh || cam.fov !== fov) { cam.aspect = w / vh; cam.fov = fov; cam.updateProjectionMatrix(); }
+  // landscape: the creator panel sits on the right, so the character gets the left part of the screen
+  const crL = creating && w > h, vw = crL ? Math.round(w * 0.54) : w, vh = creating && !crL ? Math.round(h * 0.46) : h, vy = h - vh; const fov = creating ? (crL ? 30 : 34) : w < h ? 72 : 58;
+  if (cam.aspect !== vw / vh || cam.fov !== fov) { cam.aspect = vw / vh; cam.fov = fov; cam.updateProjectionMatrix(); }
   renderer.setScissorTest(false); renderer.setViewport(0, 0, w, h); renderer.clear();
   if (window.__cam) { cam.position.set(...window.__cam.p); cam.lookAt(...window.__cam.l); } // test hook
-  if (composer && !creating) composer.render(); else { renderer.setViewport(0, vy, w, vh); renderer.render(scene, cam); }
+  if (composer && !creating) composer.render(); else { renderer.setViewport(0, vy, vw, vh); renderer.render(scene, cam); }
   if (playing && G.on && pip.w > 0) {
     renderer.setScissorTest(true); renderer.setScissor(pip.x, pip.y, pip.w, pip.h); renderer.setViewport(pip.x, pip.y, pip.w, pip.h);
     IT.forEach((it) => { it.ring.visible = false; }); renderer.render(scene, feedCam); renderer.setScissorTest(false);
