@@ -7,6 +7,7 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { LANGS, STR } from './i18n.js';
 import { piSignIn, PiState } from './pi.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
+import { carModel, loadCars } from './city3d.js';
 import { register, loadReal, realTick, setRealEnabled, setRealBudget, realDebug } from './real.js';
 const mk = (av, o) => register(makeChar(av), av, o);
 import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL, isExclusive, EXCLUSIVE } from './shop.js';
@@ -40,7 +41,7 @@ const cfg = { real: store.get('real', true), voice: store.get('voice', true), vi
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.8.0';
+const VERSION = '1.8.1';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -359,7 +360,7 @@ put(box(1.8, 0.1, 0.5, 0x8a5a2b), SX + 3, 0.5, -3.6).castShadow = true; put(box(
 const car = new THREE.Group(); put(slab(3.6, 0.6, 1.7, 0.3, 0xff4d6d), 0, 0.95, 0, car); put(slab(2.0, 0.55, 1.5, 0.3, 0xffffff), -0.2, 1.5, 0, car);
 [[-1.1, 0.86], [1.1, 0.86], [-1.1, -0.86], [1.1, -0.86]].forEach(([x, z]) => { const w = cyl(0.34, 0.34, 0.22, 0x1c1c22); w.rotation.x = Math.PI / 2; put(w, x, 0.34, z, car); });
 put(sph(0.1, 0xfff3b0, { emissive: 0xfff3b0 }), 1.78, 0.75, 0.55, car); put(sph(0.1, 0xfff3b0, { emissive: 0xfff3b0 }), 1.78, 0.75, -0.55, car);
-car.position.set(SX - 3, 0, 5.2); cur.add(shadow(car));
+car.position.set(SX - 3, 0, 5.2); cur.add(shadow(car)); carModel(car, 0, 4.0);
 // awards arch
 [-2.4, 2.4].forEach((z) => put(box(0.6, 4.2, 0.6, 0xffcf3f), SX + 13.4, 2.1, z).castShadow = true); put(box(0.7, 0.9, 5.6, 0xc81e2d), SX + 13.4, 4.4, 0);
 const archSign = put(signPlane('★ AWARDS ★', '#c81e2d', '#ffcf3f', 5, 0.8, 640, 110, 'bold 80px system-ui'), SX + 13.04, 4.4, 0); archSign.rotation.y = -Math.PI / 2;
@@ -436,7 +437,7 @@ const traffic = [];
   const add = (o, x, y, zz) => { o.position.set(x, y, zz); o.castShadow = true; g.add(o); }; add(box(3.4, 0.7, 1.6, c), 0, 0.65, 0); add(box(1.8, 0.6, 1.4, 0xbfe3ff), -0.2, 1.25, 0);
   [[-1.1, 0.8], [1.1, 0.8], [-1.1, -0.8], [1.1, -0.8]].forEach(([a, b]) => { const w = cyl(0.34, 0.34, 0.24, 0x1a1a22); w.rotation.x = Math.PI / 2; add(w, a, 0.34, b); });
   add(sph(0.12, 0xfff3b0, { emissive: 0xfff3b0 }), 1.7, 0.7, 0.5); add(sph(0.12, 0xfff3b0, { emissive: 0xfff3b0 }), 1.7, 0.7, -0.5);
-  g.position.set(SX + x0, 0, z); g.rotation.y = dir > 0 ? 0 : Math.PI; cur.add(g); traffic.push({ g, dir, v: 6 }); });
+  g.position.set(SX + x0, 0, z); g.rotation.y = dir > 0 ? 0 : Math.PI; cur.add(g); carModel(g, traffic.length + 1); traffic.push({ g, dir, v: 6 }); });
 function trafficTick(dt) { traffic.forEach((c) => { const p = c.g.position, ahead = (G.px - p.x) * c.dir, near = Math.abs(G.pz - p.z) < 1.7 && ahead > -1.8 && ahead < 5.5; c.v += ((near ? 0 : 6) - c.v) * Math.min(1, dt * 4); p.x += c.dir * c.v * dt; if (p.x > SX + 56) p.x = SX - 56; if (p.x < SX - 56) p.x = SX + 56; c.g.visible = Math.abs(p.x - G.px) < 48; }); }
 // police officer for the chase (filming without a StudioLab licence)
 const cop = mk({ skin: 2, hairStyle: 0, hairColor: 0, beard: 1, top: 0, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, capColor: 4, acc: { cap: true } });
@@ -1228,4 +1229,5 @@ if (!store.get('story_done', false)) setTimeout(() => { afterCreator = true; G.z
 showDiag(IS_MOBILE ? 'mobile · ' + cfg.quality : cfg.quality); setTimeout(() => { const d = document.getElementById('diag'); if (d && !errShown) d.remove(); }, 6000);
 requestAnimationFrame(frame);
 // realistic characters load after the game is up, so the first screen never waits for them
+setTimeout(loadCars, 900);
 if (cfg.real) setTimeout(() => { if (IS_MOBILE) setRealBudget(6, 18); loadReal(); }, 1200);

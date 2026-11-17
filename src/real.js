@@ -139,7 +139,7 @@ function attach(c) {
   c.simple = c.g.children.filter((o) => o !== r.root);
 }
 function showSimple(c, on) { if (!c.real) return; c.simple.forEach((o) => { o.visible = on; }); c.real.root.visible = !on; }
-function play(c, name) { const r = c.real; if (!r || r.cur === name || !r.acts[name]) return; const a = r.acts[name]; a.reset().fadeIn(0.25).play(); if (r.cur && r.acts[r.cur]) r.acts[r.cur].fadeOut(0.25); r.cur = name; }
+function play(c, name) { const r = c.real; if (!r || r.cur === name || !r.acts[name]) return; const a = r.acts[name]; const prev = r.cur && r.acts[r.cur]; a.reset().setEffectiveWeight(1).play(); if (prev) a.crossFadeFrom(prev, 0.25, false); r.cur = name; }
 
 const tmp = new THREE.Vector3(), ranked = [];
 export function realTick(dt, camera) {
