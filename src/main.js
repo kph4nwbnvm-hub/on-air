@@ -38,7 +38,7 @@ const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), qu
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.5.4';
+const VERSION = '1.5.5';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -1019,7 +1019,7 @@ function edBuild() {
   const h = document.createElement('p'); h.className = 'pubempty'; h.textContent = t('ed_hint'); L.appendChild(h);
   const row = document.createElement('div'); row.className = 'edrow'; ed.shots.forEach((s) => { const b = document.createElement('button'); b.className = 'edshot' + (s.cut ? ' cut' : ''); b.textContent = s.ic; b.onclick = () => { s.cut = !s.cut; sfx.click(); edBuild(); }; row.appendChild(b); }); L.appendChild(row);
   const sv = document.createElement('button'); sv.className = 'big pubpay'; sv.textContent = '💾 ' + t('ed_save');
-  sv.onclick = () => { let d = 0; ed.shots.forEach((s) => { if (s.cut) d += s.b ? 5 : -5; }); const q0 = ed.iv.q; ed.iv.q = Math.max(1, Math.min(100, q0 + d)); ed.iv.cut = true; store.set('interviews', ed.list); (d > 0 ? sfx.win : sfx.bad)(); gToast('✂️ ' + t('pub_q') + ' ' + Math.round(q0) + '% ➜ ' + Math.round(ed.iv.q) + '%'); ed = null; panelMode = null; pcBuild(); };
+  sv.onclick = () => { let d = 0; ed.shots.forEach((s) => { if (s.cut) d += s.b ? 5 + Math.floor(gearLv('edit') / 3) : -5; }); const q0 = ed.iv.q; ed.iv.q = Math.max(1, Math.min(100, q0 + d)); ed.iv.cut = true; store.set('interviews', ed.list); (d > 0 ? sfx.win : sfx.bad)(); gToast('✂️ ' + t('pub_q') + ' ' + Math.round(q0) + '% ➜ ' + Math.round(ed.iv.q) + '%'); ed = null; panelMode = null; pcBuild(); };
   L.appendChild(sv);
 }
 // once everything is diagnosed, Uncle Saleh hands over exactly the price of the broken parts (level 1 each)

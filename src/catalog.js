@@ -55,6 +55,7 @@ const F = [
   ['equip', 'ring', '⭕', 'style', 'إضاءة دائرية', 'Ring light'], ['equip', 'green', '🟩', 'xp', 'شاشة خضراء', 'Green screen'],
   ['equip', 'switcher', '🔀', 'coins', 'مبدّل الكاميرات', 'Video switcher'], ['equip', 'radio', '📻', 'fix', 'لاسلكي الطاقم', 'Crew radio'],
   ['equip', 'lightdesk', '🎚️', 'style', 'طاولة الإضاءة', 'Lighting console'],
+  ['equip', 'edit', '🎞️', 'fans', 'منظومة مونتاج', 'Editing suite'],
   // cables and connectors (owned, not equipped): a device works only with a hub that supports its connector and the matching cable
   // computer parts (owned; installed into the office PC)
   ['parts', 'psu', '🔌', 'fix', 'مزوّد الطاقة', 'Power supply'], ['parts', 'board', '🟩', 'fix', 'اللوحة الأم', 'Motherboard'], ['parts', 'ram', '🧠', 'fix', 'الذاكرة (RAM)', 'Memory (RAM)'], ['parts', 'disk', '💽', 'fix', 'القرص الصلب', 'Hard drive'], ['parts', 'fan', '🌀', 'fix', 'مروحة التبريد', 'Cooling fan'],

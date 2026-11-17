@@ -4,6 +4,12 @@
 export const MAX_LV = 15;
 
 const T = {
+  edit: [
+    ['مقص ولصق شريط الفيلم', 'Film splicer', '1920s', null], ['عارض أفلام عمودي', 'Upright film viewer', '1930s', null], ['طاولة مونتاج أفلام', 'Flatbed editing table', '1950s', null],
+    ['مونتاج شريط عريض', 'Quad tape editing', '1960s', null], ['مونتاج خطي بشريطين', 'Two-deck linear editing', '1970s', null], ['غرفة مونتاج خطي', 'Linear editing suite', '1980s', null],
+    ['أول مونتاج غير خطي', 'First non-linear editor', '1989', null], ['مونتاج رقمي مكتبي', 'Desktop digital editing', '1995', null], ['مونتاج HD', 'HD editing', '2005', null],
+    ['مونتاج 4K', '4K editing', '2012', null], ['مونتاج سحابي', 'Cloud editing', '2018', null], ['مونتاج 8K', '8K editing', '2020', null],
+    ['مونتاج بقص تلقائي ذكي', 'AI auto-cut editing', '2023', null], ['مونتير ذكي', 'AI editor', '2025', null], ['مونتاج عصبي مستقبلي', 'Neural future editing', 'future', null]],
   camera: [
     ['كاميرا أيقونوسكوب ميكانيكية', 'Iconoscope camera', '1930s', 'rca'], ['كاميرا أورثيكون بالأبيض والأسود', 'Image-orthicon B/W camera', '1950s', 'rca'],
     ['كاميرا ملونة بأنابيب', 'Colour tube camera', '1960s', 'rca'], ['كاميرا أخبار محمولة ENG', 'ENG news camera', '1970s', 'rca'],
@@ -98,7 +104,7 @@ const G = {
 // family -> [track, signal group (needs a hub) or null]
 export const FAM_TRACK = {
   'equip.cam': ['camera', 'video'], 'equip.mic': ['mic', 'audio'], 'equip.light': ['light', 'lights'], 'equip.mixer': ['mixer', null], 'equip.switcher': ['switcher', null],
-  'equip.lightdesk': ['lightdesk', null], 'equip.prompter': ['device', 'video'], 'equip.monitor': ['device', 'video'], 'equip.drone': ['device', 'video'], 'equip.gimbal': ['device', null],
+  'equip.lightdesk': ['lightdesk', null], 'equip.edit': ['edit', null], 'equip.prompter': ['device', 'video'], 'equip.monitor': ['device', 'video'], 'equip.drone': ['device', 'video'], 'equip.gimbal': ['device', null],
   'equip.headset': ['device', 'audio'], 'equip.pc': ['device', 'video'], 'equip.ring': ['decolight', 'lights'], 'equip.green': ['backdrop', 'video'], 'equip.radio': ['device', 'audio'],
   'machines.smoke': ['stagefx', 'lights'], 'machines.bubbles': ['stagefx', 'lights'], 'machines.karaoke': ['device', 'audio'], 'machines.printer': ['device', null], 'machines.robot': ['device', null],
   'machines.arcade': ['device', null], 'machines.generator': ['appliance', null],
