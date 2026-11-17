@@ -18,7 +18,8 @@ const ORIGINS = [
 function cors(req) {
   const o = req.headers.get('Origin') || '';
   return {
-    'Access-Control-Allow-Origin': ORIGINS.includes(o) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(o) ? o : ORIGINS[0],
+    // Any origin may call: every request is checked against the Pi Platform with the player's own access token.
+    'Access-Control-Allow-Origin': o || '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Vary': 'Origin',
