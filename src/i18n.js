@@ -85,7 +85,7 @@ export const STR = {
     roam_hint: 'تجوّل وكلّم الناس. ابدأ البث من طاولة التحكم، أو اطلع من الباب.',
     z_studio: 'الاستوديو', z_street: 'الشارع', z_event: 'حفل الجوائز',
     a_start: 'ابدأ البث', a_exit: 'اطلع برا', a_enter: 'ادخل الاستوديو', a_event: 'روح للحفل', a_back: 'ارجع للشارع', a_talk: 'كلّم', a_interview: 'قابل',
-    t_skin: 'سكين', t_hair: 'الشعر', t_clothes: 'الملابس', t_acc: 'الإكسسوارات',
+    t_skin: 'البشرة', t_hair: 'الشعر', t_clothes: 'الملابس', t_acc: 'الإكسسوارات',
     c_style: 'القصة', c_color: 'اللون', c_beard: 'الدقن', c_top: 'العلوي', c_bottom: 'السفلي', c_shoes: 'الحذاء', c_cap: 'لون الكاب',
     o_none: 'بدون', o_full: 'لحية كاملة', o_goatee: 'سكسوكة', o_mustache: 'شنب', o_tshirt: 'تيشيرت', o_hoodie: 'هودي', o_jacket: 'جاكيت', o_pants: 'بنطلون', o_shorts: 'شورت',
     o_cap: 'كاب', o_glasses: 'نظارة', o_headphones: 'سماعات', o_earring: 'حلق', o_chain: 'سلسال', o_bracelet: 'إسوارة', o_watch: 'ساعة', o_bag: 'شنطة',

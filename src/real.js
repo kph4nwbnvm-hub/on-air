@@ -18,8 +18,8 @@ const A = { ready: false, failed: false, male: null, female: null, hair: {}, cli
 const LIST = []; // registered simple characters
 let enabled = true, maxNear = 8, nearDist = 22;
 
-export const realReady = () => A.ready;
 export const realDebug = () => ({ ready: A.ready, failed: A.failed, n: LIST.length, withReal: LIST.filter((c) => c.real).length, shown: LIST.filter((c) => c.real && c.real.root.visible).length, clips: Object.keys(A.clips), det: LIST.map((c) => { c.g.getWorldPosition(tmp); let vis = true; for (let o = c.g; o; o = o.parent) if (!o.visible) { vis = false; break; } return [Math.round(tmp.x), Math.round(tmp.z), vis, c.real && c.real.root.visible, c.real && +c.real.root.scale.x.toFixed(2), c.simple && c.simple.length, c.real && c.real.cur]; }) });
+export const realReady = () => A.ready || A.failed || !enabled || !veil; // ready, or nothing more to wait for
 export function setRealEnabled(on) { enabled = on; if (!on) { unveil(); LIST.forEach((c) => showSimple(c, true)); } }
 export function setRealBudget(n, dist) { maxNear = n; nearDist = dist; }
 

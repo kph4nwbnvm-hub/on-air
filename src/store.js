@@ -171,6 +171,8 @@ export function makeStore(deps) {
   $('stSheet').addEventListener('click', (e) => { if (e.target.id === 'stSheet') closeSheet(); });
   const TEST_GRANT = 5000;
   $('stTest').onclick = () => { S.tokens += TEST_GRANT; save(); sfx.win(); render(); };
+  // the free test balance exists only on the Testnet site and local builds, never on Mainnet
+  if (!/kph4nwbnvm-hub|localhost|127\.0\.0\.1/.test(location.hostname)) $('stTest').remove();
 
   // office-PC helpers: starter money for parts, check/consume an owned part, jump to a category
   const give = (n) => { S.tokens = Math.round((S.tokens + n) * 1e7) / 1e7; save(); };

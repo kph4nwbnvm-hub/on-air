@@ -10,7 +10,7 @@ import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from '
 import { carModel, loadCars, loadKit, cityKit } from './city3d.js';
 import { woodTex, fabricTex, panelTex } from './tex.js';
 import { randomShape, BODY_KEYS, FACE_KEYS } from './shape.js';
-import { reshape, register, loadReal, realTick, setRealEnabled, setRealBudget, realDebug } from './real.js';
+import { realReady, reshape, register, loadReal, realTick, setRealEnabled, setRealBudget, realDebug } from './real.js';
 const mk = (av, o) => register(makeChar(av), av, o);
 import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL, isExclusive, EXCLUSIVE } from './shop.js';
 import { makeStore, TOKEN } from './store.js';
@@ -44,7 +44,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.9.3';
+const VERSION = '1.9.4';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -219,10 +219,10 @@ function streetLamp(x, z, dir) {
   put(box(0.06, 0.06, 1.1, 0x2b2e35, { rough: 0.5, metal: 0.5 }), x, 4.55, z + dir * 0.5); put(box(0.34, 0.1, 0.55, 0x2b2e35, { rough: 0.5, metal: 0.5 }), x, 4.52, z + dir * 1.05);
   put(box(0.26, 0.02, 0.44, 0xfff3d0, { emissive: 0xfff3d0, emissiveIntensity: 0.9 }), x, 4.46, z + dir * 1.05);
 }
-function building(x, z, w, h, c, wc) {
+function building(x, z, w, h, c, wc, hole) {
   wall(put(box(w, h, 4, c), x, h / 2, z), 'brick', soften(c, 0.55)).castShadow = true; put(box(w + 0.3, 0.25, 4.3, 0xe8e4dc), x, h + 0.12, z); wc = 0x2c3e52;
   const cols = Math.floor(w / 1.6), rows = Math.floor((h - 2.6) / 1.5);
-  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) { const wx = x - ((cols - 1) * 1.6) / 2 + i * 1.6, wy = 3.4 + j * 1.5; put(box(1.02, 1.02, 0.05, 0xe8e4dc), wx, wy, z + 2.01); put(box(0.9, 0.9, 0.06, wc, { rough: 0.15, metal: 0.4 }), wx, wy, z + 2.03); put(box(1.1, 0.07, 0.16, 0xd6d0c4), wx, wy - 0.5, z + 2.08); }
+  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) { const wx = x - ((cols - 1) * 1.6) / 2 + i * 1.6, wy = 3.4 + j * 1.5; if (hole && Math.abs(wx - x) < hole[0] && wy < hole[1]) continue; put(box(1.02, 1.02, 0.05, 0xe8e4dc), wx, wy, z + 2.01); put(box(0.9, 0.9, 0.06, wc, { rough: 0.15, metal: 0.4 }), wx, wy, z + 2.03); put(box(1.1, 0.07, 0.16, 0xd6d0c4), wx, wy - 0.5, z + 2.08); }
 }
 const COLL = { studio: [], street: [], event: [] }; const RECTS = { studio: [], street: [], event: [] };
 const IT = []; // interactables
@@ -360,7 +360,7 @@ cur = ZG.street; const SX = 100;
 wall(ground(124, 84, 0x6a7080, SX, 10), 'asphalt', 0xb8bcc4);
 wall(put(box(40, 0.14, 5.2, 0xd8d2c4), SX, 0.07, -5.6), 'concrete', 0xe8e4dc).receiveShadow = true; wall(put(box(40, 0.14, 3, 0xd8d2c4), SX, 0.07, 7.6), 'concrete', 0xe8e4dc).receiveShadow = true;
 for (let i = -6; i <= 6; i++) put(box(1.6, 0.02, 0.18, 0xffffff), SX + i * 3, 0.02, 1.6);
-building(SX, -10.2, 9, 6.5, 0x7a57e6, 0xbfe3ff); building(SX - 10.5, -10.2, 9, 5, 0xffcf3f, 0xffffff); building(SX + 10.5, -10.2, 9, 7.5, 0x4cc9f0, 0xfff3b0);
+building(SX, -10.2, 9, 6.5, 0x7a57e6, 0xbfe3ff, [3.4, 4.2]); // no windows behind the studio sign building(SX - 10.5, -10.2, 9, 5, 0xffcf3f, 0xffffff); building(SX + 10.5, -10.2, 9, 7.5, 0x4cc9f0, 0xfff3b0);
 put(box(1.7, 2.7, 0.2, 0x23233a), SX, 1.35, -8.15); put(box(1.4, 2.4, 0.1, 0xff8a3d, { emissive: 0xff8a3d, emissiveIntensity: 0.3 }), SX, 1.25, -8.08);
 // storefront: the game's own logo sign (waves + red dot + «على الهوا» / ON AIR STUDIO)
 function logoSignTex() {
@@ -383,7 +383,7 @@ let logoLang = lang;
 function syncLogoSign() { if (logoLang === lang) return; logoLang = lang; const o = logoSign.material.map; logoSign.material.map = logoSignTex(); logoSign.material.needsUpdate = true; o.dispose(); }
 put(box(4, 0.12, 1.4, 0xd9342b), SX - 10.5, 2.7, -7.6); put(signPlane('SHAWARMA', '#ffffff', '#d9342b', 3.4, 0.7, 640, 130, 'bold 90px system-ui'), SX - 10.5, 3.3, -8.15);
 [-12, -4, 4, 12].forEach((dx) => tree(SX + dx, 7.4));
-[-7, 0, 7].forEach((dx) => streetLamp(SX + dx, -3.5, 1));
+[-7, 7].forEach((dx) => streetLamp(SX + dx, -3.5, 1)); // none in front of the studio door
 // shawarma cart
 put(box(2.2, 0.9, 1.1, 0xffffff), SX - 8, 0.65, -4.6).castShadow = true; put(box(2.24, 0.25, 1.14, 0xd9342b), SX - 8, 0.9, -4.6); put(box(2.5, 0.1, 1.5, 0xd9342b), SX - 8, 2.2, -4.6).castShadow = true;
 [-1, 1].forEach((s) => { put(cyl(0.03, 0.03, 1.3, 0x555555), SX - 8 + s, 1.6, -4.1); put(cyl(0.25, 0.25, 0.1, 0x222222), SX - 8 + s * 0.8, 0.25, -4.0).rotation.x = Math.PI / 2; });
@@ -1013,7 +1013,7 @@ function pubBuild() {
 }
 // tabs on the working computer: publishing | skill tree
 let pcTab = 'pub';
-function pcTabs(L) { const w = document.createElement('div'); w.className = 'pctabs'; [['pub', '📡'], ['skills', '🌳'], ['lab', '🪪'], ['up', '🛠️']].forEach(([k, txt]) => { const b = document.createElement('button'); b.className = pcTab === k ? 'big' : 'ghost'; b.textContent = txt; b.onclick = () => { sfx.click(); pcTab = k; pcBuild(); }; w.appendChild(b); }); L.appendChild(w); }
+function pcTabs(L) { const w = document.createElement('div'); w.className = 'pctabs'; [['pub', '📡', 'pub_title'], ['skills', '🌳', 'sk_title'], ['lab', '🪪', ''], ['up', '🛠️', 'up_room']].forEach(([k, txt, lk]) => { const b = document.createElement('button'); b.className = pcTab === k ? 'big' : 'ghost'; b.innerHTML = txt + '<small>' + (lk ? t(lk) : 'StudioLab') + '</small>'; b.onclick = () => { sfx.click(); pcTab = k; pcBuild(); }; w.appendChild(b); }); L.appendChild(w); }
 // skill tree: 5 stages per skill, stage n costs n points; points come from levels, filmed interviews and challenge wins
 const SKILLS = { steady: ['🎥', (n) => '🎯 +' + n * 8 + '%'], charm: ['✨', (n) => '👥 +' + n * 10 + '%'], deals: ['🤝', (n) => '🪙 +' + n * 4 + '%'], learn: ['📚', (n) => '⭐ +' + n * 5 + '%'] };
 const skEarned = () => (shop.level - 1) * 2 + (stats.wins || 0) + (stats.ivs || 0);
@@ -1300,3 +1300,6 @@ requestAnimationFrame(frame);
 let cityOn = false; const cityLoad = () => { if (cityOn) return; cityOn = true; loadCars(); loadKit(ZG.street); }; // city models load on the first visit to the street (less GPU memory in the studio)
 setInterval(() => { if (G.zone === 'street') cityLoad(); }, 500);
 if (cfg.real) setTimeout(() => { if (IS_MOBILE) setRealBudget(store.get('gpu_lost', false) ? 6 : 9, 40); else setRealBudget(14, 50); loadReal(); }, 1200);
+
+// loading screen: stays until the realistic characters are in (or 15 s at most), so the first frame the player sees is the finished look
+{ const t0 = Date.now(), iv = setInterval(() => { const b = document.getElementById('boot'); if (!b) return clearInterval(iv); if (realReady() || Date.now() - t0 > 15000) { b.classList.add('gone'); setTimeout(() => b.remove(), 600); clearInterval(iv); } }, 200); }
