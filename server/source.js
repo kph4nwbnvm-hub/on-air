@@ -137,9 +137,16 @@ async function reward(req, env) {
   const user = await me(accessToken);
   const w = await wallet(env);
   await clearIncomplete(env);
-  const payment = await pi(env, '/payments', 'POST', {
-    payment: { amount: REWARD, memo: 'On Air Studio test reward', metadata: { kind: 'test_reward' }, uid: user.uid },
-  });
+  let payment;
+  try {
+    payment = await pi(env, '/payments', 'POST', {
+      payment: { amount: REWARD, memo: 'On Air Studio test reward', metadata: { kind: 'test_reward' }, uid: user.uid },
+    });
+  } catch (e) {
+    // Diagnostic: which permissions the player's sign-in carries (never secrets).
+    if (e instanceof Fail) e.extra = { ...(e.extra || {}), detail: 'scopes=' + ((user.credentials && user.credentials.scopes) || []).join(',') };
+    throw e;
+  }
   let txid;
   try { txid = await sendOnChain(payment, w); }
   catch (e) { await pi(env, `/payments/${payment.identifier}/cancel`, 'POST').catch(() => {}); throw e; }
