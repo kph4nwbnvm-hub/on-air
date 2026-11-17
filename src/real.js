@@ -8,9 +8,11 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { OPT } from './char.js';
+import { makeShapes, applyShape, randomShape } from './shape.js';
 
 const BASE = 'assets/chars/';
-const HAIR = ['hair_simpleparted', 'hair_buzzed', 'hair_long', 'hair_buns', 'hair_buzzed', 'hair_simpleparted'];
+// hair styles by avatar index: g = model file, p = extra built piece (afro, spikes, ponytail); index 5 is bald
+const HAIR = [{ g: 'hair_simpleparted' }, { g: 'hair_buzzed' }, { p: 'afro' }, { g: 'hair_buzzed', p: 'spiky' }, { g: 'hair_buzzedfemale' }, {}, { g: 'hair_long' }, { g: 'hair_buns' }, { g: 'hair_buzzedfemale', p: 'tail' }];
 const SKIN_TINT = [1.0, 0.95, 0.82, 0.7, 0.55, 0.42];
 const A = { ready: false, failed: false, male: null, female: null, hair: {}, clips: {} };
 const LIST = []; // registered simple characters
@@ -28,7 +30,7 @@ export async function loadReal() {
     const [m, f, a, b] = await Promise.all([load(L, 'male'), load(L, 'female').catch(() => null), load(L, 'anim_a'), load(L, 'anim_b').catch(() => ({ animations: [] }))]);
     A.male = m.scene; prepBody(A.male); if (f) { A.female = f.scene; prepBody(A.female); }
     [...a.animations, ...b.animations].forEach((c) => { A.clips[c.name] = c; });
-    for (const h of [...new Set([...HAIR, 'hair_beard'])]) { try { A.hair[h] = (await load(L, h)).scene; } catch (_) {} }
+    for (const h of [...new Set([...HAIR.map((x) => x.g).filter(Boolean), 'hair_beard'])]) { try { A.hair[h] = (await load(L, h)).scene; } catch (_) {} }
     A.ready = true; LIST.forEach((c) => { try { attach(c); } catch (e) { console.warn('attach failed', e && e.message, e && e.stack && e.stack.split('\n')[1]); } });
   } catch (e) { A.failed = true; console.warn('real chars unavailable', e); }
 }
@@ -60,6 +62,7 @@ function prepBody(root) {
     for (let i = 0; i < n; i++) { const v = acc.get(key(i)), l = Math.hypot(v[0], v[1], v[2]) || 1; sn[i * 3] = v[0] / l; sn[i * 3 + 1] = v[1] / l; sn[i * 3 + 2] = v[2] / l; }
     g.setAttribute('snorm', new THREE.BufferAttribute(sn, 3)); o.userData.body = true;
   });
+  root.updateMatrixWorld(true); try { makeShapes(root); } catch (e) { console.warn('shapes', e && e.message); }
 }
 // body material: skin texture, tinted; clothed regions painted with flat cloth colours
 function bodyMat(src, look) {
@@ -102,27 +105,43 @@ function addCap(root, col) {
   const c = new THREE.Mesh(new THREE.SphereGeometry(0.122, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), clothM(col, 0.7)); c.position.set(0, 0.1, 0); head.add(c);
   const bill = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.012, 16, 1, false, -Math.PI / 2, Math.PI), clothM(col, 0.7)); bill.position.set(0, 0.1, 0.07); bill.scale.set(1, 1, 1.2); head.add(bill);
 }
-function addHair(root, name, colHex) {
+// beard styles from the one beard model: full, goatee (chin only) or mustache (upper lip only)
+const BEARD_CUT = {};
+function beardGeo(geo, mode) {
+  const key = geo.uuid + mode; if (BEARD_CUT[key]) return BEARD_CUT[key]; geo.computeBoundingBox(); const b = geo.boundingBox, P = geo.attributes.position, I = geo.index, out = [], h = b.max.y - b.min.y;
+  const keep = (x, y, z) => { const fy = (y - b.min.y) / h; return z > b.min.z + (b.max.z - b.min.z) * 0.45 && (mode === 2 ? Math.abs(x) < 0.03 && fy < 0.5 : Math.abs(x) < 0.036 && fy > 0.42 && fy < 0.72); };
+  for (let i = 0; i < I.count; i += 3) { let x = 0, y = 0, z = 0; for (let k = 0; k < 3; k++) { const v = I.getX(i + k); x += P.getX(v); y += P.getY(v); z += P.getZ(v); } if (keep(x / 3, y / 3, z / 3)) out.push(I.getX(i), I.getX(i + 1), I.getX(i + 2)); }
+  const g = geo.clone(); g.setIndex(out); BEARD_CUT[key] = g; return g;
+}
+function addHair(root, name, colHex, mode = 1) {
   const src = A.hair[name]; if (!src) return; const body = []; root.traverse((o) => { if (o.isSkinnedMesh && o.userData.body) body.push(o); }); if (!body.length) return;
   const sk = body[0].skeleton, byName = {}; sk.bones.forEach((b) => { byName[b.name] = b; });
   src.traverse((o) => { if (!o.isSkinnedMesh) return;
     const mat = o.material.clone(); mat.color.set(colHex).multiplyScalar(2.2); mat.roughness = 0.7;
-    const m = new THREE.SkinnedMesh(o.geometry, mat); m.frustumCulled = false; m.castShadow = true;
+    const m = new THREE.SkinnedMesh(mode > 1 ? beardGeo(o.geometry, mode) : o.geometry, mat); m.frustumCulled = false; m.castShadow = true;
     const bones = o.skeleton.bones.map((b) => byName[b.name] || sk.bones[0]); root.add(m); m.bind(new THREE.Skeleton(bones, o.skeleton.boneInverses), body[0].bindMatrix); });
 }
+function addPiece(root, kind, col) {
+  const head = boneOf(root, /^head$/i); if (!head) return; const m = new THREE.MeshStandardMaterial({ color: new THREE.Color(col).multiplyScalar(1.3), roughness: 0.95, metalness: 0 });
+  if (kind === 'afro') { const g = new THREE.IcosahedronGeometry(0.135, 4), P = g.attributes.position; for (let i = 0; i < P.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(P, i), k = 1 + 0.06 * Math.sin(v.x * 90) * Math.sin(v.y * 80) * Math.sin(v.z * 70); P.setXYZ(i, v.x * k, v.y * k, v.z * k); } g.computeVertexNormals();
+    const a = new THREE.Mesh(g, m); a.position.set(0, 0.175, -0.055); a.scale.set(1.12, 0.92, 1.0); a.castShadow = true; head.add(a); }
+  if (kind === 'spiky') for (let i = 0; i < 15; i++) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.028, 0.085, 6), m), an = (i / 7) * Math.PI * 2, r = i === 0 ? 0 : i < 8 ? 0.06 : 0.032; c.position.set(Math.cos(an) * r, 0.19 - r * 0.25, Math.sin(an) * r - 0.01); c.rotation.set(Math.sin(an) * r * 6, 0, -Math.cos(an) * r * 6); head.add(c); }
+  if (kind === 'tail') { const t = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.012, 0.3, 10), m); t.position.set(0, 0.0, -0.15); t.rotation.x = 0.35; t.castShadow = true; head.add(t); const k = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 8), m); k.position.set(0, 0.12, -0.12); head.add(k); }
+}
+function addStyle(root, st, col) { if (st.g) addHair(root, st.g, col); if (st.p) addPiece(root, st.p, col); }
 function lookOf(av) {
   const c = (i, d) => OPT.cloth[i ?? d] ?? 0xffffff; const dress = av.dress || '';
   const thobe = dress === 'thobe' || dress === 'bisht', female = !!av.female && !!A.female;
   return { skin: av.skin ?? 1, top: thobe ? 0xf4f2ec : c(av.topColor, 0), bottom: thobe ? 0xf4f2ec : c(av.bottomColor, 7), shoes: OPT.shoes[av.shoes ?? 0] ?? 0x222222,
     female, sleeves: thobe || female || av.top !== 0 ? 1 : 0, legs: av.bottom === 1 && !thobe && !female ? 0 : 1, collar: thobe || av.top === 1 ? 1 : 0, thobe, bisht: dress === 'bisht' ? 0x3a2a1c : 0,
-    hair: HAIR[av.hairStyle ?? 0], hairCol: OPT.hairColor[av.hairColor ?? 1] ?? 0x2a1c14, beard: (av.beard ?? 0) > 0, cap: !!(av.acc && av.acc.cap), capCol: OPT.cloth[av.capColor ?? 1] ?? 0x2e7df6 };
+    hair: HAIR[av.hairStyle ?? 0], hairCol: OPT.hairColor[av.hairColor ?? 1] ?? 0x2a1c14, beard: av.beard ?? 0, cap: !!(av.acc && av.acc.cap), capCol: OPT.cloth[av.capColor ?? 1] ?? 0x2e7df6 };
 }
 function build(av) {
   const look = lookOf(av), root = SkeletonUtils.clone(look.female ? A.female : A.male);
-  root.traverse((o) => { if (o.isSkinnedMesh) { o.frustumCulled = false; o.castShadow = true; if (o.userData.body) o.material = bodyMat(o.material, look); } });
-  if (look.female) { addThobe(root, look.bottom, 0); addHair(root, look.hair === 'hair_buzzed' ? 'hair_long' : look.hair, look.hairCol); }
-  else if (look.thobe) { addThobe(root, look.top, look.bisht); addGhutra(root, 0xf7f7f2); } else { if (look.cap) addCap(root, look.capCol); else addHair(root, look.hair, look.hairCol); }
-  if (look.beard && !look.female) addHair(root, 'hair_beard', look.hairCol);
+  root.traverse((o) => { if (o.isSkinnedMesh) { o.frustumCulled = false; o.castShadow = true; if (o.userData.body) o.material = bodyMat(o.material, look); else if (!/eye/i.test(o.material.name) || /brow/i.test(o.name)) { o.material = o.material.clone(); o.material.color.set(look.hairCol).multiplyScalar(1.6); } } });
+  if (look.female) { addThobe(root, look.bottom, 0); addStyle(root, look.hair || {}, look.hairCol); }
+  else if (look.thobe) { addThobe(root, look.top, look.bisht); addGhutra(root, 0xf7f7f2); } else { if (look.cap) addCap(root, look.capCol); else addStyle(root, look.hair || {}, look.hairCol); }
+  if (look.beard && !look.female) addHair(root, 'hair_beard', look.hairCol, look.beard);
   const mixer = new THREE.AnimationMixer(root), acts = {};
   Object.keys(A.clips).forEach((k) => { acts[k] = mixer.clipAction(A.clips[k]); });
   return { root, mixer, acts, cur: null };
@@ -135,9 +154,13 @@ function attach(c) {
   const r = build(c.av || {}); c.real = r;
   // fit to the simple body's height
   const bb = new THREE.Box3().setFromObject(c.g), hs = Math.max(1.2, bb.max.y - bb.min.y || 1.7); r.root.scale.setScalar(Math.min(1.1, hs / 1.83));
+  r.base = r.root.scale.x; reshape(c);
   r.root.visible = false; c.g.add(r.root); c.lastPos = new THREE.Vector3(); c.speed = 0;
   c.simple = c.g.children.filter((o) => o !== r.root);
 }
+// body/face shape: the avatar's own values, or a random natural shape for crowd characters
+export function reshape(c) { if (!c.real) return; const av = c.av || {}; if (!av.body && !c.rshape) c.rshape = randomShape(); const sh = av.body ? av : c.rshape; applyShape(c.real.root, c.real.base, sh.body || {}, sh.face || {}); }
+export function reshapeAll() { LIST.forEach(reshape); }
 function showSimple(c, on) { if (!c.real) return; c.simple.forEach((o) => { o.visible = on; }); c.real.root.visible = !on; }
 function play(c, name) { const r = c.real; if (!r || r.cur === name || !r.acts[name]) return; const a = r.acts[name]; const prev = r.cur && r.acts[r.cur]; a.reset().setEffectiveWeight(1).play(); if (prev) a.crossFadeFrom(prev, 0.25, false); r.cur = name; }
 

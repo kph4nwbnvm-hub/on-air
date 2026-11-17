@@ -21,13 +21,13 @@ export function at(m, x, y, z, parent) { m.position.set(x, y, z); if (parent) pa
 export const OPT = {
   skin: [0xf6d3b3, 0xf0c8a0, 0xd9a877, 0xc68e62, 0x9a6a44, 0x6b4630],
   hairColor: [0x1c130d, 0x2a1c14, 0x5a3a1c, 0x8a5a2b, 0xd9b36a, 0xb0b0b8, 0xd9342b, 0x3a6cff, 0xeae6df],
-  hairStyle: 6, beard: ['none', 'full', 'goatee', 'mustache'],
+  hairStyle: 9, beard: ['none', 'full', 'goatee', 'mustache'],
   top: ['tshirt', 'hoodie', 'jacket'], bottom: ['pants', 'shorts'],
   cloth: [0x2e7df6, 0xd9342b, 0x19a05e, 0xffcf3f, 0xff8a3d, 0x8a63f0, 0xffffff, 0x23233a, 0xff6fa8, 0x2ab8b0, 0xd4af37, 0xc8ccd6],
   shoes: [0xffffff, 0x222222, 0xd9342b, 0xffcf3f, 0x2e7df6, 0xd4af37],
   acc: ['cap', 'glasses', 'headphones', 'earring', 'chain', 'bracelet', 'watch', 'bag'],
 };
-export const DEFAULT_AVATAR = { skin: 1, hairStyle: 0, hairColor: 1, beard: 0, top: 1, topColor: 0, bottom: 0, bottomColor: 7, shoes: 0, capColor: 1, acc: {} };
+export const DEFAULT_AVATAR = { skin: 1, hairStyle: 0, hairColor: 1, beard: 0, top: 1, topColor: 0, bottom: 0, bottomColor: 7, shoes: 0, capColor: 1, acc: {}, body: {}, face: {} };
 
 export function makeChar(a) {
   a = { ...DEFAULT_AVATAR, ...a, acc: { ...(a.acc || {}) } };
@@ -82,6 +82,7 @@ export function makeChar(a) {
   if (hs === 1) { const h = dome(0.256); h.rotation.x = -0.12; head.add(h); }
   if (hs === 2) { const h = at(sph(0.33, hairC), 0, 0.12, -0.05, head); h.scale.set(1.05, 0.9, 1); }
   if (hs === 3) { const h = dome(0.262); h.rotation.x = -0.2; head.add(h); for (let i = 0; i < 8; i++) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 8), M(hairC)); const ang = (i / 8) * 6.28; at(c, Math.sin(ang) * 0.12, 0.27, Math.cos(ang) * 0.12 - 0.02, head); c.rotation.set(Math.cos(ang) * 0.5, 0, -Math.sin(ang) * 0.5); } at(new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.24, 8), M(hairC)), 0, 0.31, -0.02, head); }
+  if (hs >= 6) { const h = dome(0.27); h.rotation.x = -0.2; head.add(h); if (hs !== 8) { const b = at(cap(0.2, hs === 6 ? 0.42 : 0.3, hairC), 0, -0.14, -0.13, head); b.scale.set(1.15, 1, 0.6); } }
   if (hs === 4) { const h = dome(0.27); h.rotation.x = -0.2; head.add(h); const b = at(cap(0.2, 0.3, hairC), 0, -0.14, -0.13, head); b.scale.set(1.15, 1, 0.6); }
   const bd = OPT.beard[a.beard];
   if (bd === 'full') { const b = new THREE.Mesh(new THREE.SphereGeometry(0.257, 20, 12, 0, Math.PI * 2, Math.PI / 1.75, Math.PI / 2.4), M(hairC)); b.position.z = 0.02; head.add(b); }

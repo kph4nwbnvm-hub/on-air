@@ -8,7 +8,8 @@ import { LANGS, STR } from './i18n.js';
 import { piSignIn, PiState } from './pi.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
 import { carModel, loadCars } from './city3d.js';
-import { register, loadReal, realTick, setRealEnabled, setRealBudget, realDebug } from './real.js';
+import { randomShape, BODY_KEYS, FACE_KEYS } from './shape.js';
+import { reshape, register, loadReal, realTick, setRealEnabled, setRealBudget, realDebug } from './real.js';
 const mk = (av, o) => register(makeChar(av), av, o);
 import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL, isExclusive, EXCLUSIVE } from './shop.js';
 import { makeStore, TOKEN } from './store.js';
@@ -41,7 +42,7 @@ const cfg = { real: store.get('real', true), voice: store.get('voice', true), vi
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.8.1';
+const VERSION = '1.9.0';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -708,7 +709,7 @@ function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator', 'profil
 function buildLangs() { const g = $('langGrid'); g.innerHTML = ''; LANGS.forEach((l) => { const b = document.createElement('button'); b.textContent = l.name; b.dir = l.rtl ? 'rtl' : 'ltr'; if (l.code === lang) b.className = 'sel'; b.onclick = () => { lang = l.code; store.set('lang', lang); applyLang(); show('settings'); buildSettings(); }; g.appendChild(b); }); }
 function enterRoam() { lastAct = 0; G.on = false; G.zone = 'studio'; G.px = 0; G.pz = 3.3; G.face = Math.PI; player.armR.rotation.set(0, 0, 0); show('hud'); resize(); syncScene(); snapCam = true; say(t('roam_hint'), '', true); }
 // character creator
-let tab = 'skin';
+let tab = 'skin'; const hv = new THREE.Vector3();
 function showLevel() {
   const lv = shop.level, a = xpFor(lv), b = xpFor(Math.min(MAX_LEVEL, lv + 1));
   const pct = lv >= MAX_LEVEL ? 100 : Math.round(((shop.xp - a) / (b - a)) * 100);
@@ -717,7 +718,7 @@ function showLevel() {
 function toast(msg) { const el = $('crToast'); el.textContent = msg; el.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => { el.hidden = true; }, 2200); }
 function buildCreator() {
   showLevel();
-  const tabs = $('crTabs'); tabs.innerHTML = ''; (shop.level < 2 ? ['skin', 'hair'] : ['skin', 'hair', 'clothes', 'acc', 'packs']).forEach((k) => { const b = document.createElement('button'); b.textContent = t('t_' + k); if (k === tab) b.className = 'sel'; b.onclick = () => { tab = k; sfx.click(); buildCreator(); }; tabs.appendChild(b); });
+  const tabs = $('crTabs'); tabs.innerHTML = ''; (shop.level < 2 ? ['skin', 'body', 'face', 'hair'] : ['skin', 'body', 'face', 'hair', 'clothes', 'acc', 'packs']).forEach((k) => { const b = document.createElement('button'); b.textContent = t('t_' + k); if (k === tab) b.className = 'sel'; b.onclick = () => { tab = k; sfx.click(); buildCreator(); }; tabs.appendChild(b); });
   const body = $('crBody'); body.innerHTML = '';
   const row = (label) => { const h = document.createElement('h4'); h.textContent = label; body.appendChild(h); const d = document.createElement('div'); d.className = 'opts'; body.appendChild(d); return d; };
   const changed = () => { store.set('avatar', avatar); rebuildPlayer(); sfx.click(); buildCreator(); };
@@ -726,8 +727,15 @@ function buildCreator() {
   const mark = (b, id) => { if (shop.has(id)) return; const tag = document.createElement('i'); tag.className = 'tag'; if (isExclusive(id)) { tag.textContent = '👑30'; b.classList.add('locked'); } else if (shop.available(id)) tag.textContent = '🪙' + price(id); else { tag.textContent = '🔒' + reqLevel(id); b.classList.add('locked'); } b.appendChild(tag); };
   const swatches = (label, cols, k, field) => { const d = row(label); cols.forEach((c, i) => { const id = (field || k) + ':' + i; const b = document.createElement('button'); b.className = 'sw' + (avatar[k] === i ? ' sel' : ''); b.style.background = '#' + c.toString(16).padStart(6, '0'); b.onclick = gate(id, () => { avatar[k] = i; }); if (k !== 'skin') mark(b, id); d.appendChild(b); }); };
   const chips = (label, names, k) => { const d = row(label); names.forEach((n, i) => { const id = k + ':' + i; const b = document.createElement('button'); b.className = 'chip' + (avatar[k] === i ? ' sel' : ''); b.textContent = n; b.onclick = gate(id, () => { avatar[k] = i; }); mark(b, id); d.appendChild(b); }); };
+  // body and face sliders: free for everyone, applied live to the realistic character
+  const slider = (grp, k, label) => { const d = row(label); d.className = 'opts sl'; const inp = document.createElement('input'); inp.type = 'range'; inp.min = -100; inp.max = 100; inp.step = 5; inp.value = Math.round(((avatar[grp] || {})[k] || 0) * 100);
+    inp.oninput = () => { avatar[grp] = { ...(avatar[grp] || {}), [k]: +inp.value / 100 }; player.av = look(); reshape(player); }; inp.onchange = () => { store.set('avatar', avatar); sfx.click(); }; d.appendChild(inp); };
+  const shapeBtns = (keys, grp) => { const d = row(''); [['🎲 ' + t('c_random'), () => { const r = randomShape(); avatar[grp] = r[grp]; }], ['↺ ' + t('c_reset'), () => { avatar[grp] = {}; }]].forEach(([n, f]) => { const b = document.createElement('button'); b.className = 'chip'; b.textContent = n; b.onclick = () => { f(); store.set('avatar', avatar); player.av = look(); reshape(player); sfx.click(); buildCreator(); }; d.appendChild(b); }); void keys; };
+  if (tab === 'body') { const d = row(t('b_type')); [['o_male', false], ['o_female', true]].forEach(([n, f]) => { const b = document.createElement('button'); b.className = 'chip' + (!!avatar.female === f ? ' sel' : ''); b.textContent = t(n); b.onclick = () => { avatar.female = f; if (f && avatar.beard) avatar.beard = 0; changed(); }; d.appendChild(b); });
+    BODY_KEYS.forEach((k) => slider('body', k, t('b_' + k))); shapeBtns(BODY_KEYS, 'body'); }
+  if (tab === 'face') { FACE_KEYS.forEach((k) => slider('face', k, t('f_' + k))); shapeBtns(FACE_KEYS, 'face'); }
   if (tab === 'skin') swatches(t('c_color'), OPT.skin, 'skin');
-  if (tab === 'hair') { chips(t('c_style'), ['1', '2', '3', '4', '5', '6'], 'hairStyle'); swatches(t('c_color'), OPT.hairColor, 'hairColor'); chips(t('c_beard'), OPT.beard.map((b) => t('o_' + b)), 'beard'); }
+  if (tab === 'hair') { chips(t('c_style'), Array.from({ length: OPT.hairStyle }, (_, i) => String(i + 1)), 'hairStyle'); swatches(t('c_color'), OPT.hairColor, 'hairColor'); chips(t('c_beard'), OPT.beard.map((b) => t('o_' + b)), 'beard'); }
   if (tab === 'clothes') { chips(t('c_top'), OPT.top.map((b) => t('o_' + b)), 'top'); swatches(t('c_color'), OPT.cloth, 'topColor', 'cloth'); chips(t('c_bottom'), OPT.bottom.map((b) => t('o_' + b)), 'bottom'); swatches(t('c_color'), OPT.cloth, 'bottomColor', 'cloth'); swatches(t('c_shoes'), OPT.shoes, 'shoes'); }
   if (tab === 'acc') { const d = row(t('t_acc')); OPT.acc.forEach((n) => { const id = 'acc:' + n; const b = document.createElement('button'); b.className = 'chip' + (avatar.acc[n] ? ' sel' : ''); b.textContent = t('o_' + n); b.onclick = gate(id, () => { avatar.acc[n] = !avatar.acc[n]; }); mark(b, id); d.appendChild(b); }); swatches(t('c_cap'), OPT.cloth, 'capColor', 'cloth'); }
   if (tab === 'packs') PACKS.forEach((p) => {
@@ -1180,7 +1188,8 @@ function frameBody(now) {
     if (G.on && G.time >= ROUND) endRound();
   } else if (creating) {
     player.g.position.set(0, 0, 3.3); player.g.rotation.y = Math.sin(tt * 0.7) * 0.9; player.legL.rotation.x = player.legR.rotation.x = player.armL.rotation.x = 0; player.armR.rotation.set(0, 0, 0);
-    cam.position.set(0, 1.45, 6.9); cam.lookAt(0, 1.0, 3.3);
+    if (tab === 'face') { player.g.rotation.y *= 0.4; let hy = 1.62; if (player.real && player.real.root.visible) { if (!player.real.headB) player.real.root.traverse((o) => { if (o.isBone && /^head$/i.test(o.name)) player.real.headB = o; }); if (player.real.headB) { player.real.headB.getWorldPosition(hv); hy = hv.y + 0.07; } }
+      cam.position.set(0, hy + 0.02, 3.3 + 1.25); cam.lookAt(0, hy - 0.1, 3.3); } else { cam.position.set(0, 1.45, 6.9); cam.lookAt(0, 1.0, 3.3); }
   } else {
     if (tourI >= 0) { cam.position.lerp(tourCam.p, Math.min(1, dt * 2.2)); tourCam.l.lerp(tourCam.lt, Math.min(1, dt * 2.6)); cam.lookAt(tourCam.l); } else {
     cam.position.set(Math.sin(tt * 0.2) * 3.5, 4.4, 10.5); cam.lookAt(0.3, 1.2, -1.2); if (window.__shot) { cam.position.set(...window.__shot.p); cam.lookAt(...window.__shot.l); } }
@@ -1219,13 +1228,15 @@ function frame(now) {
 }
 
 // hook for automated checks only
-window.__onair = { realDebug, R: renderer, openPanel, sign, chase, startChase, cop, applyRoom, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { setAv: (c) => { Object.assign(avatar, c); rebuildPlayer(); }, realDebug, R: renderer, openPanel, sign, chase, startChase, cop, applyRoom, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 Object.keys(UNLOCK).forEach((id) => { const run = $(id).onclick; $(id).onclick = (e) => { if (!UNLOCK[id]()) { sfx.bad(); gToast(t('locked_hint')); return; } run(e); }; });
 applyLocks();
-setupFX(); applyLang(); syncScene(); show('menu'); resize();
-if (!store.get('story_done', false)) setTimeout(() => { afterCreator = true; G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }, 400);
+setupFX(); applyLang(); syncScene();
+// a brand-new player goes straight to the character creator, so the start menu never flashes first
+if (!store.get('story_done', false)) { afterCreator = true; G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); } else show('menu');
+resize();
 showDiag(IS_MOBILE ? 'mobile · ' + cfg.quality : cfg.quality); setTimeout(() => { const d = document.getElementById('diag'); if (d && !errShown) d.remove(); }, 6000);
 requestAnimationFrame(frame);
 // realistic characters load after the game is up, so the first screen never waits for them

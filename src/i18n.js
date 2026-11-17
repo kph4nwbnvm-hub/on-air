@@ -23,6 +23,7 @@ import TPF, { KEYS_PERF } from './tr_perf.js';
 import TSN, { KEYS_SOON } from './tr_soon.js';
 import TRL, { KEYS_REAL } from './tr_real.js';
 import TCR, { KEYS_CRED } from './tr_credits.js';
+import TSH, { KEYS_SHAPE } from './tr_shape.js';
 import TD2, { KEYS_DR } from './tr_dress.js';
 // The 53 languages of the Pi system, in the order the project owner supplied them.
 export const LANGS = [
@@ -181,6 +182,7 @@ Object.entries(TPF).forEach(([k, arr]) => { const o = {}; KEYS_PERF.forEach((key
 Object.entries(TSN).forEach(([k, arr]) => { const o = {}; KEYS_SOON.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TRL).forEach(([k, arr]) => { const o = {}; KEYS_REAL.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TCR).forEach(([k, arr]) => { const o = {}; KEYS_CRED.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
+Object.entries(TSH).forEach(([k, arr]) => { const o = {}; KEYS_SHAPE.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TD2).forEach(([k, arr]) => { const o = {}; KEYS_DR.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 // extra languages beyond Pi's list (whole-interface files)
 EXTRA_LANGS.forEach((l) => { if (!LANGS.some((x) => x.code === l.code)) LANGS.push(l); STR[l.code] = { ...(STR[l.code] || {}), ...EXTRA[l.code] }; });

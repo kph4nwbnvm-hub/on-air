@@ -3,18 +3,18 @@
 
 // Items that are free from the start.
 const FREE = new Set([
-  'hairStyle:0', 'hairStyle:1', 'hairStyle:2', 'hairColor:0', 'hairColor:1', 'hairColor:2', 'beard:0',
+  'hairStyle:0', 'hairStyle:1', 'hairStyle:2', 'hairStyle:5', 'hairStyle:6', 'hairColor:0', 'hairColor:1', 'hairColor:2', 'beard:0',
   'top:0', 'top:1', 'bottom:0', 'cloth:0', 'cloth:1', 'cloth:2', 'cloth:3', 'cloth:7', 'shoes:0', 'shoes:1',
 ]);
 
 // Each level unlocks a mix of items from every category; higher levels unlock more.
 export const LEVEL_ITEMS = {
   2: ['hairStyle:3', 'cloth:4', 'acc:cap'],
-  3: ['hairColor:3', 'beard:1', 'bottom:1', 'acc:glasses'],
+  3: ['hairStyle:7', 'hairColor:3', 'beard:1', 'bottom:1', 'acc:glasses'],
   4: ['top:2', 'shoes:2', 'cloth:5', 'acc:headphones'],
   5: ['hairStyle:4', 'hairColor:4', 'beard:2', 'cloth:6', 'acc:watch'],
   6: ['shoes:3', 'hairColor:5', 'cloth:8', 'acc:chain', 'acc:earring', 'beard:3'],
-  7: ['hairStyle:5', 'hairColor:6', 'hairColor:7', 'shoes:4', 'cloth:9', 'acc:bracelet', 'acc:bag'],
+  7: ['hairStyle:8', 'hairColor:6', 'hairColor:7', 'shoes:4', 'cloth:9', 'acc:bracelet', 'acc:bag'],
 };
 export const MAX_LEVEL = 7;
 
