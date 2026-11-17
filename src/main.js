@@ -38,7 +38,7 @@ const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), qu
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.7.5';
+const VERSION = '1.7.6';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -1190,8 +1190,20 @@ function frameBody(now) {
 }
 // never let one bad frame kill the render loop; show the error so a phone screenshot tells us what broke
 let errShown = 0;
-function showDiag(msg) { let d = document.getElementById('diag'); if (!d) { d = document.createElement('div'); d.id = 'diag'; d.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99;max-width:70vw;font:11px/1.3 monospace;color:#ff8080;background:rgba(0,0,0,.6);padding:4px 6px;border-radius:6px;direction:ltr;text-align:left;pointer-events:none'; document.body.appendChild(d); } d.textContent = VERSION + ' · ' + msg; }
+function showDiag(msg) { let d = document.getElementById('diag'); if (!d) { d = document.createElement('div'); d.id = 'diag'; d.onclick = () => { if (++perf.taps >= 5) { perf.taps = 0; perfShow(!perf.el); } }; d.style.cssText = 'position:fixed;left:6px;bottom:6px;z-index:99;max-width:70vw;font:11px/1.3 monospace;color:#ff8080;background:rgba(0,0,0,.6);padding:4px 6px;border-radius:6px;direction:ltr;text-align:left;pointer-events:none'; document.body.appendChild(d); } d.textContent = VERSION + ' · ' + msg; }
+// performance guard: a hidden FPS counter (?fps in the URL, or tap the version label 5 times) and an automatic drop to light mode
+const perf = { n: 0, t0: 0, fps: 60, low: 0, el: null, taps: 0, done: false };
+function perfShow(on) { if (on && !perf.el) { perf.el = document.createElement('div'); perf.el.style.cssText = 'position:fixed;right:6px;top:6px;z-index:99;font:12px monospace;background:rgba(0,0,0,.6);color:#7fe9ff;padding:3px 6px;border-radius:6px;pointer-events:none'; document.body.appendChild(perf.el); } if (!on && perf.el) { perf.el.remove(); perf.el = null; } }
+if (/[?&]fps\b/.test(location.search)) perfShow(true);
+function perfTick(now) {
+  if (!perf.t0) perf.t0 = now; perf.n++; const span = now - perf.t0; if (span < 2000) return;
+  perf.fps = (perf.n * 1000) / span; perf.n = 0; perf.t0 = now;
+  if (perf.el) { const i = renderer.info.render; perf.el.textContent = Math.round(perf.fps) + ' fps · ' + i.calls + ' dc · ' + Math.round(i.triangles / 1000) + 'k tri · ' + cfg.quality; }
+  if (document.hidden || perf.done) return; perf.low = perf.fps < 28 ? perf.low + 1 : 0;
+  if (perf.low >= 3) { perf.done = true; perf.low = 0; if (cfg.quality !== 'low') { cfg.quality = 'low'; store.set('quality', 'low'); renderer.setPixelRatio(pixelRatio()); try { setupFX(); } catch (_) {} } else renderer.setPixelRatio(Math.max(0.75, renderer.getPixelRatio() * 0.8)); try { gToast('⚡ ' + t('perf_lite')); } catch (_) {} }
+}
 function frame(now) {
+  try { perfTick(now); } catch (_) {}
   try { frameBody(now); } catch (e) { if (errShown++ < 3) { console.error(e); showDiag('ERR ' + (e && e.message ? e.message : e)); } }
   requestAnimationFrame(frame);
 }
