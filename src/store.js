@@ -1,4 +1,6 @@
 // App-token store: buy, equip, use, merge cards; smart browsing (category, rarity, search, sort); collections.
+import { trG } from './gearnames.js';
+import './tr_gear.js';
 import { CATS, CARDS, RARITY, EFFECTS, COLLECTIONS, card, value, priceOf, catOf, tierOf, isGear, buyable, info, note, MAX_LV, BUY_MAX, FAMILIES } from './catalog.js';
 import { HUB_OF, supports, signalOf } from './levels.js';
 import { fmtTok } from './pricing.js';
@@ -19,8 +21,8 @@ export function makeStore(deps) {
   const equipped = () => Object.values(S.equip).flat();
   const isEquipped = (id) => equipped().includes(id);
   const fmtEff = (k, v) => { const s = t('e_' + k); return v < 0 ? s.replace('+{v}', String(v)).replace('{v}', String(v)) : s.replace('{v}', v); };
-  const famName = (c) => (c.fam.cat === 'parts' ? t('p_' + c.fam.id) : c.fam.name[getLang()] || c.fam.name.en);
-  const nameOf = (c) => { const i = info(c); const st = getLang() === 'ar' ? i.ar : i.en; return i.full ? st : famName(c) + ' · ' + st; };
+  const famName = (c) => (c.fam.cat === 'parts' ? t('p_' + c.fam.id) : (getLang() === 'ar' ? c.fam.name.ar : trG(c.fam.name.en, getLang())));
+  const nameOf = (c) => { const i = info(c); const st = getLang() === 'ar' ? i.ar : trG(i.en, getLang()); return i.full ? st : famName(c) + ' · ' + st; };
   const color = (c) => RARITY[tierOf(c.r) - 1].color;
   // starter gear: level-1 broadcast kit with its flaws, so players feel every upgrade
   if (!store.get('starter', false)) {
@@ -176,7 +178,7 @@ export function makeStore(deps) {
   const usePart = (fam) => { const id = partId(fam); if (!id) return 0; add(id, -1); save(); return +id.split('.')[2]; };
   // wardrobe helpers: which outfit families the player owns, and their display info
   const ownedFams = (cat) => [...new Set(Object.keys(S.cards).filter((id) => id.startsWith(cat + '.') && S.cards[id] > 0).map((id) => id.split('.')[1]))];
-  const famInfo = (cat, fam) => { const f = FAMILIES.find((x) => x.cat === cat && x.id === fam); return f ? { icon: f.icon, name: f.name[getLang()] || f.name.en } : null; };
+  const famInfo = (cat, fam) => { const f = FAMILIES.find((x) => x.cat === cat && x.id === fam); return f ? { icon: f.icon, name: getLang() === 'ar' ? f.name.ar : trG(f.name.en, getLang()) } : null; };
   const equippedFam = (cat) => { const id = (S.equip[cat] || [])[0]; return id ? id.split('.')[1] : null; };
   const setNeeds = (fn, go) => { needsFn = fn; needsGo = go; };
   const needsReady = () => { const nd = needsFn(); return nd.length > 0 && nd.every(ownsPart); };
