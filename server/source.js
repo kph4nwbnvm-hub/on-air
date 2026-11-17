@@ -76,7 +76,7 @@ async function pi(env, path, method = 'GET', body) {
   if (!env.PI_API_KEY) throw new Fail('api_key_missing', 500);
   const r = await fetch(PI_API + path, {
     method,
-    headers: { Authorization: 'Key ' + env.PI_API_KEY, 'Content-Type': 'application/json' },
+    headers: { Authorization: 'Key ' + String(env.PI_API_KEY).trim(), 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
   const d = await r.json().catch(() => ({}));
