@@ -44,7 +44,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.9.7';
+const VERSION = '1.9.8';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -1215,7 +1215,7 @@ function buildSettings() {
       const r = await claimTestReward();
       b.children[1].textContent = r.ok ? '✅' : '⚠️'; b.disabled = false;
       const n = $('soonNote'); clearTimeout(soonNote.h); n.hidden = false; soonNote.h = setTimeout(() => { n.hidden = true; }, 4000);
-      n.textContent = (r.ok ? (ar ? 'وصلتك 0.01 π تجريبية' : '0.01 test-π sent') : r.error === 'not_signed_in' ? (ar ? 'افتح اللعبة من متصفح Pi وسجّل دخولك' : 'Open in Pi Browser and sign in') : (ar ? 'تعذّر الإرسال: ' : 'Failed: ') + r.error);
+      n.textContent = (r.ok ? (ar ? 'وصلتك 0.01 π تجريبية' : '0.01 test-π sent') : r.error === 'not_signed_in' ? (ar ? 'افتح اللعبة من متصفح Pi وسجّل دخولك' : 'Open in Pi Browser and sign in') : (ar ? 'تعذّر الإرسال: ' : 'Failed: ') + r.error + (r.detail ? ' (' + r.detail + ')' : '') + ' · v' + VERSION);
     };
     rows.appendChild(b);
   }

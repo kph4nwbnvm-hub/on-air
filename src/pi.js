@@ -57,7 +57,7 @@ export async function claimTestReward() {
   if (!PiState.accessToken) return { ok: false, error: 'not_signed_in' };
   try {
     const r = await timeout(fetch(A2U_URL + '/a2u/reward', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accessToken: PiState.accessToken }),
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ accessToken: PiState.accessToken }), // simple request: no CORS preflight
     }), 60000);
     return await r.json();
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }

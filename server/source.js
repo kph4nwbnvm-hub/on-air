@@ -4,7 +4,7 @@
 //   PI_API_KEY      : the Testnet app's API key (Pi Developer Portal)
 //   APP_WALLET_SEED : the Testnet app wallet private seed (starts with S) or its 24-word passphrase
 import { Buffer } from 'buffer';
-import { Keypair, TransactionBuilder, Operation, Asset, Memo, Account } from '@stellar/stellar-base';
+import { StrKey, TransactionBuilder, Operation, Asset, Memo, Account, xdr } from '@stellar/stellar-base';
 
 const PI_API = 'https://api.minepi.com/v2';
 const HORIZON = { 'Pi Testnet': 'https://api.testnet.minepi.com', 'Pi Network': 'https://api.mainnet.minepi.com' };
@@ -35,9 +35,12 @@ async function hmac512(key, data) {
   const k = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-512' }, false, ['sign']);
   return new Uint8Array(await crypto.subtle.sign('HMAC', k, data));
 }
-async function keypairFrom(secret) {
+// The wallet key is used through WebCrypto Ed25519 (native, light on CPU), never through pure-JS crypto.
+const b64u = (u8) => btoa(String.fromCharCode(...u8)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const fromB64u = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+async function rawSeedFrom(secret) {
   const s = (secret || '').trim();
-  if (/^S[A-Z2-7]{55}$/.test(s)) return Keypair.fromSecret(s);
+  if (/^S[A-Z2-7]{55}$/.test(s)) return new Uint8Array(StrKey.decodeEd25519SecretSeed(s));
   const words = s.toLowerCase().split(/\s+/).filter(Boolean);
   if (words.length !== 12 && words.length !== 24) throw new Fail('wallet_seed_missing_or_invalid', 500);
   const enc = new TextEncoder();
@@ -53,7 +56,19 @@ async function keypairFrom(secret) {
     I = await hmac512(chain, data);
     key = I.slice(0, 32); chain = I.slice(32);
   }
-  return Keypair.fromRawEd25519Seed(Buffer.from(key));
+  return key;
+}
+let walletCache = null; // { secret, key, pub, address }
+async function wallet(env) {
+  if (walletCache && walletCache.secret === env.APP_WALLET_SEED) return walletCache;
+  const raw = await rawSeedFrom(env.APP_WALLET_SEED);
+  const der = new Uint8Array(48);
+  der.set([0x30, 0x2e, 0x02, 0x01, 0x00, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x04, 0x22, 0x04, 0x20]);
+  der.set(raw, 16);
+  const key = await crypto.subtle.importKey('pkcs8', der, { name: 'Ed25519' }, true, ['sign']);
+  const pub = fromB64u((await crypto.subtle.exportKey('jwk', key)).x);
+  walletCache = { secret: env.APP_WALLET_SEED, key, pub, address: StrKey.encodeEd25519PublicKey(Buffer.from(pub)) };
+  return walletCache;
 }
 
 // --- Pi Platform API ---
@@ -76,22 +91,23 @@ async function me(accessToken) {
 }
 
 // --- blockchain: build, sign and submit the A2U transaction ---
-async function sendOnChain(payment, kp) {
+async function sendOnChain(payment, w) {
   const horizon = HORIZON[payment.network];
   if (!horizon) throw new Fail('unknown_network', 500);
-  if (payment.from_address !== kp.publicKey()) throw new Fail('private_seed_mismatch', 500, { app_wallet: payment.from_address });
-  const acc = await (await fetch(`${horizon}/accounts/${kp.publicKey()}`)).json();
+  if (payment.from_address !== w.address) throw new Fail('private_seed_mismatch', 500, { app_wallet: payment.from_address });
+  const acc = await (await fetch(`${horizon}/accounts/${w.address}`)).json();
   if (!acc.sequence) throw new Fail('app_wallet_not_found', 500);
   const fees = await (await fetch(`${horizon}/fee_stats`)).json();
   const fee = String(fees.last_ledger_base_fee || 100000);
-  const tx = new TransactionBuilder(new Account(kp.publicKey(), acc.sequence), {
+  const tx = new TransactionBuilder(new Account(w.address, acc.sequence), {
     fee, networkPassphrase: payment.network,
     timebounds: { minTime: 0, maxTime: Math.floor(Date.now() / 1000) + 180 },
   })
     .addOperation(Operation.payment({ destination: payment.to_address, asset: Asset.native(), amount: String(payment.amount) }))
     .addMemo(Memo.text(payment.identifier))
     .build();
-  tx.sign(kp);
+  const sig = new Uint8Array(await crypto.subtle.sign('Ed25519', w.key, tx.hash()));
+  tx.signatures.push(new xdr.DecoratedSignature({ hint: Buffer.from(w.pub.slice(28)), signature: Buffer.from(sig) }));
   const r = await fetch(`${horizon}/transactions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -119,13 +135,13 @@ async function reward(req, env) {
   const { accessToken } = await req.json().catch(() => ({}));
   if (!accessToken) throw new Fail('missing_access_token');
   const user = await me(accessToken);
-  const kp = await keypairFrom(env.APP_WALLET_SEED);
+  const w = await wallet(env);
   await clearIncomplete(env);
   const payment = await pi(env, '/payments', 'POST', {
     payment: { amount: REWARD, memo: 'On Air Studio test reward', metadata: { kind: 'test_reward' }, uid: user.uid },
   });
   let txid;
-  try { txid = await sendOnChain(payment, kp); }
+  try { txid = await sendOnChain(payment, w); }
   catch (e) { await pi(env, `/payments/${payment.identifier}/cancel`, 'POST').catch(() => {}); throw e; }
   await pi(env, `/payments/${payment.identifier}/complete`, 'POST', { txid });
   return { ok: true, username: user.username, amount: REWARD, txid };
@@ -138,14 +154,14 @@ export default {
     try {
       if (req.method === 'GET' && path === '/') {
         // Health check: says what is configured, never the secrets themselves.
-        let wallet = null;
-        try { wallet = (await keypairFrom(env.APP_WALLET_SEED)).publicKey(); } catch (e) {}
-        return json(req, { ok: true, service: 'on-air-pi', api_key_set: !!env.PI_API_KEY, app_wallet: wallet });
+        let address = null;
+        try { address = (await wallet(env)).address; } catch (e) {}
+        return json(req, { ok: true, service: 'on-air-pi', api_key_set: !!env.PI_API_KEY, app_wallet: address, v: 2 });
       }
       if (req.method === 'POST' && path === '/a2u/reward') return json(req, await reward(req, env));
       return json(req, { ok: false, error: 'not_found' }, 404);
     } catch (e) {
-      const f = e instanceof Fail ? e : new Fail('server_error', 500);
+      const f = e instanceof Fail ? e : new Fail('server_error', 500, { detail: String((e && e.message) || e).slice(0, 200) });
       return json(req, { ok: false, error: f.code, ...(f.extra || {}) }, f.status);
     }
   },
