@@ -1,3 +1,4 @@
+import { EXTRA, EXTRA_LANGS } from './tr_extra.js';
 import TR from './tr.js';
 import TR_SHOP from './tr_shop.js';
 import TR_DAILY from './tr_daily.js';
@@ -173,3 +174,5 @@ Object.entries(TCT).forEach(([k, arr]) => { const o = {}; KEYS_CITY.forEach((key
 Object.entries(TUP).forEach(([k, arr]) => { const o = {}; KEYS_UP.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TO2).forEach(([k, arr]) => { const o = {}; KEYS_OBJ2.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TD2).forEach(([k, arr]) => { const o = {}; KEYS_DR.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
+// extra languages beyond Pi's list (whole-interface files)
+EXTRA_LANGS.forEach((l) => { if (!LANGS.some((x) => x.code === l.code)) LANGS.push(l); STR[l.code] = { ...(STR[l.code] || {}), ...EXTRA[l.code] }; });
