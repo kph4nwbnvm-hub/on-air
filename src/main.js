@@ -38,7 +38,7 @@ const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), qu
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.5.2';
+const VERSION = '1.5.3';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -203,7 +203,7 @@ const STAGE_R = [];
 // everyone starts in the same plain outfit; looks change only through what the player earns or buys
 const UNI = { top: 0, topColor: 11, bottom: 0, bottomColor: 7, shoes: 1, acc: {} };
 const design = store.get('design', { on: false, top: 11, bot: 7 }); if (design.on) { UNI.topColor = design.top; UNI.bottomColor = design.bot; }
-const fit = { lv: store.get('fit', 0) };
+const fit = { lv: store.get('fit', 0) }; const cafe = { on: store.get('coffee', false) };
 const upg = { room: 0, pc: 0, desk: 0, ...store.get('upg', {}) }; const applySlots = () => CATS.forEach((c) => { if (c.id === 'furniture' || c.id === 'decor') c.slots = 3 + upg.room; }); applySlots();
 const uni = (av) => ({ ...av, ...UNI, acc: {} });
 /* ================= STUDIO ================= */
@@ -403,7 +403,7 @@ function syncCity() { if (cityLang === lang) return; cityLang = lang; citySigns.
   [-56, 56].forEach((dx) => put(box(6, 7, 46, 0x8a93a6), SX + dx, 3.5, 10)); // end caps
   // row A (between the two streets): gym, café, the store, park, clothes
   shopFront(-40, 12, 15, 5.5, 0x3b4a6b, 0xd9342b, '🏋️', () => t('sh_gym'), () => openPanel('gym'), 'sh_gym');
-  shopFront(-20, 12, 15, 5, 0x8a5a3a, 0x5a3a22, '☕', () => t('sh_cafe'), null, 'sh_cafe');
+  shopFront(-20, 12, 15, 5, 0x8a5a3a, 0x5a3a22, '☕', () => t('sh_cafe'), () => openPanel('cafe'), 'sh_cafe');
   shopFront(0, 12, 15, 6, 0x0f9d76, 0x0b6f55, '🛍️', () => ADS.WORLD.souq[lang === 'ar' ? 'ar' : 'en'], () => $('hudStore').onclick(), 'sh_market');
   shopFront(40, 12, 15, 5, 0xe86aa6, 0xb0347a, '👕', () => t('sh_clothes'), () => { $('hudStore').onclick(); if (!$('storeS').hidden) { cs.setCat('skins'); cs.render(); } }, 'sh_clothes');
   // park (open block): grass, trees, fountain, benches
@@ -578,7 +578,7 @@ function startRound() {
   confetti.forEach((c) => { c.m.visible = false; }); $('qSheet').hidden = true; show('hud'); syncScene(); resize(); snapCam = true; sfx.seg();
   const c = chNow(); PASS = c.pass; ROUND = c.t; SEG = ROUND / 2; G.next = ROUND <= 90 ? 5 : 9; const prev = chDone > 0 && chDone < CH.length ? CH[chDone - 1].k : null; const allK = ['product', 'camera', 'light', 'confetti'], kNow = c.k || allK, kPrev = chDone > 0 ? CH[chDone - 1].k || allK : []; const fresh = chDone < CH.length ? kNow.filter((k) => !kPrev.includes(k)) : [];
   say((chDone < CH.length ? '🎯 ' + t('ch_title').replace('{n}', chDone + 1) + ' · ' : '') + t('ch_goal').replace('{p}', Math.round(PASS * 100)) + (fresh.length ? ' · ' + t('ch_new') + ': ' + fresh.map((k) => t('p_' + k)).join(' + ') : ''), '', true);
-  G.bonus += cs.bonuses().trust + upg.desk * 3;
+  G.bonus += cs.bonuses().trust + upg.desk * 3 + (cafe.on ? 5 : 0); if (cafe.on) { cafe.on = false; store.set('coffee', false); }
 }
 function endRound() {
   G.on = false; G.asking = false; $('qSheet').hidden = true; const missed = Math.max(0, (SEG >= 75 ? 3 : SEG >= 45 ? 2 : 1) - G.asked.length); G.bonus -= missed * 6;
@@ -845,7 +845,7 @@ function endChase(caught) {
 function chaseTick(dt, tt) {
   if (!chase.on) return; if (G.zone !== 'street') return endChase(false); chase.t -= dt; if (chase.t <= 0) return endChase(false);
   const p = cop.g.position, dx = G.px - p.x, dz = G.pz - p.z, d = Math.hypot(dx, dz); if (d < 0.9) return endChase(true);
-  p.x += (dx / d) * 3.5 * dt; p.z += (dz / d) * 3.5 * dt; cop.g.rotation.y = Math.atan2(dx, dz); const sw = Math.sin(tt * 12) * 0.8; cop.legL.rotation.x = sw; cop.legR.rotation.x = -sw; cop.armL.rotation.x = -sw * 0.8; cop.armR.rotation.x = sw * 0.8;
+  p.x += (dx / d) * 3.5 * dt; p.z += (dz / d) * 3.5 * dt; RECTS.street.forEach(([a, b, c, e]) => { const k = 0.3; if (p.x > a - k && p.x < b + k && p.z > c - k && p.z < e + k) { const l = p.x - (a - k), r = b + k - p.x, u = p.z - (c - k), w = e + k - p.z, mn = Math.min(l, r, u, w); if (mn === u || mn === w) { p.z = mn === u ? c - k : e + k; p.x += Math.sign(dx || 1) * 3.5 * dt; } else { p.x = mn === l ? a - k : b + k; p.z += Math.sign(dz || 1) * 3.5 * dt; } } }); cop.g.rotation.y = Math.atan2(dx, dz); const sw = Math.sin(tt * 12) * 0.8; cop.legL.rotation.x = sw; cop.legR.rotation.x = -sw; cop.armL.rotation.x = -sw * 0.8; cop.armR.rotation.x = sw * 0.8;
   copLamp.material.color.set(Math.floor(tt * 6) % 2 ? 0xff2a40 : 0x2a6bff); copLamp.material.emissive.copy(copLamp.material.color);
   if (chase.t < chase.mark - 5) { chase.mark -= 5; say('🚓 ' + Math.ceil(chase.t) + ' · ' + t('pol_run'), 'warn', true); }
 }
@@ -893,6 +893,7 @@ function pcClose() { $('pc').hidden = true; G.asking = false; panelMode = null; 
 let panelMode = null; function openPanel(k) { sfx.click(); panelMode = k; pcOpen(); }
 function pcBuild() {
   if (panelMode === 'edit' && ed) return edBuild();
+  if (panelMode === 'cafe') return cafeBuild();
   if (panelMode === 'gym') return gymBuild(); if (panelMode === 'designer') return designBuild();
   if (pcS.fixed) return pcTab === 'skills' ? skBuild() : pcTab === 'lab' ? labBuild() : pcTab === 'up' ? upBuild() : pubBuild();
   $('pcTitle').textContent = '🖥️ ' + t('pc_title'); const L = $('pcList'); L.innerHTML = '';
@@ -969,6 +970,15 @@ function gymBuild() {
   row.innerHTML = '<span class="ic">🏃</span><span class="nm"><b></b><small></small></span>'; row.querySelector('b').textContent = '⚡ +' + lv * 6 + '%'; row.querySelector('small').textContent = '●'.repeat(lv) + '○'.repeat(5 - lv);
   const b = document.createElement('button'); if (lv >= 5) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { const cost = 150 * (lv + 1); b.className = G.coins >= cost ? 'big' : 'ghost'; b.disabled = G.coins < cost; b.textContent = '⬆ 🪙 ' + cost;
     b.onclick = () => { addCoins(-cost); fit.lv++; store.set('fit', fit.lv); sfx.win(); gToast('🏃 ⚡ +' + fit.lv * 6 + '%'); gymBuild(); }; }
+  row.appendChild(b); L.appendChild(row);
+}
+// café: one coffee = +5 trust at the start of the next broadcast (one cup at a time)
+function cafeBuild() {
+  $('pcTitle').textContent = '☕ ' + t('sh_cafe'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = ''; const row = document.createElement('div'); row.className = 'pcrow';
+  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p);
+  row.innerHTML = '<span class="ic">☕</span><span class="nm"><b></b><small></small></span>'; row.querySelector('b').textContent = '🔴 📈 +5'; row.querySelector('small').textContent = cafe.on ? '●' : '○';
+  const b = document.createElement('button'); if (cafe.on) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { b.className = G.coins >= 25 ? 'big' : 'ghost'; b.disabled = G.coins < 25; b.textContent = '🪙 25';
+    b.onclick = () => { addCoins(-25); cafe.on = true; store.set('coffee', true); sfx.good(); gToast('☕ 📈 +5'); cafeBuild(); }; }
   row.appendChild(b); L.appendChild(row);
 }
 // fashion designer: an expensive one-time fee unlocks a custom studio uniform — pick the top and bottom colours for the whole team
