@@ -241,6 +241,8 @@ button.locked{opacity:.45}
 #drList button span{font-size:26px}#drList button.sel{outline:3px solid #ffcf3f}
 #drList p{grid-column:1/-1;text-align:center;opacity:.85;margin:8px 0}
 .drall{display:flex;align-items:center;gap:8px;margin:12px 2px 4px;font-size:15px}.drall input{width:22px;height:22px}
+#soonNote{position:fixed;left:50%;bottom:12%;transform:translateX(-50%);z-index:99999;background:rgba(20,16,46,.96);color:#fff;border:2px solid #ffcf3f;border-radius:14px;padding:10px 18px;font-weight:700;font-size:15px;box-shadow:0 8px 24px rgba(0,0,0,.4);pointer-events:none;white-space:nowrap}
+button.soon{opacity:.85}button.soon::after{content:" 🔒";font-size:.8em}
 </style>
 </head>
 <body>
@@ -256,6 +258,7 @@ button.locked{opacity:.45}
     <button id="bChar" class="ghost" data-t="customize"></button>
     <button id="bStore" class="ghost store"></button>
     <button id="bHow" class="ghost" data-t="how"></button>
+    <div class="two"><button id="bMp" class="ghost soon" data-soon="sv_mp" data-ic="👥"></button><button id="bLb" class="ghost soon" data-soon="sv_lb" data-ic="🏆"></button></div>
     <div class="two"><button id="bProfile" class="ghost"></button><button id="bSettings" class="ghost"></button></div>
   </div>
 </section>
@@ -316,7 +319,7 @@ button.locked{opacity:.45}
 <section id="storeS" class="screen" hidden>
   <div id="stPanel">
     <div id="stHead"><button id="stBack">✕</button><h3 data-t="st_store"></h3><span id="stTok"></span></div>
-    <button id="stTest" class="ghost small" data-t="st_test"></button>
+    <div class="two"><button id="stTest" class="ghost small" data-t="st_test"></button><button id="stTopup" class="ghost small soon" data-soon="sv_topup" data-ic="π"></button></div>
     <div id="stCats" class="chips"></div>
     <div id="stTools"><input id="stSearch" autocomplete="off" spellcheck="false"><select id="stSort"></select></div>
     <div id="stRar" class="chips"></div>
@@ -396,5 +399,6 @@ button.locked{opacity:.45}
 </section>
 
 <script>/*BUNDLE*/</script>
+<div id="soonNote" hidden></div>
 </body>
 </html>

@@ -38,7 +38,7 @@ const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), qu
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.7.6';
+const VERSION = '1.7.7';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -57,7 +57,7 @@ function applyLang() {
   const L = LANGS.find((l) => l.code === lang) || LANGS[0];
   document.documentElement.lang = L.code; document.documentElement.dir = L.rtl ? 'rtl' : 'ltr';
   document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
-  try { syncSignText(); syncLogoSign(); ADS.setTr(t); } catch (_) {} try { syncCity(); } catch (_) {}
+  try { syncSignText(); syncLogoSign(); ADS.setTr(t); } catch (_) {} try { syncSoon(); } catch (_) {} try { syncCity(); } catch (_) {}
   $('langBtn').textContent = '🌐 ' + L.name; $('bProfile').textContent = '👤 ' + t('profile'); $('bSettings').textContent = '⚙️ ' + t('settings'); $('bStore').textContent = '🛍️ ' + t('st_store');
   if (!$('settings').hidden) buildSettings(); if (!$('profile').hidden) buildProfile(); if (!$('storeS').hidden) cs.render(); if (!$('storeS').hidden) cs.render();
 }
@@ -1118,12 +1118,16 @@ function buildProfile() {
   const sd = document.createElement('div'); sd.style.gridColumn = '1 / -1'; sd.innerHTML = '<small></small>'; sd.children[0].textContent = t('p_since') + ' ' + since; g.appendChild(sd);
 }
 $('pName').addEventListener('change', () => { const v = $('pName').value.replace(/[<>]/g, '').trim().slice(0, 16); $('pName').value = v; store.set('name', v); });
+// features that need the hosting server: the buttons are in place, and for now they answer with a small "coming soon" note
+function soonNote() { const n = $('soonNote'); n.textContent = '🚧 Coming Soon'; n.hidden = false; sfx.click(); clearTimeout(soonNote.h); soonNote.h = setTimeout(() => { n.hidden = true; }, 1800); }
+function syncSoon() { document.querySelectorAll('button.soon').forEach((b) => { b.textContent = b.dataset.ic + ' ' + t(b.dataset.soon); b.onclick = soonNote; }); }
 function buildSettings() {
   const rows = $('setRows'); rows.innerHTML = '';
   const row = (icon, label, val, fn) => { const b = document.createElement('button'); b.className = 'srow'; b.innerHTML = '<span></span><span></span>'; b.children[0].textContent = icon + ' ' + label; b.children[1].textContent = val; b.onclick = () => { fn(); sfx.click(); buildSettings(); }; rows.appendChild(b); };
   row(soundOn ? '🔊' : '🔇', t('sound'), t(soundOn ? 'on' : 'off'), () => { soundOn = !soundOn; store.set('sound', soundOn); if (!soundOn && window.speechSynthesis) speechSynthesis.cancel(); });
   row('🗣️', t('s_voice'), t(cfg.voice ? 'on' : 'off'), () => { cfg.voice = !cfg.voice; store.set('voice', cfg.voice); if (!cfg.voice && window.speechSynthesis) speechSynthesis.cancel(); });
   row('📳', t('s_vibe'), t(cfg.vibe ? 'on' : 'off'), () => { cfg.vibe = !cfg.vibe; store.set('vibe', cfg.vibe); buzz(80); });
+  { const b = document.createElement('button'); b.className = 'srow'; b.innerHTML = '<span></span><span></span>'; b.children[0].textContent = '☁️ ' + t('sv_cloud'); b.children[1].textContent = '🔒 Coming Soon'; b.onclick = soonNote; rows.appendChild(b); }
   row('🖥️', t('s_quality'), t(cfg.quality === 'low' ? 'q_low' : 'q_high'), () => { cfg.quality = cfg.quality === 'low' ? 'high' : 'low'; store.set('quality', cfg.quality); renderer.setPixelRatio(pixelRatio()); setupFX(); resize(); });
   $('setVer').textContent = t('s_version') + ' ' + VERSION; const r = $('bReset'); r.classList.remove('armed'); r.textContent = t('s_reset');
 }
