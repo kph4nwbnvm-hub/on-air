@@ -38,7 +38,7 @@ const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), qu
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.5.3';
+const VERSION = '1.5.4';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -425,9 +425,17 @@ function syncCity() { if (cityLang === lang) return; cityLang = lang; citySigns.
   npc('street', SX - 38, 10.2, 0, { skin: 1, hairStyle: 4, hairColor: 0, top: 2, topColor: 5, bottom: 1, bottomColor: 0, shoes: 3, acc: { headphones: true } }, 'n_rival', ['n_rival1', 'n_rival2']);
   npc('street', SX + 17, 16.5, -1, { skin: 2, hairStyle: 3, hairColor: 3, top: 0, topColor: 1, bottom: 1, bottomColor: 6, shoes: 0 }, 'n_fan', ['n_fan1', 'n_fan2']);
   npc('street', SX + 36, 4, -1.6, { skin: 4, hairStyle: 0, hairColor: 0, beard: 2, top: 0, topColor: 7, bottom: 0, bottomColor: 2, shoes: 1, acc: { glasses: true } }, 'n_vendor', ['n_vendor1', 'n_vendor2']);
-  npc('street', SX - 4, 21, 2.6, { skin: 0, hairStyle: 2, hairColor: 5, top: 1, topColor: 4, bottom: 0, bottomColor: 1, shoes: 4 }, 'n_fan', ['n_fan1', 'n_fan2']);
-  npc('street', SX + 30, 23.5, 3.1, { skin: 3, hairStyle: 5, hairColor: 1, top: 2, topColor: 0, bottom: 1, bottomColor: 5, shoes: 2, capColor: 3, acc: { cap: true } }, 'n_rival', ['n_rival1', 'n_rival2']);
+  npc('street', SX - 4, 19.7, 2.6, { skin: 0, hairStyle: 2, hairColor: 5, top: 1, topColor: 4, bottom: 0, bottomColor: 1, shoes: 4 }, 'n_fan', ['n_fan1', 'n_fan2']);
+  npc('street', SX + 33, 26.1, 3.1, { skin: 3, hairStyle: 5, hairColor: 1, top: 2, topColor: 0, bottom: 1, bottomColor: 5, shoes: 2, capColor: 3, acc: { cap: true } }, 'n_rival', ['n_rival1', 'n_rival2']);
 }
+// traffic on the second street: cars loop along two lanes and brake for the player
+const traffic = [];
+[[21.8, 1, 0xd9342b, -40], [21.8, 1, 0x2e7df6, 12], [24.1, -1, 0xffcf3f, 30], [24.1, -1, 0xffffff, -18]].forEach(([z, dir, c, x0]) => { const g = new THREE.Group();
+  const add = (o, x, y, zz) => { o.position.set(x, y, zz); o.castShadow = true; g.add(o); }; add(box(3.4, 0.7, 1.6, c), 0, 0.65, 0); add(box(1.8, 0.6, 1.4, 0xbfe3ff), -0.2, 1.25, 0);
+  [[-1.1, 0.8], [1.1, 0.8], [-1.1, -0.8], [1.1, -0.8]].forEach(([a, b]) => { const w = cyl(0.34, 0.34, 0.24, 0x1a1a22); w.rotation.x = Math.PI / 2; add(w, a, 0.34, b); });
+  add(sph(0.12, 0xfff3b0, { emissive: 0xfff3b0 }), 1.7, 0.7, 0.5); add(sph(0.12, 0xfff3b0, { emissive: 0xfff3b0 }), 1.7, 0.7, -0.5);
+  g.position.set(SX + x0, 0, z); g.rotation.y = dir > 0 ? 0 : Math.PI; cur.add(g); traffic.push({ g, dir, v: 6 }); });
+function trafficTick(dt) { traffic.forEach((c) => { const p = c.g.position, ahead = (G.px - p.x) * c.dir, near = Math.abs(G.pz - p.z) < 1.7 && ahead > -1.8 && ahead < 5.5; c.v += ((near ? 0 : 6) - c.v) * Math.min(1, dt * 4); p.x += c.dir * c.v * dt; if (p.x > SX + 56) p.x = SX - 56; if (p.x < SX - 56) p.x = SX + 56; c.g.visible = Math.abs(p.x - G.px) < 48; }); }
 // police officer for the chase (filming without a StudioLab licence)
 const cop = makeChar({ skin: 2, hairStyle: 0, hairColor: 0, beard: 1, top: 0, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, capColor: 4, acc: { cap: true } });
 const copLamp = put(sph(0.13, 0xff2a40, { emissive: 0xff2a40, emissiveIntensity: 2 }), 0, 2.05, 0, cop.g); cop.g.visible = false; cur.add(cop.g);
@@ -1033,7 +1041,7 @@ interact('studio', PCX + 1.15, PCZ, 1.25, 'a_pc', '🖥️', () => roam() && !st
 });
 
 // ───────── simple start: features unlock step by step, with one clear objective on screen ─────────
-const objKey = () => (!store.get('story_done', false) ? '' : !store.get('story4_done', false) ? 'obj_iv' : !pcS.fixed ? (cs.needsReady() ? 'obj_pc2' : 'obj_pc') : chDone === 0 ? 'obj_live' : '');
+const objKey = () => (!store.get('story_done', false) ? '' : !store.get('story4_done', false) ? 'obj_iv' : !pcS.fixed ? (cs.needsReady() ? 'obj_pc2' : 'obj_pc') : chDone === 0 ? 'obj_live' : fans.shoofni + fans.laqta + fans.sada === 0 ? 'obj_pub' : skSpent() === 0 && skEarned() > 0 ? 'obj_skill' : licence < 1 ? 'obj_lic' : upg.room < 1 ? 'obj_grow' : '');
 const UNLOCK = { bStore: () => pcS.gift || pcS.fixed || cs.S.tokens > 0, bChar: () => shop.level >= 2, bProfile: () => store.get('story4_done', false) };
 function applyLocks() { Object.entries(UNLOCK).forEach(([id, ok]) => { $(id).classList.toggle('locked', !ok()); }); }
 setInterval(() => { const k = objKey(), el = $('objBar'); const on = !!k && !G.on && !storyOn && !ivOn && !$('hud').hidden && $('pc').hidden && $('story').hidden; el.hidden = !on; if (on) el.textContent = '🎯 ' + t(k); if (!$('menu').hidden) applyLocks(); $('hudStore').classList.toggle('locked', !UNLOCK.bStore()); $('hudStore').hidden = storyOn || ivOn; }, 500);
@@ -1136,7 +1144,7 @@ function frameBody(now) {
   gold.rotation.y = tt * 0.7; guest.head.rotation.y = Math.sin(tt * 0.8) * 0.25; guest.armR.rotation.x = -0.5 + Math.sin(tt * 2) * 0.12;
   crew.g.rotation.y = Math.sin(tt * 1.1) * 0.9 - 0.6; crew.armL.rotation.x = -1.2 + Math.sin(tt * 3) * 0.3; crew.armR.rotation.x = -1.0 + Math.cos(tt * 3) * 0.3;
   crowd.forEach((c, i) => { c.g.position.y = Math.abs(Math.sin(tt * 3 + i * 1.3)) * 0.12; c.armL.rotation.x = c.armR.rotation.x = -2.7 + Math.sin(tt * 6 + i) * 0.3; });
-  trophy.rotation.y = tt * 0.5; if (G.zone === 'studio') atmos(dt, tt); updateSign(tt); ivTick(dt); chaseTick(dt, tt); if (G.zone === 'street') { const L = NPCS.filter((n) => n.zone === 'street').map((n) => [Math.hypot(n.ch.g.position.x - G.px, n.ch.g.position.z - G.pz), n]).sort((p, q) => p[0] - q[0]); L.forEach(([d, n], i) => { n.ch.g.visible = i < 4 && d < 32; }); } roomSpin.forEach((b) => { b.rotation.y += dt * 0.8; });
+  trophy.rotation.y = tt * 0.5; if (G.zone === 'studio') atmos(dt, tt); updateSign(tt); ivTick(dt); chaseTick(dt, tt); if (G.zone === 'street') trafficTick(dt); if (G.zone === 'street') { const L = NPCS.filter((n) => n.zone === 'street').map((n) => [Math.hypot(n.ch.g.position.x - G.px, n.ch.g.position.z - G.pz), n]).sort((p, q) => p[0] - q[0]); L.forEach(([d, n], i) => { n.ch.g.visible = i < 4 && d < 32; }); } roomSpin.forEach((b) => { b.rotation.y += dt * 0.8; });
   NPCS.forEach((n, i) => { const d = Math.hypot(G.px - n.x, G.pz - n.z); const want = d < 3.5 && n.zone === G.zone ? Math.atan2(G.px - n.x, G.pz - n.z) : n.face; let dr = want - n.ch.g.rotation.y; while (dr > Math.PI) dr -= 6.283; while (dr < -Math.PI) dr += 6.283; n.ch.g.rotation.y += dr * Math.min(1, dt * 5); n.ch.armR.rotation.x = Math.sin(tt * 1.5 + i) * 0.12; n.ch.head.rotation.x = Math.sin(tt * 1.1 + i * 2) * 0.05; });
   IT.forEach((it, i) => { it.ring.visible = it.zone === G.zone && it.cond(); it.ring.material.opacity = 0.25 + Math.sin(tt * 3 + i) * 0.12; });
   confetti.forEach((c) => { if (c.m.visible && c.m.position.y > c.ty) { c.m.position.y = Math.max(c.ty, c.m.position.y - c.vy * dt); c.m.rotation.x += dt * 6; c.m.rotation.z += dt * 4; if (c.m.position.y === c.ty) c.m.rotation.set(-Math.PI / 2, 0, c.m.rotation.z); } });

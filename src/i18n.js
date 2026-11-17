@@ -17,6 +17,7 @@ import TSK, { KEYS_SK } from './tr_skill.js';
 import TLB, { KEYS_LAB } from './tr_lab.js';
 import TCT, { KEYS_CITY } from './tr_city.js';
 import TUP, { KEYS_UP } from './tr_up.js';
+import TO2, { KEYS_OBJ2 } from './tr_obj2.js';
 import TD2, { KEYS_DR } from './tr_dress.js';
 // The 53 languages of the Pi system, in the order the project owner supplied them.
 export const LANGS = [
@@ -170,4 +171,5 @@ Object.entries(TSK).forEach(([k, arr]) => { const o = {}; KEYS_SK.forEach((key, 
 Object.entries(TLB).forEach(([k, arr]) => { const o = {}; KEYS_LAB.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TCT).forEach(([k, arr]) => { const o = {}; KEYS_CITY.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TUP).forEach(([k, arr]) => { const o = {}; KEYS_UP.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
+Object.entries(TO2).forEach(([k, arr]) => { const o = {}; KEYS_OBJ2.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
 Object.entries(TD2).forEach(([k, arr]) => { const o = {}; KEYS_DR.forEach((key, i) => { o[key] = arr[i]; }); STR[k] = { ...(STR[k] || {}), ...o }; });
