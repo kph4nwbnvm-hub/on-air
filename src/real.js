@@ -28,7 +28,7 @@ export async function loadReal() {
   try {
     const L = new GLTFLoader(); L.setMeshoptDecoder(MeshoptDecoder);
     const [m, f, a, b] = await Promise.all([load(L, 'male'), load(L, 'female').catch(() => null), load(L, 'anim_a'), load(L, 'anim_b').catch(() => ({ animations: [] }))]);
-    A.male = m.scene; prepBody(A.male); if (f) { A.female = f.scene; prepBody(A.female); }
+    A.male = m.scene; prepBody(A.male); if (f) { A.female = f.scene; prepBody(A.female); A.female.traverse((o) => { if (o.userData.body) o.userData.female = true; }); }
     [...a.animations, ...b.animations].forEach((c) => { A.clips[c.name] = c; });
     for (const h of [...new Set([...HAIR.map((x) => x.g).filter(Boolean), 'hair_beard'])]) { try { A.hair[h] = (await load(L, h)).scene; } catch (_) {} }
     A.ready = true; LIST.forEach((c) => { try { attach(c); } catch (e) { console.warn('attach failed', e && e.message, e && e.stack && e.stack.split('\n')[1]); } });
@@ -88,7 +88,7 @@ function boneOf(root, rx) { let b = null; root.traverse((o) => { if (!b && o.isB
 // cloth meshes are built in metres around the bone; the character is ~1.83 m tall
 function addThobe(root, col, bisht) {
   const pelvis = boneOf(root, /^pelvis$/i); if (!pelvis) return;
-  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.33, 0.98, 18, 1, true), clothM(col)); skirt.position.set(0, -0.44, 0); skirt.castShadow = true;
+  const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.42, 0.98, 20, 1, true), clothM(col)); skirt.position.set(0, -0.44, 0); skirt.castShadow = true;
   const holder = new THREE.Group(); holder.add(skirt); pelvis.add(holder); holder.userData.fixUp = true; // keep upright in world space
   if (bisht) { const cape = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.42, 1.25, 18, 1, true, Math.PI * 0.18, Math.PI * 1.64), clothM(bisht, 0.6)); cape.position.set(0, -0.28, 0); holder.add(cape);
     const trim = new THREE.Mesh(new THREE.TorusGeometry(0.27, 0.012, 6, 24, Math.PI * 1.64), clothM(0xd4af37, 0.35)); trim.rotation.set(Math.PI / 2, 0, Math.PI * 0.18 + Math.PI / 2); trim.position.set(0, 0.34, 0); holder.add(trim); }
@@ -173,7 +173,9 @@ export function realTick(dt, camera) {
     let vis = true; for (let o = c.g; o; o = o.parent) if (!o.visible && o !== c.real.root) { vis = false; break; }
     c.g.getWorldPosition(tmp); const d = tmp.distanceTo(camera.position);
     const jump = tmp.distanceTo(c.lastPos), mv = jump > 1.5 ? 0 : jump / Math.max(dt, 1e-3); c.lastPos.copy(tmp); c.speed = jump > 1.5 ? 0 : c.speed * 0.6 + mv * 0.4;
-    if (vis && d < nearDist) ranked.push([d, c]); else showSimple(c, true);
+    // a character that is already realistic keeps a small advantage, so two at similar distances never flip back and forth
+    const keep = c.real.root.visible ? 0.85 : 1;
+    if (vis && d * keep < nearDist) ranked.push([d * keep, c]); else showSimple(c, true);
   }
   ranked.sort((a, b) => a[0] - b[0]);
   ranked.forEach(([d, c], i) => {
@@ -181,7 +183,15 @@ export function realTick(dt, camera) {
     const o = c.ropts || {}; let want = o.anim || 'Idle_Loop';
     if (!o.anim) { if (c.speed > 3) want = 'Jog_Fwd_Loop'; else if (c.speed > 0.5) want = 'Walk_Loop'; }
     play(c, want); c.real.mixer.update(i < 4 ? dt : dt * (Math.random() < 0.5 ? 2 : 0)); // far ones update every other frame
+    if (!/Sitting/.test(want)) armsIn(c.real); if (c.real.seat === undefined) c.real.seat = /Sitting/.test(want) ? SEAT_UP : 0; c.real.root.position.y = c.real.seat;
     c.real.root.traverse((x) => { if (x.userData.fixUp) { x.parent.getWorldQuaternion(fq); c.g.getWorldQuaternion(gq); x.quaternion.copy(fq.invert()).multiply(gq); } });
   });
 }
 const fq = new THREE.Quaternion(), gq = new THREE.Quaternion();
+// the base body has very wide shoulders, so the stock idle and walk hold the arms away from the body; bring them in a little
+const SEAT_UP = 0.36, ARM_IN = 0.2, aq = new THREE.Quaternion(), pq = new THREE.Quaternion(), fwd = new THREE.Vector3();
+function armsIn(r) {
+  if (!r.arms) { r.arms = []; r.root.traverse((o) => { if (o.isBone && /^upperarm_[lr]$/i.test(o.name)) r.arms.push([o, /_l$/i.test(o.name) ? 1 : -1]); }); }
+  r.root.getWorldQuaternion(gq); fwd.set(0, 0, 1).applyQuaternion(gq);
+  r.arms.forEach(([b, s]) => { b.parent.getWorldQuaternion(pq); aq.setFromAxisAngle(fwd, -s * ARM_IN); b.quaternion.premultiply(pq.clone().invert().multiply(aq).multiply(pq)); });
+}

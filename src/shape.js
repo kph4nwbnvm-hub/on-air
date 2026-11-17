@@ -6,7 +6,7 @@ import * as THREE from 'three';
 
 export const BODY_KEYS = ['h', 'w', 'm', 'sh', 'head'];
 export const FACE_KEYS = ['face', 'jaw', 'chin', 'cheek', 'nose', 'noseW', 'lips', 'eyes', 'brow', 'browT'];
-const BODY_T = ['fat', 'muscle', 'shoulders', 'faceL', 'jaw', 'chin', 'cheek', 'nose', 'noseW', 'lips'];
+const BODY_T = ['fat', 'muscle', 'shoulders', 'faceL', 'jaw', 'chin', 'cheek', 'nose', 'noseW', 'lips', 'bust'];
 
 function cat(n) {
   n = n.toLowerCase();
@@ -44,6 +44,8 @@ export function makeShapes(root) {
   // body keys
   {
     const g = body.geometry, P = g.attributes.position, S = g.attributes.snorm, W = weights(body), n = P.count, T = BODY_T.map(() => new Float32Array(n * 3));
+    // bust landmark: the most forward chest point off the centre line (only matters on the female base)
+    let bust = null; for (let i = 0; i < n; i++) { const w = W[i]; if ((w.chest || 0) < 0.5) continue; const ax = Math.abs(P.getX(i)); if (ax > 0.04 && ax < 0.15 && (!bust || P.getZ(i) > bust.z)) bust = { x: ax, y: P.getY(i), z: P.getZ(i) }; }
     for (let i = 0; i < n; i++) {
       const w = W[i], x = P.getX(i), y = P.getY(i), z = P.getZ(i), nx = S.getX(i), ny = S.getY(i), nz = S.getZ(i), sx = Math.sign(x) || 1, h = w.head || 0;
       const set = (k, dx, dy, dz) => { const a = T[k]; a[i * 3] += dx; a[i * 3 + 1] += dy; a[i * 3 + 2] += dz; };
@@ -58,6 +60,7 @@ export function makeShapes(root) {
       // shoulder width: the whole arm moves out
       const arm = (w.clav || 0) * 0.5 + (w.uarm || 0) + (w.farm || 0) + (w.hand || 0) + (w.chest || 0) * sstep(0.08, 0.2, Math.abs(x)) * 0.5;
       set(2, sx * 0.035 * arm, 0, 0);
+      if (bust && ((w.chest || 0) + (w.belly || 0) * 0.5) > 0.2 && nz > 0) { const k = gauss(Math.abs(x) - bust.x, y - bust.y, 0, 0.075, 0.08, 1) * sstep(bust.z - 0.13, bust.z - 0.02, z); set(10, -sx * 0.01 * k, 0.012 * k, -0.06 * k); }
       if (h < 0.05) continue;
       const dy0 = y - L.E.y, fr = sstep(-0.02, 0.06, z);
       // face length: lower face moves down
@@ -104,7 +107,7 @@ export function applyShape(root, base, body = {}, face = {}) {
     if (!o.isSkinnedMesh || !o.morphTargetDictionary) return; const d = o.morphTargetDictionary, I = o.morphTargetInfluences, s = (k, x) => { if (d[k] !== undefined) I[d[k]] = x; };
     const w = v(body, 'w'); s('fat', w > 0 ? w : w * 0.55); s('muscle', v(body, 'm')); s('shoulders', v(body, 'sh'));
     s('faceL', v(face, 'face')); s('jaw', v(face, 'jaw')); s('chin', v(face, 'chin')); s('cheek', v(face, 'cheek')); s('nose', v(face, 'nose')); s('noseW', v(face, 'noseW')); s('lips', v(face, 'lips'));
-    s('eyes', v(face, 'eyes')); s('brow', v(face, 'brow')); s('browT', v(face, 'browT'));
+    s('bust', o.userData.female ? 0.55 : 0); s('eyes', v(face, 'eyes')); s('brow', v(face, 'brow')); s('browT', v(face, 'browT'));
     if (o.isBone) return;
   });
   root.traverse((o) => { if (o.isBone && /^head$/i.test(o.name)) o.scale.setScalar(1 + v(body, 'head') * 0.08); });
