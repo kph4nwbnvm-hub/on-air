@@ -144,7 +144,7 @@ async function reward(req, env) {
     });
   } catch (e) {
     // Diagnostic: which permissions the player's sign-in carries (never secrets).
-    if (e instanceof Fail) e.extra = { ...(e.extra || {}), detail: 'scopes=' + ((user.credentials && user.credentials.scopes) || []).join(',') };
+    if (e instanceof Fail) e.extra = { ...(e.extra || {}), detail: 'scopes=' + ((user.credentials && user.credentials.scopes) || []).join(',') + ' wallet=' + (user.wallet_address ? user.wallet_address.slice(0, 5) + '...' : 'none') };
     throw e;
   }
   let txid;

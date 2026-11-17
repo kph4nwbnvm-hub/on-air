@@ -39,7 +39,7 @@ export async function piSignIn() {
   try {
     if (!(await sdkReady(8000))) throw new Error('sdk');
     await window.Pi.init({ version: '2.0' });
-    const auth = await timeout(window.Pi.authenticate(['username', 'payments'], onIncompletePaymentFound), 20000);
+    const auth = await timeout(window.Pi.authenticate(['username', 'payments', 'wallet_address'], onIncompletePaymentFound), 20000);
     if (!auth || !auth.accessToken) throw new Error('no token');
     PiState.accessToken = auth.accessToken; // kept in memory only, sent to our own server for Testnet rewards
     const data = await exchangeToken(auth.accessToken);
