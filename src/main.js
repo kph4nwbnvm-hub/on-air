@@ -48,7 +48,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.10.2';
+const VERSION = '1.10.3';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -813,7 +813,9 @@ function buildCreator() {
   const shapeBtns = (keys, grp) => { const d = row(''); [['🎲 ' + t('c_random'), () => { const r = randomShape(); avatar[grp] = r[grp]; }], ['↺ ' + t('c_reset'), () => { avatar[grp] = {}; }]].forEach(([n, f]) => { const b = document.createElement('button'); b.className = 'chip'; b.textContent = n; b.onclick = () => { f(); store.set('avatar', avatar); player.av = look(); reshape(player); sfx.click(); buildCreator(); }; d.appendChild(b); }); void keys; };
   if (tab === 'body') { const d = row(t('b_type')); [['o_male', false], ['o_female', true]].forEach(([n, f]) => { const b = document.createElement('button'); b.className = 'chip' + (!!avatar.female === f ? ' sel' : ''); b.textContent = t(n); b.onclick = () => { avatar.female = f; if (f && avatar.beard) avatar.beard = 0; const fem = [4, 6, 7, 8]; if (f && !fem.includes(avatar.hairStyle)) avatar.hairStyle = 6; if (!f && fem.includes(avatar.hairStyle)) avatar.hairStyle = 0; changed(); }; d.appendChild(b); });
     BODY_KEYS.forEach((k) => slider('body', k, t('b_' + k))); shapeBtns(BODY_KEYS, 'body'); }
-  if (tab === 'face') { FACE_KEYS.forEach((k) => slider('face', k, t('f_' + k))); shapeBtns(FACE_KEYS, 'face'); }
+  // eye and lip colours: free for everyone; the first swatch keeps the natural colour
+  const freeSw = (label, cols, k) => { const d = row(label); cols.forEach((c, i) => { const b = document.createElement('button'); b.className = 'sw' + ((avatar[k] || 0) === i ? ' sel' : ''); b.style.background = '#' + c.toString(16).padStart(6, '0'); if (!i) b.textContent = '✓'; b.onclick = () => { avatar[k] = i; changed(); }; d.appendChild(b); }); };
+  if (tab === 'face') { freeSw('👁️ ' + t('c_eyes'), OPT.eye, 'eye'); freeSw('👄 ' + t('c_lips'), OPT.lip, 'lip'); FACE_KEYS.forEach((k) => slider('face', k, t('f_' + k))); shapeBtns(FACE_KEYS, 'face'); }
   if (tab === 'skin') swatches(t('c_color'), OPT.skin, 'skin');
   if (tab === 'hair') { chips(t('c_style'), Array.from({ length: OPT.hairStyle }, (_, i) => String(i + 1)), 'hairStyle'); swatches(t('c_color'), OPT.hairColor, 'hairColor'); chips(t('c_beard'), OPT.beard.map((b) => t('o_' + b)), 'beard'); }
   if (tab === 'clothes') { chips(t('c_top'), OPT.top.map((b) => t('o_' + b)), 'top'); swatches(t('c_color'), OPT.cloth, 'topColor', 'cloth'); chips(t('c_bottom'), OPT.bottom.map((b) => t('o_' + b)), 'bottom'); swatches(t('c_color'), OPT.cloth, 'bottomColor', 'cloth'); swatches(t('c_shoes'), OPT.shoes, 'shoes'); }

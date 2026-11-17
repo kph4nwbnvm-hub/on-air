@@ -67,20 +67,32 @@ function prepBody(root) {
 // body material: skin texture, tinted; clothed regions painted with flat cloth colours
 function bodyMat(src, look) {
   const m = src.clone(); m.color.setScalar(SKIN_TINT[look.skin] ?? 1); m.roughness = 0.8; m.metalness = 0;
-  const u = { cTop: { value: new THREE.Color(look.top) }, cBot: { value: new THREE.Color(look.bottom) }, cShoe: { value: new THREE.Color(look.shoes) }, sleeves: { value: look.sleeves }, legs: { value: look.legs }, collar: { value: look.collar } };
+  const u = { cTop: { value: new THREE.Color(look.top) }, cBot: { value: new THREE.Color(look.bottom) }, cShoe: { value: new THREE.Color(look.shoes) }, sleeves: { value: look.sleeves }, legs: { value: look.legs }, collar: { value: look.collar }, cLip: { value: new THREE.Color(look.lip ?? 0) }, lipOn: { value: look.lip != null ? 0.85 : 0 }, lipC: { value: look.female ? new THREE.Vector2(0.1836, 0.2637) : new THREE.Vector2(0.1855, 0.2656) }, lipH: { value: look.female ? new THREE.Vector2(0.036, 0.0155) : new THREE.Vector2(0.035, 0.0105) } };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
     sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float region; attribute vec3 clothw; attribute vec3 snorm; attribute vec3 regA; attribute vec3 regB; varying vec3 vA; varying vec3 vB; varying float vReg; uniform float sleeves; uniform float legs;').replace('#include <begin_vertex>', `#include <begin_vertex>
 vReg = region; vA = regA; vB = regB; float cwt = clothw.x + clothw.y * sleeves + clothw.z * legs; transformed += snorm * 0.012 * clamp(cwt, 0.0, 1.0);`);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vReg; varying vec3 vA; varying vec3 vB; uniform vec3 cTop; uniform vec3 cBot; uniform vec3 cShoe; uniform float sleeves; uniform float legs; uniform float collar;')
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vReg; varying vec3 vA; varying vec3 vB; uniform vec3 cTop; uniform vec3 cBot; uniform vec3 cShoe; uniform float sleeves; uniform float legs; uniform float collar; uniform vec3 cLip; uniform float lipOn; uniform vec2 lipC; uniform vec2 lipH;')
       .replace('#include <map_fragment>', `#include <map_fragment>
       float wT = clamp(vA.x + vA.y * sleeves + vA.z * collar, 0.0, 1.0), wB = clamp(vB.x + vB.y * legs, 0.0, 1.0), wS = clamp(vB.z, 0.0, 1.0);
       diffuseColor.rgb = mix(diffuseColor.rgb, cTop, smoothstep(0.35, 0.65, wT));
       diffuseColor.rgb = mix(diffuseColor.rgb, cBot, smoothstep(0.35, 0.65, wB));
-      diffuseColor.rgb = mix(diffuseColor.rgb, cShoe, smoothstep(0.35, 0.65, wS));`);
+      diffuseColor.rgb = mix(diffuseColor.rgb, cShoe, smoothstep(0.35, 0.65, wS));
+      #ifdef USE_MAP
+      if (lipOn > 0.0) { float ld = length((vMapUv - lipC) / lipH); float lm = (1.0 - smoothstep(0.55, 1.0, ld)) * lipOn; float lu = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)); diffuseColor.rgb = mix(diffuseColor.rgb, cLip * clamp(lu / 0.42, 0.5, 1.4), lm); }
+      #endif`);
   };
-  m.customProgramCacheKey = () => 'body-regions';
+  m.customProgramCacheKey = () => 'body-regions-lip';
   return m;
+}
+// eye colour: re-tint only the iris disc of the eye texture (centre of the UV square), keep pupil and highlight
+function eyeMat(src, col) {
+  const m = src.clone(); const u = { cEye: { value: new THREE.Color(col) } };
+  m.onBeforeCompile = (sh) => { Object.assign(sh.uniforms, u); sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec3 cEye;').replace('#include <map_fragment>', `#include <map_fragment>
+    #ifdef USE_MAP
+    { float d = length(vMapUv - vec2(0.498, 0.498)); float im = 1.0 - smoothstep(0.086, 0.103, d); float lu = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)); vec3 tn = cEye * clamp(lu * 2.4, 0.0, 1.3); im *= 1.0 - smoothstep(0.62, 0.85, lu); diffuseColor.rgb = mix(diffuseColor.rgb, tn, im); }
+    #endif`); };
+  m.customProgramCacheKey = () => 'eye-tint'; return m;
 }
 const clothM = (c, rough = 0.85) => new THREE.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0, side: THREE.DoubleSide });
 function boneOf(root, rx) { let b = null; root.traverse((o) => { if (!b && o.isBone && rx.test(o.name)) b = o; }); return b; }
@@ -143,11 +155,11 @@ function lookOf(av) {
   const abaya = dress === 'abaya' ? 0x141418 : 0;
   return { skin: av.skin ?? 1, top: abaya || (thobe ? 0xf4f2ec : c(av.topColor, 0)), bottom: abaya || (thobe ? 0xf4f2ec : c(av.bottomColor, 7)), hijab: modest ? (abaya || (OPT.cloth[av.capColor ?? 7] ?? 0x23233a)) : null, shoes: OPT.shoes[av.shoes ?? 0] ?? 0x222222,
     female, sleeves: thobe || female || av.top !== 0 ? 1 : 0, legs: av.bottom === 1 && !thobe && !female ? 0 : 1, collar: thobe || modest || av.top === 1 ? 1 : 0, thobe, bisht: dress === 'bisht' ? 0x3a2a1c : 0,
-    hair: HAIR[av.hairStyle ?? 0], hairCol: OPT.hairColor[av.hairColor ?? 1] ?? 0x2a1c14, beard: av.beard ?? 0, cap: !!(av.acc && av.acc.cap), capCol: OPT.cloth[av.capColor ?? 1] ?? 0x2e7df6 };
+    hair: HAIR[av.hairStyle ?? 0], hairCol: OPT.hairColor[av.hairColor ?? 1] ?? 0x2a1c14, beard: av.beard ?? 0, cap: !!(av.acc && av.acc.cap), capCol: OPT.cloth[av.capColor ?? 1] ?? 0x2e7df6, eye: av.eye ? OPT.eye[av.eye] : null, lip: av.lip ? OPT.lip[av.lip] : null };
 }
 function build(av) {
   const look = lookOf(av), root = SkeletonUtils.clone(look.female ? A.female : A.male);
-  root.traverse((o) => { if (o.isSkinnedMesh) { o.frustumCulled = false; o.castShadow = true; if (o.userData.body) o.material = bodyMat(o.material, look); else if (!/eye/i.test(o.material.name) || /brow/i.test(o.name)) { o.material = o.material.clone(); o.material.color.set(look.hairCol).multiplyScalar(1.6); } } });
+  root.traverse((o) => { if (o.isSkinnedMesh) { o.frustumCulled = false; o.castShadow = true; if (o.userData.body) o.material = bodyMat(o.material, look); else if (look.eye != null && /eye/i.test(o.material.name) && !/brow/i.test(o.name)) o.material = eyeMat(o.material, look.eye); else if (!/eye/i.test(o.material.name) || /brow/i.test(o.name)) { o.material = o.material.clone(); o.material.color.set(look.hairCol).multiplyScalar(1.6); } } });
   if (look.female) { addThobe(root, look.bottom, 0); if (look.hijab !== null) addShayla(root, look.hijab); else addStyle(root, look.hair || {}, look.hairCol); }
   else if (look.thobe) { addThobe(root, look.top, look.bisht); addGhutra(root, 0xf7f7f2); } else { if (look.cap) addCap(root, look.capCol); else addStyle(root, look.hair || {}, look.hairCol); }
   if (look.beard && !look.female) addHair(root, 'hair_beard', look.hairCol, look.beard);

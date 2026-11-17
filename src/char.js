@@ -25,6 +25,9 @@ export const OPT = {
   top: ['tshirt', 'hoodie', 'jacket'], bottom: ['pants', 'shorts'],
   cloth: [0x2e7df6, 0xd9342b, 0x19a05e, 0xffcf3f, 0xff8a3d, 0x8a63f0, 0xffffff, 0x23233a, 0xff6fa8, 0x2ab8b0, 0xd4af37, 0xc8ccd6],
   shoes: [0xffffff, 0x222222, 0xd9342b, 0xffcf3f, 0x2e7df6, 0xd4af37],
+  // index 0 = the model's natural colour (no tint)
+  eye: [0x3b2414, 0x1e130b, 0x7a5a26, 0x3f8a4a, 0x3a78c8, 0x8a96a0, 0xb8862a],
+  lip: [0x8a3b2e, 0xb04a52, 0xd9342b, 0xe0788a, 0x7a2a40, 0xa8705e, 0x5a2232],
   acc: ['cap', 'glasses', 'headphones', 'earring', 'chain', 'bracelet', 'watch', 'bag'],
 };
 export const DEFAULT_AVATAR = { skin: 1, hairStyle: 0, hairColor: 1, beard: 0, top: 1, topColor: 0, bottom: 0, bottomColor: 7, shoes: 0, capColor: 1, acc: {}, body: {}, face: {} };
@@ -68,13 +71,13 @@ export function makeChar(a) {
   const head = at(sph(0.25, skin), 0, 1.66, 0, g); p.head = head;
   [-0.09, 0.09].forEach((x) => {
     const w = at(sph(0.05, 0xffffff, { rough: 0.15 }), x, 0.02, 0.205, head); w.scale.set(1, 1.1, 0.6);
-    at(sph(0.032, 0x3b2414, { rough: 0.1 }), x, 0.018, 0.232, head); at(sph(0.017, 0x050505, { rough: 0.05 }), x, 0.018, 0.249, head);
+    at(sph(0.032, OPT.eye[a.eye || 0] ?? 0x3b2414, { rough: 0.1 }), x, 0.018, 0.232, head); at(sph(0.017, 0x050505, { rough: 0.05 }), x, 0.018, 0.249, head);
     at(sph(0.009, 0xffffff, { emissive: 0xffffff, emissiveIntensity: 0.6 }), x + 0.012, 0.034, 0.258, head);
     const br = at(cap(0.012, 0.06, hairC), x, 0.1, 0.228, head); br.rotation.z = Math.PI / 2 + (x < 0 ? 0.12 : -0.12);
     const ch = at(sph(0.04, 0xff8a8a, { transparent: true, opacity: 0.28 }), x * 1.55, -0.06, 0.2, head); ch.scale.set(1, 0.6, 0.4);
   });
   const nose = at(sph(0.034, skin), 0, -0.025, 0.245, head); nose.scale.set(0.9, 1, 1.1);
-  { const mo = at(tor(0.045, 0.011, 0x8a3b2e, Math.PI), 0, -0.088, 0.228, head); mo.rotation.z = Math.PI; }
+  { const mo = at(tor(0.045, 0.011, OPT.lip[a.lip || 0] ?? 0x8a3b2e, Math.PI), 0, -0.088, 0.228, head); mo.rotation.z = Math.PI; }
   at(sph(0.05, skin), -0.245, 0, 0, head); at(sph(0.05, skin), 0.245, 0, 0, head);
   const dome = (r) => new THREE.Mesh(new THREE.SphereGeometry(r, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2.05), M(hairC));
   const hs = a.acc.cap && a.hairStyle !== 5 && a.hairStyle !== 4 ? 1 : a.hairStyle;
