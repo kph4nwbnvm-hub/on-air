@@ -52,7 +52,7 @@ export async function piSignIn() {
 }
 
 // Testnet App-to-User test reward (needed by Pi before a Mainnet app wallet). Our own server pays 0.01 test-π.
-export const A2U_URL = 'https://on-air-pi.creative-codes.workers.dev';
+export const A2U_URL = 'https://on-air-pi.games-fca.workers.dev';
 export async function claimTestReward() {
   if (!PiState.accessToken) return { ok: false, error: 'not_signed_in' };
   try {
