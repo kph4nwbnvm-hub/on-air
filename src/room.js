@@ -1,8 +1,13 @@
 // Studio customisation: equipped furniture / decor cards appear as objects in the studio, set cards repaint the walls.
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { woodTex, fabricTex, isWood } from './tex.js';
 
-const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: o.rough ?? 0.7, metalness: o.metal ?? 0.05, emissive: o.emissive ?? 0x000000, emissiveIntensity: o.ei ?? 1 });
-const box = (g, w, h, d, c, x, y, z, o) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), M(c, o)); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
+// wood-coloured parts get wood grain, soft non-emissive parts get a fabric weave; everything has slightly rounded edges
+const M = (c, o = {}) => { const glow = !!o.emissive, metal = (o.metal ?? 0) > 0.4, wood = isWood(c);
+  return new THREE.MeshStandardMaterial({ color: wood ? new THREE.Color(c).multiplyScalar(1.5) : c, map: glow || metal ? null : wood ? woodTex() : fabricTex(), roughness: o.rough ?? (wood ? 0.6 : 0.85), metalness: o.metal ?? 0.02, emissive: o.emissive ?? 0x000000, emissiveIntensity: o.ei ?? 1 }); };
+const rbox = (w, h, d) => { const r = Math.min(0.035, Math.min(w, h, d) * 0.22); return r < 0.006 ? new THREE.BoxGeometry(w, h, d) : new RoundedBoxGeometry(w, h, d, 2, r); };
+const box = (g, w, h, d, c, x, y, z, o) => { const m = new THREE.Mesh(rbox(w, h, d), M(c, o)); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
 const cyl = (g, r1, r2, h, c, x, y, z, o) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, 20), M(c, o)); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
 const sph = (g, r, c, x, y, z, o) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r, 18, 14), M(c, o)); m.position.set(x, y, z); m.castShadow = true; g.add(m); return m; };
 // trim colour improves with the card level: wood → steel → gold → glowing
@@ -17,7 +22,8 @@ export const KIND = {
 export function buildProp(fam, lv) {
   const g = new THREE.Group(), T = trim(lv), t = T.c, to = T.o;
   switch (fam) {
-    case 'sofa': box(g, 1.7, 0.4, 0.75, 0x5a3a2a, 0, 0.3, 0); box(g, 1.7, 0.55, 0.2, 0x4a2e20, 0, 0.72, -0.28); box(g, 0.2, 0.5, 0.75, 0x4a2e20, -0.85, 0.5, 0); box(g, 0.2, 0.5, 0.75, 0x4a2e20, 0.85, 0.5, 0); box(g, 1.8, 0.08, 0.8, t, 0, 0.06, 0, to); break;
+    case 'sofa': box(g, 1.9, 0.28, 0.85, 0x4a2e20, 0, 0.26, 0); [-0.6, 0, 0.6].forEach((x) => { box(g, 0.58, 0.16, 0.7, 0x5a3a2a, x, 0.47, 0.04); box(g, 0.58, 0.5, 0.18, 0x5a3a2a, x, 0.78, -0.3); });
+      [-0.95, 0.95].forEach((x) => box(g, 0.18, 0.55, 0.85, 0x4a2e20, x, 0.48, 0)); [[-0.85, 0.35], [0.85, 0.35], [-0.85, -0.35], [0.85, -0.35]].forEach(([x, z]) => cyl(g, 0.03, 0.022, 0.13, t, x, 0.06, z, to)); break;
     case 'anchor': cyl(g, 0.28, 0.28, 0.08, t, 0, 0.05, 0, to); cyl(g, 0.04, 0.04, 0.4, 0x333333, 0, 0.28, 0); box(g, 0.55, 0.1, 0.55, 0x23233a, 0, 0.52, 0); box(g, 0.55, 0.75, 0.1, 0x23233a, 0, 0.92, -0.23); break;
     case 'desk': box(g, 1.8, 0.1, 0.8, t, 0, 0.92, 0, to); box(g, 1.7, 0.85, 0.1, 0x1f3a6b, 0, 0.45, 0.3); box(g, 0.1, 0.85, 0.7, 0x1f3a6b, -0.8, 0.45, 0); box(g, 0.1, 0.85, 0.7, 0x1f3a6b, 0.8, 0.45, 0); break;
     case 'meeting': cyl(g, 0.8, 0.8, 0.07, t, 0, 0.75, 0, to); cyl(g, 0.1, 0.25, 0.72, 0x333333, 0, 0.37, 0); [[-1.05, 0], [1.05, 0], [0, 1.05]].forEach(([x, z]) => { box(g, 0.4, 0.07, 0.4, 0x555a66, x, 0.45, z); box(g, 0.04, 0.45, 0.04, 0x333333, x, 0.22, z); }); break;

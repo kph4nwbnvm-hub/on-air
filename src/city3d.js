@@ -13,7 +13,8 @@ function fit(src, len) {
   const k = len / Math.max(s.x, 0.01); m.scale.setScalar(k); const c = new THREE.Vector3(); b.getCenter(c);
   m.position.set(-c.x * k, -b.min.y * k, -c.z * k);
   m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; const mt = o.material; if (mt) { mt.metalness = Math.min(mt.metalness ?? 0, 0.3); mt.roughness = Math.max(mt.roughness ?? 1, 0.45); } } });
-  const w = new THREE.Group(); w.add(m); return w;
+  // the models face -X; turn them so the front points +X like the game's cars
+  const w = new THREE.Group(); w.add(m); w.rotation.y = Math.PI; const o = new THREE.Group(); o.add(w); return o;
 }
 function apply(g, i, len) {
   if (!MODELS.length || g.userData.realCar) return;

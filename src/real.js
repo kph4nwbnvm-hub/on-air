@@ -100,6 +100,14 @@ function addGhutra(root, col) {
   const drape = new THREE.Mesh(new THREE.CylinderGeometry(0.126, 0.165, 0.26, 18, 1, true, Math.PI * 0.62, Math.PI * 0.76), clothM(col)); drape.position.set(0, -0.01, 0); g.add(drape);
   const agal = new THREE.Mesh(new THREE.TorusGeometry(0.105, 0.014, 6, 24), clothM(0x111111, 0.5)); agal.rotation.x = Math.PI / 2; agal.position.set(0, 0.16, -0.01); g.add(agal);
 }
+// modest head covering (shayla / hijab): fitted cap over the hair and a drape around the neck, open at the face
+function addShayla(root, col) {
+  const head = boneOf(root, /^head$/i); if (!head) return; const g = new THREE.Group(); head.add(g); const m = clothM(col, 0.9);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.122, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.6), m); cap.position.set(0, 0.105, -0.012); cap.scale.set(1.04, 1.05, 1.08); g.add(cap);
+  const side = new THREE.Mesh(new THREE.CylinderGeometry(0.124, 0.13, 0.17, 20, 1, true, Math.PI * 0.72, Math.PI * 1.56), m); side.position.set(0, 0.04, -0.012); g.add(side);
+  const drape = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.24, 0.3, 22, 1, true, Math.PI * 0.62, Math.PI * 1.76), m); drape.position.set(0, -0.15, -0.01); g.add(drape);
+  const chin = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.13, 0.12, 20, 1, true), m); chin.position.set(0, -0.06, 0.0); g.add(chin);
+}
 function addCap(root, col) {
   const head = boneOf(root, /^head$/i); if (!head) return;
   const c = new THREE.Mesh(new THREE.SphereGeometry(0.122, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), clothM(col, 0.7)); c.position.set(0, 0.1, 0); head.add(c);
@@ -131,15 +139,16 @@ function addPiece(root, kind, col) {
 function addStyle(root, st, col) { if (st.g) addHair(root, st.g, col); if (st.p) addPiece(root, st.p, col); }
 function lookOf(av) {
   const c = (i, d) => OPT.cloth[i ?? d] ?? 0xffffff; const dress = av.dress || '';
-  const thobe = dress === 'thobe' || dress === 'bisht', female = !!av.female && !!A.female;
-  return { skin: av.skin ?? 1, top: thobe ? 0xf4f2ec : c(av.topColor, 0), bottom: thobe ? 0xf4f2ec : c(av.bottomColor, 7), shoes: OPT.shoes[av.shoes ?? 0] ?? 0x222222,
-    female, sleeves: thobe || female || av.top !== 0 ? 1 : 0, legs: av.bottom === 1 && !thobe && !female ? 0 : 1, collar: thobe || av.top === 1 ? 1 : 0, thobe, bisht: dress === 'bisht' ? 0x3a2a1c : 0,
+  const thobe = dress === 'thobe' || dress === 'bisht', modest = dress === 'abaya' || dress === 'hijab', female = (!!av.female || modest) && !!A.female;
+  const abaya = dress === 'abaya' ? 0x141418 : 0;
+  return { skin: av.skin ?? 1, top: abaya || (thobe ? 0xf4f2ec : c(av.topColor, 0)), bottom: abaya || (thobe ? 0xf4f2ec : c(av.bottomColor, 7)), hijab: modest ? (abaya || (OPT.cloth[av.capColor ?? 7] ?? 0x23233a)) : null, shoes: OPT.shoes[av.shoes ?? 0] ?? 0x222222,
+    female, sleeves: thobe || female || av.top !== 0 ? 1 : 0, legs: av.bottom === 1 && !thobe && !female ? 0 : 1, collar: thobe || modest || av.top === 1 ? 1 : 0, thobe, bisht: dress === 'bisht' ? 0x3a2a1c : 0,
     hair: HAIR[av.hairStyle ?? 0], hairCol: OPT.hairColor[av.hairColor ?? 1] ?? 0x2a1c14, beard: av.beard ?? 0, cap: !!(av.acc && av.acc.cap), capCol: OPT.cloth[av.capColor ?? 1] ?? 0x2e7df6 };
 }
 function build(av) {
   const look = lookOf(av), root = SkeletonUtils.clone(look.female ? A.female : A.male);
   root.traverse((o) => { if (o.isSkinnedMesh) { o.frustumCulled = false; o.castShadow = true; if (o.userData.body) o.material = bodyMat(o.material, look); else if (!/eye/i.test(o.material.name) || /brow/i.test(o.name)) { o.material = o.material.clone(); o.material.color.set(look.hairCol).multiplyScalar(1.6); } } });
-  if (look.female) { addThobe(root, look.bottom, 0); addStyle(root, look.hair || {}, look.hairCol); }
+  if (look.female) { addThobe(root, look.bottom, 0); if (look.hijab !== null) addShayla(root, look.hijab); else addStyle(root, look.hair || {}, look.hairCol); }
   else if (look.thobe) { addThobe(root, look.top, look.bisht); addGhutra(root, 0xf7f7f2); } else { if (look.cap) addCap(root, look.capCol); else addStyle(root, look.hair || {}, look.hairCol); }
   if (look.beard && !look.female) addHair(root, 'hair_beard', look.hairCol, look.beard);
   const mixer = new THREE.AnimationMixer(root), acts = {};
@@ -183,13 +192,26 @@ export function realTick(dt, camera) {
     const o = c.ropts || {}; let want = o.anim || 'Idle_Loop';
     if (!o.anim) { if (c.speed > 3) want = 'Jog_Fwd_Loop'; else if (c.speed > 0.5) want = 'Walk_Loop'; }
     play(c, want); c.real.mixer.update(i < 4 ? dt : dt * (Math.random() < 0.5 ? 2 : 0)); // far ones update every other frame
-    if (!/Sitting/.test(want)) armsIn(c.real); if (c.real.seat === undefined) c.real.seat = /Sitting/.test(want) ? SEAT_UP : 0; c.real.root.position.y = c.real.seat;
+    if (!/Sitting/.test(want)) { armsIn(c.real); c.real.root.position.y = 0; c.real.root.position.z = 0; } else chairSit(c.real, o.seatY ?? 0.66);
     c.real.root.traverse((x) => { if (x.userData.fixUp) { x.parent.getWorldQuaternion(fq); c.g.getWorldQuaternion(gq); x.quaternion.copy(fq.invert()).multiply(gq); } });
   });
 }
 const fq = new THREE.Quaternion(), gq = new THREE.Quaternion();
 // the base body has very wide shoulders, so the stock idle and walk hold the arms away from the body; bring them in a little
-const SEAT_UP = 0.36, ARM_IN = 0.2, aq = new THREE.Quaternion(), pq = new THREE.Quaternion(), fwd = new THREE.Vector3();
+const ARM_IN = 0.2, aq = new THREE.Quaternion(), pq = new THREE.Quaternion(), fwd = new THREE.Vector3();
+// chair sitting: the stock clip folds the legs under the body, so the legs are posed here (thighs level, shins down)
+// and the body is lifted until the hips rest on the seat
+const v1 = new THREE.Vector3(), v2 = new THREE.Vector3(), dir = new THREE.Vector3(), tgt = new THREE.Vector3(), qw = new THREE.Quaternion(), qb = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+function aim(bone, child, target) {
+  bone.getWorldPosition(v1); child.getWorldPosition(v2); dir.subVectors(v2, v1).normalize(); qw.setFromUnitVectors(dir, target);
+  bone.getWorldQuaternion(qb); bone.parent.getWorldQuaternion(pq); bone.quaternion.copy(pq.invert().multiply(qw.multiply(qb))); bone.updateMatrixWorld(true);
+}
+function chairSit(r, seatY) {
+  if (!r.legs) { const b = {}; r.root.traverse((o) => { if (o.isBone) b[o.name] = o; }); r.legs = ['l', 'r'].map((k) => [b['thigh_' + k], b['calf_' + k], b['foot_' + k]]).filter((l) => l.every(Boolean)); r.pelvis = b.pelvis; }
+  r.root.updateMatrixWorld(true); r.root.getWorldQuaternion(gq); fwd.set(0, 0, 1).applyQuaternion(gq); fwd.y = 0; fwd.normalize();
+  r.legs.forEach(([th, ca, ft]) => { tgt.copy(fwd).addScaledVector(up, -0.12).normalize(); aim(th, ca, tgt); tgt.copy(up).negate().addScaledVector(fwd, 0.12).normalize(); aim(ca, ft, tgt); });
+  if (r.pelvis) { r.pelvis.getWorldPosition(v1); const sc = r.root.parent ? r.root.parent.getWorldScale(v2).y : 1; r.root.position.y += (seatY - v1.y) / Math.max(sc, 0.01); r.root.position.z = 0.24; }
+}
 function armsIn(r) {
   if (!r.arms) { r.arms = []; r.root.traverse((o) => { if (o.isBone && /^upperarm_[lr]$/i.test(o.name)) r.arms.push([o, /_l$/i.test(o.name) ? 1 : -1]); }); }
   r.root.getWorldQuaternion(gq); fwd.set(0, 0, 1).applyQuaternion(gq);
