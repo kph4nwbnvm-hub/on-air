@@ -7,6 +7,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { LANGS, STR } from './i18n.js';
 import { piSignIn, PiState } from './pi.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
+import { register, loadReal, realTick, setRealEnabled, setRealBudget, realDebug } from './real.js';
+const mk = (av, o) => register(makeChar(av), av, o);
 import { makeShop, wornIds, price, reqLevel, PACKS, roundXp, xpFor, MAX_LEVEL, isExclusive, EXCLUSIVE } from './shop.js';
 import { makeStore, TOKEN } from './store.js';
 import { tokenPrice } from './pricing.js';
@@ -34,11 +36,11 @@ let lang = store.get('lang', null) || detectLang();
 let soundOn = store.get('sound', true);
 const IS_MOBILE = /iPhone|iPad|iPod|Android|Mobile|PiBrowser/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
 // phones default to the light pipeline; a previous GPU crash forces it
-const cfg = { voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
+const cfg = { real: store.get('real', true), voice: store.get('voice', true), vibe: store.get('vibe', true), quality: store.get('gpu_lost', false) ? 'low' : store.get('quality', IS_MOBILE ? 'low' : 'high') };
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.7.7';
+const VERSION = '1.8.0';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -196,7 +198,7 @@ const COLL = { studio: [], street: [], event: [] }; const RECTS = { studio: [], 
 const IT = []; // interactables
 function interact(zone, x, z, r, key, icon, cond, run) { const ringM = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.58, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35, side: THREE.DoubleSide })); ringM.rotation.x = -Math.PI / 2; ringM.position.set(x, 0.035, z); ZG[zone].add(ringM); const it = { zone, x, z, r, key, icon, cond, run, ring: ringM }; IT.push(it); return it; }
 const NPCS = [];
-function npc(zone, x, z, face, av, name, lines) { const ch = makeChar(uni(av)); ch.g.position.set(x, 0, z); ch.g.rotation.y = face; ZG[zone].add(ch.g); COLL[zone].push([x, z, 0.4]); const n = { ch, x, z, face, name, lines, i: 0, zone }; NPCS.push(n); return n; }
+function npc(zone, x, z, face, av, name, lines) { const ch = mk(uni(av)); ch.g.position.set(x, 0, z); ch.g.rotation.y = face; ZG[zone].add(ch.g); COLL[zone].push([x, z, 0.4]); const n = { ch, x, z, face, name, lines, i: 0, zone }; NPCS.push(n); return n; }
 
 // decor that appears as the studio grows: [minLevel, firstChild, endChild) of the studio group
 const STAGE_R = [];
@@ -273,7 +275,7 @@ const chairGuest = armchair(0xd98a2b); chairGuest.position.set(IV.x + 0.95, 0, I
 put(cyl(0.34, 0.34, 0.04, 0xf6efe2), IV.x, 0.62, IV.z + 0.35).castShadow = true; put(cyl(0.04, 0.04, 0.6, 0x222222), IV.x, 0.3, IV.z + 0.35); put(cyl(0.2, 0.22, 0.03, 0x222222), IV.x, 0.02, IV.z + 0.35);
 { const b = ADS.bottle('elva', 0.36); b.position.set(IV.x - 0.12, 0.64, IV.z + 0.33); b.rotation.y = -Math.PI / 2; cur.add(b); } put(cyl(0.05, 0.04, 0.12, 0xffffff), IV.x + 0.12, 0.7, IV.z + 0.4);
 const GUEST_AV = { skin: 3, hairStyle: 1, hairColor: 0, beard: 1 };
-const guest = makeChar(uni(GUEST_AV));
+const guest = mk(uni(GUEST_AV), { anim: 'Sitting_Idle_Loop' });
 sit(guest); guest.g.position.set(IV.x + 0.95, -0.14, IV.z - 0.05); guest.g.rotation.y = -0.45; cur.add(guest.g);
 put(sph(0.16, 0xffffff), IV.x + 1.75, 0.16, IV.z + 0.5).castShadow = true; plant(IV.x + 2.0, IV.z - 1.3); plant(DESK.x - 2.4, DESK.z - 1.2);
 // storage corner (camera 3)
@@ -282,7 +284,7 @@ for (let i = 0; i < 3; i++) put(box(1.6, 0.06, 0.54, 0x5a4028), 6.2, 0.55 + i * 
 put(box(0.5, 0.4, 0.4, 0xd9a05b), 5.8, 0.8, -3.5); put(box(0.4, 0.5, 0.4, 0x4fb3d9), 6.6, 1.55, -3.5); put(box(0.6, 0.3, 0.4, 0xff4d6d), 6.3, 2.15, -3.5);
 put(box(0.9, 0.7, 0.7, 0xc98f4e), 6.5, 0.35, -2.4).castShadow = true; put(box(0.7, 0.5, 0.6, 0xb57f42), 6.5, 0.95, -2.4).castShadow = true;
 const CREW_AV = { skin: 0, hairStyle: 0, hairColor: 2 };
-const crew = makeChar(uni({ skin: 0, hairStyle: 0, hairColor: 2, top: 0, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, capColor: 1, acc: { cap: true } }));
+const crew = mk(uni({ skin: 0, hairStyle: 0, hairColor: 2, top: 0, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, capColor: 1, acc: { cap: true } }), { anim: 'Idle_TalkingPhone_Loop' });
 crew.g.position.set(5.5, 0, -2.9); cur.add(crew.g);
 const SHOTS = [{ p: [DESK.x + 0.25, 1.62, 1.7], l: [DESK.x + 0.3, 1.2, DESK.z] }, { p: [IV.x, 1.5, 1.6], l: [IV.x, 1.05, IV.z] }, { p: [4.6, 1.62, 0.3], l: [6.1, 1.0, -3.2] }];
 const tripods = SHOTS.map((s, i) => { const tp = SFX.broadcastCam(i + 1, SFX.lab(i + 1)); tp.g.position.set(s.p[0], 0, s.p[2] + 0.55); tp.g.rotation.y = Math.atan2(-(s.l[0] - s.p[0]), -(s.l[2] - s.p[2])); cur.add(tp.g); return tp; });
@@ -437,7 +439,7 @@ const traffic = [];
   g.position.set(SX + x0, 0, z); g.rotation.y = dir > 0 ? 0 : Math.PI; cur.add(g); traffic.push({ g, dir, v: 6 }); });
 function trafficTick(dt) { traffic.forEach((c) => { const p = c.g.position, ahead = (G.px - p.x) * c.dir, near = Math.abs(G.pz - p.z) < 1.7 && ahead > -1.8 && ahead < 5.5; c.v += ((near ? 0 : 6) - c.v) * Math.min(1, dt * 4); p.x += c.dir * c.v * dt; if (p.x > SX + 56) p.x = SX - 56; if (p.x < SX - 56) p.x = SX + 56; c.g.visible = Math.abs(p.x - G.px) < 48; }); }
 // police officer for the chase (filming without a StudioLab licence)
-const cop = makeChar({ skin: 2, hairStyle: 0, hairColor: 0, beard: 1, top: 0, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, capColor: 4, acc: { cap: true } });
+const cop = mk({ skin: 2, hairStyle: 0, hairColor: 0, beard: 1, top: 0, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, capColor: 4, acc: { cap: true } });
 const copLamp = put(sph(0.13, 0xff2a40, { emissive: 0xff2a40, emissiveIntensity: 2 }), 0, 2.05, 0, cop.g); cop.g.visible = false; cur.add(cop.g);
 
 // bake the static street scenery into two meshes (lit + glowing) so the big district costs a handful of draw calls
@@ -471,7 +473,7 @@ put(box(0.2, 1.0, 3.4, 0x30303a), EX + 6.9, 0.5, 0); const mediaSign = put(signP
 // crowd
 const crowd = [];
 [-9, -4, 1].forEach((dx, i) => [-3.2, 3.2].forEach((z, j) => { const ch = makeChar({ skin: (i * 2 + j) % 6, hairStyle: (i + j * 3) % 6, hairColor: (i * 3 + j) % 6, top: (i + j) % 3, topColor: (i * 2 + j * 5 + 1) % 10, bottom: j, bottomColor: (i + 7) % 10, shoes: i % 5, acc: { glasses: i === 1, cap: i === 2 && j === 0 } }); ch.g.position.set(EX + dx + j * 1.2, 0, z); ch.g.rotation.y = z > 0 ? Math.PI : 0; cur.add(ch.g); crowd.push(ch); }));
-const starS = npc('event', EX - 5, -0.5, -Math.PI / 2, { skin: 1, hairStyle: 4, hairColor: 6, top: 2, topColor: 8, bottom: 0, bottomColor: 5, shoes: 3, acc: { earring: true, chain: true } }, 'star_s', []);
+const starS = npc('event', EX - 5, -0.5, -Math.PI / 2, { female: true, skin: 1, hairStyle: 4, hairColor: 6, top: 2, topColor: 8, bottom: 0, bottomColor: 5, shoes: 3, acc: { earring: true, chain: true } }, 'star_s', []);
 const starT = npc('event', EX + 1.5, 0.5, -Math.PI / 2, { skin: 3, hairStyle: 0, hairColor: 0, beard: 2, top: 2, topColor: 7, bottom: 0, bottomColor: 7, shoes: 1, acc: { glasses: true, watch: true } }, 'star_t', []);
 npc('event', EX + 6.0, 1.3, -Math.PI / 2, { skin: 4, hairStyle: 1, hairColor: 0, beard: 1, top: 2, topColor: 7, bottom: 0, bottomColor: 7, shoes: 1, acc: { glasses: true } }, 'n_guard', ['n_guard1', 'n_guard2']);
 STAR_SETUP();
@@ -481,7 +483,7 @@ function STAR_SETUP() { starS.set = [0, 1, 2].map((i) => ({ q: 'qs' + i, a: 'as'
 // the player's own clothes stay plain until the studio reaches level 2
 // outfit cards map to looks the character model can show (colours and cut; not full 3D costumes yet)
 const OUTFIT = {
-  thobe: { top: 2, topColor: 6, bottom: 0, bottomColor: 6, shoes: 1 }, bisht: { top: 2, topColor: 10, bottom: 0, bottomColor: 6, shoes: 5 }, tux: { top: 2, topColor: 7, bottom: 0, bottomColor: 7, shoes: 1 },
+  thobe: { top: 2, topColor: 6, bottom: 0, bottomColor: 6, shoes: 1, dress: 'thobe' }, bisht: { top: 2, topColor: 10, bottom: 0, bottomColor: 6, shoes: 5, dress: 'bisht' }, tux: { top: 2, topColor: 7, bottom: 0, bottomColor: 7, shoes: 1 },
   astro: { top: 1, topColor: 6, bottom: 0, bottomColor: 11, shoes: 0 }, chef: { top: 0, topColor: 6, bottom: 0, bottomColor: 7, shoes: 0, acc: { cap: true }, capColor: 6 }, pilot: { top: 2, topColor: 0, bottom: 0, bottomColor: 7, shoes: 1, acc: { cap: true }, capColor: 7 },
   sport: { top: 0, topColor: 2, bottom: 1, bottomColor: 6, shoes: 3 }, ninja: { top: 1, topColor: 7, bottom: 0, bottomColor: 7, shoes: 1 }, detective: { top: 2, topColor: 4, bottom: 0, bottomColor: 7, shoes: 1, acc: { glasses: true } },
   wizard: { top: 1, topColor: 5, bottom: 0, bottomColor: 5, shoes: 5 }, cowboy: { top: 2, topColor: 4, bottom: 0, bottomColor: 0, shoes: 2, acc: { cap: true }, capColor: 4 }, diver: { top: 0, topColor: 9, bottom: 1, bottomColor: 9, shoes: 4 },
@@ -490,8 +492,8 @@ const OUTFIT = {
 const wear = (av, fam) => (fam && OUTFIT[fam] ? { ...av, ...OUTFIT[fam], acc: { ...(OUTFIT[fam].acc || {}) } } : uni(av));
 // the player wears the equipped outfit card; otherwise plain clothes until level 2
 const look = () => { const f = cs.equippedFam('skins'); return f && OUTFIT[f] ? wear(avatar, f) : shop.level < 2 ? uni(avatar) : avatar; };
-let player = makeChar(shop.level < 2 ? uni(avatar) : avatar); scene.add(player.g);
-function rebuildPlayer() { const pos = player.g.position.clone(), ry = player.g.rotation.y; scene.remove(player.g); player = makeChar(look()); player.g.position.copy(pos); player.g.rotation.y = ry; scene.add(player.g); }
+let player = mk(shop.level < 2 ? uni(avatar) : avatar); scene.add(player.g);
+function rebuildPlayer() { const pos = player.g.position.clone(), ry = player.g.rotation.y; scene.remove(player.g); player = mk(look()); player.g.position.copy(pos); player.g.rotation.y = ry; scene.add(player.g); }
 const amb = new THREE.HemisphereLight(0xdfe6ff, 0x3a3060, 0.9); scene.add(amb);
 const stageA = new THREE.PointLight(0xa463ff, 6, 12, 1.6); stageA.position.set(-5.5, 3.2, -2.5); scene.add(stageA);
 const stageB = new THREE.PointLight(0x3ad4ff, 6, 12, 1.6); stageB.position.set(5.5, 3.2, -2.5); scene.add(stageB);
@@ -787,9 +789,9 @@ function sheet(x, z, w, h, d) { const m = new THREE.Mesh(new THREE.BoxGeometry(w
 [[-3.6, 1.4], [1.3, 2.6], [3.9, 0.9], [-0.9, -0.6], [5.0, -0.9], [-5.0, -0.2]].forEach(([x, z]) => DUST.push({ m: dustPile(x, z), x, z, done: false }));
 [[DESK.x, DESK.z + 0.9, 3.5, 1.5, 1.6], [CON.x, CON.z + 0.4, 1.8, 1.5, 1.3], [IV.x, IV.z + 0.1, 3.3, 1.15, 1.6]].forEach(([x, z, w, h, d]) => DUST.push({ m: sheet(x, z, w, h, d), x, z: z + d / 2 + 0.3, done: false }));
 let storyOn = false, cleaning = false, SI = -1, afterCreator = false;
-const salehAv = { skin: 2, hairStyle: 1, hairColor: 5, beard: 1, top: 2, topColor: 4, bottom: 0, bottomColor: 3, shoes: 1 };
-const salehSt = makeChar(uni(salehAv)); salehSt.g.visible = false; ZG.street.add(salehSt.g);
-const salehIn = makeChar(uni(salehAv)); salehIn.g.visible = false; ZG.studio.add(salehIn.g);
+const salehAv = { skin: 2, hairStyle: 1, hairColor: 5, beard: 1, top: 2, topColor: 6, bottom: 0, bottomColor: 6, shoes: 1, dress: 'thobe' };
+const salehSt = mk(uni(salehAv)); salehSt.g.visible = false; ZG.street.add(salehSt.g);
+const salehIn = mk(uni(salehAv)); salehIn.g.visible = false; ZG.studio.add(salehIn.g);
 DUST.forEach((d) => interact('studio', d.x, d.z, 1.05, 'a_clean', '🧹', () => cleaning && !d.done, () => cleanOne(d)));
 function ruinGear(on) { tripods.forEach((tp) => { tp.g.visible = !on; }); beams.forEach((b) => { if (b && b.isObject3D) b.visible = !on; }); }
 function cleanOne(d) { d.done = true; d.m.visible = false; sfx.fix(); const left = DUST.filter((x) => !x.done).length; if (left) say('🧹 ' + left, '', true); else { cleaning = false; ruin.visible = false; ruinGear(false); applyRoom(); G.light = true; syncScene(); sfx.win(); storyNext(); } }
@@ -1047,11 +1049,11 @@ function applyLocks() { Object.entries(UNLOCK).forEach(([id, ok]) => { $(id).cla
 setInterval(() => { const k = objKey(), el = $('objBar'); const on = !!k && !G.on && !storyOn && !ivOn && !$('hud').hidden && $('pc').hidden && $('story').hidden; el.hidden = !on; if (on) el.textContent = '🎯 ' + t(k); if (!$('menu').hidden) applyLocks(); $('hudStore').classList.toggle('locked', !UNLOCK.bStore()); $('hudStore').hidden = storyOn || ivOn; }, 500);
 
 // ───────── wardrobe: one studio outfit for the whole crew, or a different outfit per person ─────────
-const STAFF = { crew: { ch: crew, av: CREW_AV, post: null }, guest: { ch: guest, av: GUEST_AV, post: (c) => sit(c) } };
+const STAFF = { crew: { ch: crew, av: CREW_AV, post: null, ropts: { anim: 'Idle_TalkingPhone_Loop' } }, guest: { ch: guest, av: GUEST_AV, post: (c) => sit(c), ropts: { anim: 'Sitting_Idle_Loop' } } };
 const looks = store.get('looks', { all: null, crew: null, guest: null });
 function restyle(key) {
-  const st = STAFF[key], fam = looks[key] || looks.all; const n = makeChar(wear(st.av, cs.ownedFams('skins').includes(fam) ? fam : null)); if (st.post) st.post(n);
-  const o = st.ch.g, par = o.parent; n.g.position.copy(o.position); n.g.rotation.copy(o.rotation); n.g.scale.copy(o.scale); n.g.visible = o.visible; par.remove(o); par.add(n.g); Object.assign(st.ch, n);
+  const st = STAFF[key], fam = looks[key] || looks.all; const nav = wear(st.av, cs.ownedFams('skins').includes(fam) ? fam : null), n = makeChar(nav); if (st.post) st.post(n);
+  const o = st.ch.g, par = o.parent; n.g.position.copy(o.position); n.g.rotation.copy(o.rotation); n.g.scale.copy(o.scale); n.g.visible = o.visible; par.remove(o); par.add(n.g); Object.assign(st.ch, n); register(st.ch, nav, st.ropts);
 }
 let drKey = 'crew';
 function drBuild() {
@@ -1128,6 +1130,7 @@ function buildSettings() {
   row('🗣️', t('s_voice'), t(cfg.voice ? 'on' : 'off'), () => { cfg.voice = !cfg.voice; store.set('voice', cfg.voice); if (!cfg.voice && window.speechSynthesis) speechSynthesis.cancel(); });
   row('📳', t('s_vibe'), t(cfg.vibe ? 'on' : 'off'), () => { cfg.vibe = !cfg.vibe; store.set('vibe', cfg.vibe); buzz(80); });
   { const b = document.createElement('button'); b.className = 'srow'; b.innerHTML = '<span></span><span></span>'; b.children[0].textContent = '☁️ ' + t('sv_cloud'); b.children[1].textContent = '🔒 Coming Soon'; b.onclick = soonNote; rows.appendChild(b); }
+  row('🧍', t('s_real'), t(cfg.real ? 'on' : 'off'), () => { cfg.real = !cfg.real; store.set('real', cfg.real); setRealEnabled(cfg.real); if (cfg.real) loadReal(); });
   row('🖥️', t('s_quality'), t(cfg.quality === 'low' ? 'q_low' : 'q_high'), () => { cfg.quality = cfg.quality === 'low' ? 'high' : 'low'; store.set('quality', cfg.quality); renderer.setPixelRatio(pixelRatio()); setupFX(); resize(); });
   $('setVer').textContent = t('s_version') + ' ' + VERSION; const r = $('bReset'); r.classList.remove('armed'); r.textContent = t('s_reset');
 }
@@ -1204,16 +1207,18 @@ function perfTick(now) {
   perf.fps = (perf.n * 1000) / span; perf.n = 0; perf.t0 = now;
   if (perf.el) { const i = renderer.info.render; perf.el.textContent = Math.round(perf.fps) + ' fps · ' + i.calls + ' dc · ' + Math.round(i.triangles / 1000) + 'k tri · ' + cfg.quality; }
   if (document.hidden || perf.done) return; perf.low = perf.fps < 28 ? perf.low + 1 : 0;
-  if (perf.low >= 3) { perf.done = true; perf.low = 0; if (cfg.quality !== 'low') { cfg.quality = 'low'; store.set('quality', 'low'); renderer.setPixelRatio(pixelRatio()); try { setupFX(); } catch (_) {} } else renderer.setPixelRatio(Math.max(0.75, renderer.getPixelRatio() * 0.8)); try { gToast('⚡ ' + t('perf_lite')); } catch (_) {} }
+  if (perf.low >= 3) { perf.done = true; perf.low = 0; setRealBudget(4, 14); if (cfg.quality !== 'low') { cfg.quality = 'low'; store.set('quality', 'low'); renderer.setPixelRatio(pixelRatio()); try { setupFX(); } catch (_) {} } else renderer.setPixelRatio(Math.max(0.75, renderer.getPixelRatio() * 0.8)); try { gToast('⚡ ' + t('perf_lite')); } catch (_) {} }
 }
+let realT = 0;
 function frame(now) {
   try { perfTick(now); } catch (_) {}
+  try { const d = Math.min(0.05, (now - (realT || now)) / 1000); realT = now; if (cfg.real) realTick(d, cam); } catch (e) { console.warn(e); }
   try { frameBody(now); } catch (e) { if (errShown++ < 3) { console.error(e); showDiag('ERR ' + (e && e.message ? e.message : e)); } }
   requestAnimationFrame(frame);
 }
 
 // hook for automated checks only
-window.__onair = { R: renderer, openPanel, sign, chase, startChase, cop, applyRoom, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
+window.__onair = { realDebug, R: renderer, openPanel, sign, chase, startChase, cop, applyRoom, dr: { open: drOpen, looks }, crewRef: crew, pc: { S: pcS, open: pcOpen }, cs, iv: { start: (i) => startInterview(NPCS.filter((n) => n.zone === 'street' && !n.star)[i]), pos: () => ivPos, zone: () => ivZoneW }, story: { DUST, clean: (i) => cleanOne(DUST[i]), step: () => SI }, PiState, G, IT, NPCS, act, startRound, endRound, firePrank, enterZone, mess, go: (x, z) => { G.px = x; G.pz = z; }, skip: (s) => { G.time += s; G.good += s; } };
 
 scene.traverse((o) => { if (!o.isMesh || !o.material) return; const m = o.material; if (m.isMeshBasicMaterial) m.toneMapped = false; if (m.isMeshStandardMaterial && m.emissive && m.emissive.getHex() !== 0) m.emissiveIntensity *= 3.5; });
 Object.keys(UNLOCK).forEach((id) => { const run = $(id).onclick; $(id).onclick = (e) => { if (!UNLOCK[id]()) { sfx.bad(); gToast(t('locked_hint')); return; } run(e); }; });
@@ -1222,3 +1227,5 @@ setupFX(); applyLang(); syncScene(); show('menu'); resize();
 if (!store.get('story_done', false)) setTimeout(() => { afterCreator = true; G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }, 400);
 showDiag(IS_MOBILE ? 'mobile · ' + cfg.quality : cfg.quality); setTimeout(() => { const d = document.getElementById('diag'); if (d && !errShown) d.remove(); }, 6000);
 requestAnimationFrame(frame);
+// realistic characters load after the game is up, so the first screen never waits for them
+if (cfg.real) setTimeout(() => { if (IS_MOBILE) setRealBudget(6, 18); loadReal(); }, 1200);
