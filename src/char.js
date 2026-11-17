@@ -96,6 +96,7 @@ export function makeChar(a) {
   if (a.acc.headphones) { const b = at(tor(0.275, 0.025, 0x222222, Math.PI), 0, 0.02, 0, head); at(cyl(0.08, 0.08, 0.06, 0xd9342b), -0.27, 0, 0, head).rotation.z = Math.PI / 2; at(cyl(0.08, 0.08, 0.06, 0xd9342b), 0.27, 0, 0, head).rotation.z = Math.PI / 2; b.rotation.y = 0; }
   if (a.acc.earring) at(sph(0.03, 0xffcf3f), -0.265, -0.07, 0.02, head);
   g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+  g.userData.isChar = true;
   return { g, ...p };
 }
 export function sit(ch) { ch.legL.rotation.x = ch.legR.rotation.x = -1.45; ch.armL.rotation.x = ch.armR.rotation.x = -0.5; }

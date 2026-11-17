@@ -230,9 +230,18 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
 #iv{position:fixed;inset:auto 0 0 0;z-index:44;display:flex;justify-content:center;padding:14px}
 .ivbox{width:min(560px,100%);background:rgba(12,8,30,.94);border:1px solid rgba(127,233,255,.55);border-radius:20px;padding:14px 16px}
 #ivHint{margin:0 0 8px;font-size:14px;opacity:.85;text-align:center}
-#ivTrack{position:relative;height:54px;border-radius:14px;background:rgba(255,255,255,.08);overflow:hidden;direction:ltr}
-#ivZone{position:absolute;top:0;bottom:0;left:50%;transform:translateX(-50%);border:3px solid #3ddc97;border-radius:12px;background:rgba(61,220,151,.14)}
-#ivDot{position:absolute;top:50%;font-size:30px;transform:translate(-50%,-50%);left:50%}
+#ivTrack{position:relative;height:96px;border-radius:10px;background:radial-gradient(ellipse at 50% 55%,rgba(60,70,110,.55),rgba(5,5,14,.95) 75%);overflow:hidden;direction:ltr;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+#ivTrack .vf{position:absolute;width:16px;height:16px;border:2px solid rgba(255,255,255,.85)}
+#ivTrack .vf.a{top:7px;left:7px;border-right:0;border-bottom:0}#ivTrack .vf.b{top:7px;right:7px;border-left:0;border-bottom:0}#ivTrack .vf.c{bottom:7px;left:7px;border-right:0;border-top:0}#ivTrack .vf.d{bottom:7px;right:7px;border-left:0;border-top:0}
+#ivTrack .rec{position:absolute;top:7px;left:30px;font:700 11px/1 ui-monospace,monospace;color:#fff;letter-spacing:.05em}#ivTrack .rec::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff3b4e;margin-inline-end:5px;animation:recb 1s steps(2) infinite}
+@keyframes recb{50%{opacity:.15}}
+#ivTrack .bat{position:absolute;top:7px;right:30px;font:700 11px/1 ui-monospace,monospace;color:#fff}
+#ivTrack .grid{position:absolute;inset:0;background:linear-gradient(90deg,transparent 33.2%,rgba(255,255,255,.12) 33.3%,transparent 33.5%,transparent 66.5%,rgba(255,255,255,.12) 66.6%,transparent 66.8%)}
+#ivZone{position:absolute;top:22px;bottom:14px;left:50%;transform:translateX(-50%);border:2px solid #ffcf3f;border-radius:6px;background:rgba(255,207,63,.06);transition:border-color .12s,background .12s}#ivZone.in{border-color:#3ddc97;background:rgba(61,220,151,.16)}
+#ivZone::before,#ivZone::after{content:"";position:absolute;left:50%;top:50%;background:#3ddc97;transform:translate(-50%,-50%)}#ivZone::before{width:14px;height:2px}#ivZone::after{width:2px;height:14px}
+#ivDot{position:absolute;top:56%;left:50%;width:30px;height:42px;transform:translate(-50%,-50%);font-size:0}
+#ivDot::before{content:"";position:absolute;left:50%;top:0;width:16px;height:16px;border-radius:50%;background:#f0c8a0;transform:translateX(-50%);box-shadow:0 0 0 2px rgba(0,0,0,.25)}
+#ivDot::after{content:"";position:absolute;left:50%;bottom:0;width:28px;height:24px;border-radius:14px 14px 4px 4px;background:#2e7df6;transform:translateX(-50%)}
 #ivQ{min-height:48px;margin:10px 0;font-size:16px;line-height:1.5;text-align:start}
 .ivrow{display:flex;align-items:center;gap:10px}.ivrow span{flex:1;font-size:13px;opacity:.85}.ivrow button{flex:0 0 96px;margin:0;font-size:26px}
 #pc{position:fixed;inset:0;z-index:43;display:flex;align-items:center;justify-content:center;padding:14px;background:rgba(5,3,14,.6)}
@@ -394,7 +403,7 @@ button.soon{opacity:.85}button.soon::after{content:" 🔒";font-size:.8em}
     <button id="drStore" class="ghost"></button></div>
 </section>
 <section id="iv" hidden>
-  <div class="ivbox"><p id="ivHint"></p><div id="ivTrack"><div id="ivZone"></div><div id="ivDot">🙂</div></div>
+  <div class="ivbox"><p id="ivHint"></p><div id="ivTrack"><div class="grid"></div><i class="vf a"></i><i class="vf b"></i><i class="vf c"></i><i class="vf d"></i><span class="rec">REC</span><span class="bat">4K · 60</span><div id="ivZone"></div><div id="ivDot"></div></div>
     <p id="ivQ"></p><div class="ivrow"><span id="ivStat"></span><button id="ivGo" class="big">🎤</button></div></div>
 </section>
 <section id="story" hidden>

@@ -48,7 +48,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.10.3';
+const VERSION = '1.10.4';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -575,6 +575,17 @@ key.shadow.mapSize.set(IS_MOBILE ? 1024 : 2048, IS_MOBILE ? 1024 : 2048); key.sh
 const rim = new THREE.DirectionalLight(0x9db4ff, 0.7); rim.position.set(-5, 6, -2); scene.add(rim);
 const sun = new THREE.DirectionalLight(0xffffff, 0); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024); sun.shadow.bias = -0.002;
 Object.assign(sun.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, near: 1, far: 60 }); scene.add(sun); scene.add(sun.target);
+// shadow budget: small static props (knobs, buttons, cables, cups) stop casting shadows; characters always keep theirs
+const shadowSeen = new WeakSet(), _sv = new THREE.Vector3();
+function trimShadows() {
+  scene.traverse((o) => {
+    if (!o.isMesh || shadowSeen.has(o)) return; shadowSeen.add(o); if (o.isSkinnedMesh || !o.castShadow) return;
+    for (let a = o; a; a = a.parent) if (a.userData && a.userData.isChar) return;
+    const g = o.geometry; if (!g) return; if (!g.boundingSphere) g.computeBoundingSphere(); o.getWorldScale(_sv);
+    if (g.boundingSphere && g.boundingSphere.radius * Math.max(_sv.x, _sv.y, _sv.z) < 0.28) o.castShadow = false;
+  });
+}
+setInterval(trimShadows, 2000);
 // atmosphere: volumetric light beams and floating dust in the studio
 const beamTex = (() => { const cv = document.createElement('canvas'); cv.width = 4; cv.height = 128; const x = cv.getContext('2d'); const g = x.createLinearGradient(0, 0, 0, 128); g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 4, 128); const tx = new THREE.CanvasTexture(cv); return tx; })();
 const beams = [[-4.2, -1.8, 0xff4fa8], [-1.4, -2.4, 0x22d3ee], [1.4, -2.4, 0x34f59a], [4.2, -1.8, 0xa855f7]].map(([x, z, c]) => {
@@ -633,6 +644,8 @@ function syncScene() {
   scene.background = new THREE.Color(st && !G.light ? 0x07050f : Z.bg); scene.fog = new THREE.Fog(scene.background.getHex(), Z.fog[0], Z.fog[1]);
   key.intensity = st && G.light ? 150 : 0; rim.intensity = st ? (G.light ? 0.9 : 0.2) : 0; stageA.intensity = stageB.intensity = st ? (G.light ? 6 : 2.5) : 0; scene.environmentIntensity = st ? (G.light ? 0.45 : 0.12) : 0.6;
   amb.intensity = st ? (G.light ? 0.7 : 0.22) : G.zone === 'street' ? 1.2 : 0.75;
+  // a light that gives no light must not draw a shadow pass (it cost ~670 draw calls in the studio)
+  sun.castShadow = !st; key.castShadow = st;
   sun.intensity = st ? 0 : G.zone === 'street' ? 2.2 : 1.2; sun.color.set(G.zone === 'event' ? 0xc9b8ff : 0xffffff);
   sun.position.set(Z.ox + 8, 16, 9); sun.target.position.set(Z.ox, 0, 0);
   gold.visible = G.product; cleaner.visible = !G.product;
@@ -933,7 +946,7 @@ function openIv() {
   $('ivZone').style.width = (ivZoneW * 100) + '%'; $('ivHint').textContent = t('iv_keep'); $('ivQ').textContent = t('iq1'); ivStat(); $('iv').hidden = false;
 }
 function ivStat() { const mic = Math.max(1, gearLv('mic')); $('ivStat').textContent = t('iv_q') + ': ' + Math.round((ivHits / 3) * 100) + '%  ·  ' + t('iv_noise') + ': ' + Math.max(0, 70 - mic * 5) + '%'; }
-function ivTick(dt) { if ($('iv').hidden) return; ivT += dt * ivSpeed; ivPos = 0.5 + Math.sin(ivT) * 0.36 + Math.sin(ivT * 2.7) * 0.1; $('ivDot').style.left = (Math.min(0.97, Math.max(0.03, ivPos)) * 100) + '%'; }
+function ivTick(dt) { if ($('iv').hidden) return; ivT += dt * ivSpeed; ivPos = 0.5 + Math.sin(ivT) * 0.36 + Math.sin(ivT * 2.7) * 0.1; $('ivDot').style.left = (Math.min(0.97, Math.max(0.03, ivPos)) * 100) + '%'; $('ivZone').classList.toggle('in', Math.abs(ivPos - 0.5) < ivZoneW / 2); }
 $('ivGo').onclick = () => {
   if ($('iv').hidden) return; const hit = Math.abs(ivPos - 0.5) < ivZoneW / 2; if (hit) { ivHits++; sfx.good(); } else sfx.bad();
   ivStep++; $('ivQ').textContent = (hit ? '✅ ' : '📉 ') + t(ivNpc.name) + ': ' + t('ia' + ivStep); ivStat();
