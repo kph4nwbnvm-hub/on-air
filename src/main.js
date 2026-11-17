@@ -48,7 +48,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.10.1';
+const VERSION = '1.10.2';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -1073,7 +1073,7 @@ function labBuild() {
 // gym: paid fitness training, 5 stages, each makes the player 6% faster (handy against the police)
 function gymBuild() {
   $('pcTitle').textContent = '🏋️ ' + t('sh_gym'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = ''; const lv = fit.lv, row = document.createElement('div'); row.className = 'pcrow';
-  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p);
+  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p); const nt = document.createElement('p'); nt.className = 'pnote'; nt.textContent = t('px_gym'); L.appendChild(nt);
   row.innerHTML = '<span class="ic">🏃</span><span class="nm"><b></b><small></small></span>'; row.querySelector('b').textContent = '⚡ +' + lv * 6 + '%'; row.querySelector('small').textContent = '●'.repeat(lv) + '○'.repeat(5 - lv);
   const b = document.createElement('button'); if (lv >= 5) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { const cost = 150 * (lv + 1); b.className = G.coins >= cost ? 'big' : 'ghost'; b.disabled = G.coins < cost; b.textContent = '⬆ 🪙 ' + cost;
     b.onclick = () => { addCoins(-cost); fit.lv++; store.set('fit', fit.lv); ev('gym'); sfx.win(); gToast('🏃 ⚡ +' + fit.lv * 6 + '%'); gymBuild(); }; }
@@ -1082,7 +1082,7 @@ function gymBuild() {
 // café: one coffee = +5 trust at the start of the next broadcast (one cup at a time)
 function cafeBuild() {
   $('pcTitle').textContent = '☕ ' + t('sh_cafe'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = ''; const row = document.createElement('div'); row.className = 'pcrow';
-  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p);
+  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p); const nt = document.createElement('p'); nt.className = 'pnote'; nt.textContent = t('px_cafe'); L.appendChild(nt);
   row.innerHTML = '<span class="ic">☕</span><span class="nm"><b></b><small></small></span>'; row.querySelector('b').textContent = '🔴 📈 +5'; row.querySelector('small').textContent = cafe.on ? '●' : '○';
   const b = document.createElement('button'); if (cafe.on) { b.className = 'ghost'; b.textContent = '✅'; b.disabled = true; } else { b.className = G.coins >= 25 ? 'big' : 'ghost'; b.disabled = G.coins < 25; b.textContent = '🪙 25';
     b.onclick = () => { addCoins(-25); cafe.on = true; store.set('coffee', true); life.coffee(); ev('cafe'); sfx.good(); gToast('☕ 📈 +5 · ⚡ +20'); cafeBuild(); }; }
@@ -1092,7 +1092,7 @@ function cafeBuild() {
 const DESIGN_FEE = 1500;
 function designBuild() {
   $('pcTitle').textContent = '✂️ ' + t('sh_designer'); $('pcStore').hidden = true; const L = $('pcList'); L.innerHTML = '';
-  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p);
+  const p = document.createElement('p'); p.className = 'skpts'; p.textContent = '🪙 ' + G.coins; L.appendChild(p); const nt = document.createElement('p'); nt.className = 'pnote'; nt.textContent = t('px_designer'); L.appendChild(nt);
   if (!design.on) { const b = document.createElement('button'); b.className = G.coins >= DESIGN_FEE ? 'big pubpay' : 'ghost pubpay'; b.disabled = G.coins < DESIGN_FEE; b.textContent = '✂️ 👔 🪙 ' + DESIGN_FEE;
     b.onclick = () => { addCoins(-DESIGN_FEE); design.on = true; store.set('design', design); sfx.win(); designBuild(); }; L.appendChild(b); return; }
   [['👕', 'top', 'topColor'], ['👖', 'bot', 'bottomColor']].forEach(([ic, k, uk]) => { const row = document.createElement('div'); row.className = 'pcrow swrow'; const i = document.createElement('span'); i.className = 'ic'; i.textContent = ic; row.appendChild(i);
