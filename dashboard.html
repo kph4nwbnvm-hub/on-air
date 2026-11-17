@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>On Air Studio — لوحة التحليلات</title>
+<style>
+:root{--bg:#0f0b1f;--card:#1b1534;--line:rgba(255,255,255,.1);--txt:#f4f1ff;--mut:#b7aed6;--acc:#ffcf3f;--a2:#6f8cf2;--ok:#4cd18a}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;padding:16px}
+h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mut);font-size:13px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}.tile b{display:block;font-size:26px;font-variant-numeric:tabular-nums}.tile small{color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}.card h2{font-size:15px;margin:0 0 10px}
+.bar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px}.bar span{flex:0 0 110px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.bar i{display:block;height:12px;border-radius:6px;background:var(--a2)}.bar em{font-style:normal;font-variant-numeric:tabular-nums}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:6px;border-bottom:1px solid var(--line);text-align:start}th{color:var(--mut);font-weight:600}
+button{background:var(--acc);color:#231a00;border:0;border-radius:10px;padding:8px 14px;font:inherit;font-weight:700;cursor:pointer}
+.err{color:#ff8a8a}
+</style>
+</head>
+<body>
+<h1>📊 On Air Studio — لوحة التحليلات</h1>
+<div class="sub">أرقام مجهولة الهوية من خادم اللعبة (بدون أسماء ولا بيانات Pi). تتحدث تلقائياً كل دقيقة. <button id="r">تحديث</button> <span id="at"></span></div>
+<div class="grid" id="tiles"></div>
+<div class="card"><h2>اللغات</h2><div id="langs"></div></div>
+<div class="card"><h2>الأحداث آخر 14 يوم</h2><div id="ev"></div></div>
+<div class="card"><h2>الأحداث حسب اليوم</h2><table id="days"></table></div>
+<p class="sub" id="msg"></p>
+<script>
+const API = 'https://on-air-pi.games-fca.workers.dev/stats';
+const NAMES = { open: 'فتح اللعبة', move: 'أول حركة', street: 'خروج للشارع', talk: 'كلام مع شخص', interview: 'مقابلة', live: 'بدء بث', round: 'بث مكتمل', store: 'فتح المتجر', buy: 'شراء', equip: 'تركيب قطعة', pc: 'الكمبيوتر', publish: 'نشر مقطع', skill: 'مهارة', gym: 'جيم', cafe: 'قهوة', dress: 'الدولاب', life: 'حياتي', life_buy: 'شراء من محلات الحياة', sleep: 'نوم', friend: 'صداقة جديدة', daily: 'مكافأة يومية', profile: 'الملف الشخصي' };
+const $ = (id) => document.getElementById(id);
+const bars = (el, rows) => { const max = Math.max(1, ...rows.map((r) => r[1])); el.innerHTML = ''; rows.forEach(([k, v]) => { const d = document.createElement('div'); d.className = 'bar'; d.innerHTML = '<span></span><i></i><em></em>'; d.children[0].textContent = k; d.children[1].style.width = Math.max(2, (v / max) * 60) + '%'; d.children[2].textContent = v.toLocaleString('ar'); el.appendChild(d); }); };
+async function load() {
+  try {
+    const r = await fetch(API, { cache: 'no-store' }); const s = await r.json(); if (!s.ok) throw new Error(s.error || 'error');
+    const T = [['اللاعبين (الكل)', s.players], ['نشط اليوم', s.active1d], ['نشط 7 أيام', s.active7d], ['جدد اليوم', s.new1d], ['بثوث مكتملة', s.rounds], ['حفظ سحابي', s.saves], ['معروض مستعمل', (s.market && s.market.listed) || 0], ['مباع مستعمل', (s.market && s.market.sold) || 0]];
+    $('tiles').innerHTML = ''; T.forEach(([k, v]) => { const d = document.createElement('div'); d.className = 'tile'; d.innerHTML = '<b></b><small></small>'; d.children[0].textContent = (v || 0).toLocaleString('ar'); d.children[1].textContent = k; $('tiles').appendChild(d); });
+    bars($('langs'), (s.langs || []).map((x) => [x.lang || '—', x.n]));
+    const tot = {}; (s.days || []).forEach((x) => { tot[x.e] = (tot[x.e] || 0) + x.n; });
+    bars($('ev'), Object.entries(tot).sort((a, b) => b[1] - a[1]).map(([k, v]) => [NAMES[k] || k, v]));
+    const days = [...new Set((s.days || []).map((x) => x.day))].sort().reverse(); const evs = Object.keys(tot).sort((a, b) => tot[b] - tot[a]).slice(0, 8);
+    const tb = $('days'); tb.innerHTML = '<tr><th>اليوم</th>' + evs.map((e) => '<th></th>').join('') + '</tr>'; evs.forEach((e, i) => { tb.rows[0].cells[i + 1].textContent = NAMES[e] || e; });
+    days.forEach((d) => { const tr = tb.insertRow(); tr.insertCell().textContent = d; evs.forEach((e) => { const x = s.days.find((y) => y.day === d && y.e === e); tr.insertCell().textContent = x ? x.n : '·'; }); });
+    $('at').textContent = '· ' + new Date(s.at).toLocaleString('ar'); $('msg').textContent = '';
+  } catch (e) { $('msg').innerHTML = '<span class="err">تعذّر الاتصال بالخادم: ' + String(e.message || e).replace(/</g, '') + '</span>'; }
+}
+$('r').onclick = load; load(); setInterval(load, 60000);
+</script>
+</body>
+</html>
