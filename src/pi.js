@@ -3,7 +3,7 @@
 // 2) the accessToken is exchanged with App Studio, which checks it against the Pi Platform
 //    and returns the only identity (uid, username) the game trusts, plus a sessionToken kept in memory.
 // Outside Pi Browser (a plain PC browser) the game keeps working without a Pi account.
-export const PiState = { ready: false, user: null, uid: null, sessionToken: null, inPi: false, error: null };
+export const PiState = { ready: false, user: null, uid: null, sessionToken: null, accessToken: null, inPi: false, error: null };
 
 const APP_STUDIO_LOGIN = 'https://backend.appstudio-u7cm9zhmha0ruwv8.piappengine.com/pi/auth/v1/login';
 
@@ -39,8 +39,9 @@ export async function piSignIn() {
   try {
     if (!(await sdkReady(8000))) throw new Error('sdk');
     await window.Pi.init({ version: '2.0' });
-    const auth = await timeout(window.Pi.authenticate(['username'], onIncompletePaymentFound), 20000);
+    const auth = await timeout(window.Pi.authenticate(['username', 'payments'], onIncompletePaymentFound), 20000);
     if (!auth || !auth.accessToken) throw new Error('no token');
+    PiState.accessToken = auth.accessToken; // kept in memory only, sent to our own server for Testnet rewards
     const data = await exchangeToken(auth.accessToken);
     PiState.sessionToken = data.sessionToken || null;
     PiState.uid = data.user ? data.user.uid : null;
@@ -48,4 +49,16 @@ export async function piSignIn() {
     PiState.ready = !!PiState.user;
   } catch (e) { PiState.error = String((e && e.message) || e); }
   return PiState;
+}
+
+// Testnet App-to-User test reward (needed by Pi before a Mainnet app wallet). Our own server pays 0.01 test-π.
+export const A2U_URL = 'https://on-air-pi.creative-codes.workers.dev';
+export async function claimTestReward() {
+  if (!PiState.accessToken) return { ok: false, error: 'not_signed_in' };
+  try {
+    const r = await timeout(fetch(A2U_URL + '/a2u/reward', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accessToken: PiState.accessToken }),
+    }), 60000);
+    return await r.json();
+  } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 }

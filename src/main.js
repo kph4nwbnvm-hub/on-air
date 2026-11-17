@@ -5,7 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { LANGS, STR } from './i18n.js';
-import { piSignIn, PiState } from './pi.js';
+import { piSignIn, PiState, claimTestReward } from './pi.js';
 import { M, box, cyl, sph, cap, tor, makeChar, sit, OPT, DEFAULT_AVATAR } from './char.js';
 import { carModel, loadCars, loadKit, cityKit } from './city3d.js';
 import { woodTex, fabricTex, panelTex } from './tex.js';
@@ -44,7 +44,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.9.5';
+const VERSION = '1.9.6';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -1207,6 +1207,18 @@ function buildSettings() {
   row('🧍', t('s_real'), t(cfg.real ? 'on' : 'off'), () => { cfg.real = !cfg.real; store.set('real', cfg.real); setRealEnabled(cfg.real); if (cfg.real) loadReal(); });
   row('🕹️', t('s_ctrl'), t(cfg.ctrl === 'free' ? 'ctrl_free' : 'ctrl_joy'), () => { cfg.ctrl = cfg.ctrl === 'free' ? 'joy' : 'free'; store.set('ctrl', cfg.ctrl); applyCtrl(); pad.style.left = pad.style.top = pad.style.bottom = ''; buildSettings(); });
   row('🖥️', t('s_quality'), t(cfg.quality === 'low' ? 'q_low' : 'q_high'), () => { cfg.quality = cfg.quality === 'low' ? 'high' : 'low'; store.set('quality', cfg.quality); renderer.setPixelRatio(pixelRatio()); setupFX(); resize(); });
+  if (/kph4nwbnvm-hub|localhost|127\.0\.0\.1/.test(location.hostname)) { // Testnet build only
+    const ar = lang === 'ar', b = document.createElement('button'); b.className = 'srow'; b.innerHTML = '<span></span><span></span>';
+    b.children[0].textContent = '🎁 ' + (ar ? 'مكافأة تجريبية 0.01 π' : 'Test reward 0.01 π'); b.children[1].textContent = 'Testnet';
+    b.onclick = async () => {
+      if (b.disabled) return; b.disabled = true; sfx.click(); b.children[1].textContent = '⏳';
+      const r = await claimTestReward();
+      b.children[1].textContent = r.ok ? '✅' : '⚠️'; b.disabled = false;
+      const n = $('soonNote'); clearTimeout(soonNote.h); n.hidden = false; soonNote.h = setTimeout(() => { n.hidden = true; }, 4000);
+      n.textContent = (r.ok ? (ar ? 'وصلتك 0.01 π تجريبية' : '0.01 test-π sent') : r.error === 'not_signed_in' ? (ar ? 'افتح اللعبة من متصفح Pi وسجّل دخولك' : 'Open in Pi Browser and sign in') : (ar ? 'تعذّر الإرسال: ' : 'Failed: ') + r.error);
+    };
+    rows.appendChild(b);
+  }
   $('setVer').textContent = t('s_version') + ' ' + VERSION; const r = $('bReset'); r.classList.remove('armed'); r.textContent = t('s_reset');
 }
 $('bReset').onclick = () => {
