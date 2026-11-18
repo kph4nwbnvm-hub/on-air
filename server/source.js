@@ -233,6 +233,15 @@ async function payApprove(req, env) {
   if (!(p.status && p.status.developer_approved)) await pi(env, '/payments/' + encodeURIComponent(paymentId) + '/approve', 'POST');
   return { ok: true };
 }
+// a pack the player started but never paid (no txid): cancel it so it does not block the next payment
+async function payCancel(req, env) {
+  const { accessToken, paymentId } = await req.json().catch(() => ({})); if (!accessToken || !paymentId) throw new Fail('missing_fields');
+  const user = await me(accessToken); const p = await pi(env, '/payments/' + encodeURIComponent(paymentId));
+  if (p.user_uid !== user.uid) throw new Fail('not_your_payment', 403);
+  if (p.transaction && p.transaction.txid) throw new Fail('already_paid');
+  if (!(p.status && (p.status.cancelled || p.status.user_cancelled))) await pi(env, '/payments/' + encodeURIComponent(paymentId) + '/cancel', 'POST');
+  return { ok: true };
+}
 async function payComplete(req, env) {
   const { accessToken, paymentId, txid } = await req.json().catch(() => ({})); if (!accessToken || !paymentId || !txid) throw new Fail('missing_fields');
   const user = await me(accessToken); const p = await pi(env, '/payments/' + encodeURIComponent(paymentId));
@@ -269,6 +278,7 @@ export default {
       if (path === '/market/browse' && req.method === 'POST') return await toHub(req, env, path, true);
       if (path === '/pay/approve' && req.method === 'POST') return json(req, await payApprove(req, env));
       if (path === '/pay/complete' && req.method === 'POST') return json(req, await payComplete(req, env));
+      if (path === '/pay/cancel' && req.method === 'POST') return json(req, await payCancel(req, env));
       if (path === '/ev' && req.method === 'POST') return await toHub(req, env, path, false);
       if (path === '/stats' && req.method === 'GET') return await toHub(req, env, path, false);
       return json(req, { ok: false, error: 'not_found' }, 404);

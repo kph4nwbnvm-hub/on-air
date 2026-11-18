@@ -24,6 +24,7 @@ function onIncompletePaymentFound(payment) {
   // a token pack paid earlier but not finished (app closed mid-way): finish it now and credit it once
   const txid = payment && payment.transaction && payment.transaction.txid;
   if (txid) setTimeout(() => serverPay('/pay/complete', { paymentId: payment.identifier, txid }).then((r) => { if (r && r.ok && r.tokens && PiState.onTokens) PiState.onTokens(r.tokens); }), 3000);
+  else if (payment && payment.identifier) setTimeout(() => serverPay('/pay/cancel', { paymentId: payment.identifier }), 3000); // started but never paid: clear it so the next purchase can start
 }
 async function serverPay(path, body) {
   try { const r = await timeout(fetch(A2U_URL + path, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ ...body, accessToken: PiState.accessToken }) }), 30000); return await r.json(); } catch (e) { return null; }
