@@ -54,7 +54,9 @@ function prepBody(root) {
     const g = o.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight, bones = o.skeleton.bones, n = si.count, r = new Float32Array(n), cw = new Float32Array(n * 3), rA = new Float32Array(n * 3), rB = new Float32Array(n * 3);
     const regs = bones.map((b) => region(b.name));
     for (let i = 0; i < n; i++) { let best = 0, bw = -1; for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k), j = si.getComponent(i, k), rg = regs[j]; if (w > bw) { bw = w; best = j; } if (rg === 1 || rg === 2) cw[i * 3] += w; else if (rg === 4) cw[i * 3 + 1] += w; else if (rg === 5) cw[i * 3 + 2] += w; }
-      r[i] = regs[best]; const rg = r[i]; rA[i * 3] = rg === 1 ? 1 : 0; rA[i * 3 + 1] = rg === 4 ? 1 : 0; rA[i * 3 + 2] = rg === 6 ? 1 : 0; rB[i * 3] = rg === 2 ? 1 : 0; rB[i * 3 + 1] = rg === 5 ? 1 : 0; rB[i * 3 + 2] = rg === 3 ? 1 : 0; }
+      r[i] = regs[best];
+      // cloth masks from the blended bone weights (not the single strongest bone), so hems follow a smooth line instead of the mesh's zig-zag triangles
+      for (let k = 0; k < 4; k++) { const w = sw.getComponent(i, k), rg = regs[si.getComponent(i, k)]; if (rg === 1) rA[i * 3] += w; else if (rg === 4) rA[i * 3 + 1] += w; else if (rg === 6) rA[i * 3 + 2] += w; else if (rg === 2) rB[i * 3] += w; else if (rg === 5) rB[i * 3 + 1] += w; else if (rg === 3) rB[i * 3 + 2] += w; } }
     g.setAttribute('region', new THREE.BufferAttribute(r, 1)); g.setAttribute('clothw', new THREE.BufferAttribute(cw, 3)); g.setAttribute('regA', new THREE.BufferAttribute(rA, 3)); g.setAttribute('regB', new THREE.BufferAttribute(rB, 3));
     // smoothed normals shared by vertices at the same spot, so the cloth offset never opens cracks along UV seams
     const P = g.attributes.position, N = g.attributes.normal, sn = new Float32Array(n * 3), key = (i) => Math.round(P.getX(i) * 2000) + ',' + Math.round(P.getY(i) * 2000) + ',' + Math.round(P.getZ(i) * 2000), acc = new Map();
