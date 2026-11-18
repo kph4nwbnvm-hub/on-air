@@ -48,7 +48,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.10.7';
+const VERSION = '1.10.8';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -1255,7 +1255,7 @@ function openTopup() {
   const acts = $('shActs'); acts.innerHTML = '';
   PI_PACKS.forEach((a) => { const b = document.createElement('button'); b.className = 'big'; b.textContent = 'π ' + a + '  →  💠 ' + (a * 1000).toLocaleString('en-US');
     b.onclick = async () => { sfx.click(); acts.querySelectorAll('button').forEach((x) => { x.disabled = true; }); const r = await payTokens(a); acts.querySelectorAll('button').forEach((x) => { x.disabled = false; });
-      if (r.ok) { if (r.tokens) PiState.onTokens(r.tokens); ev('pay'); sh.hidden = true; } else if (r.error !== 'cancelled') { sfx.bad(); gToast('⚠️ ' + t('tp_fail') + ' (' + r.error + ')'); } };
+      if (r.ok) { if (r.tokens) PiState.onTokens(r.tokens); ev('pay'); sh.hidden = true; } else if (r.error !== 'cancelled') { sfx.bad(); gToast('⚠️ ' + t('tp_fail') + ' (' + r.error + ')'); $('shMeta').textContent = '⚠️ ' + r.error + ' · v' + VERSION; } };
     acts.appendChild(b); });
 }
 function buildSettings() {

@@ -34,8 +34,8 @@ export function payTokens(amount) {
     if (!window.Pi || !PiState.accessToken) return resolve({ ok: false, error: 'not_signed_in' });
     try {
       window.Pi.createPayment({ amount, memo: 'On Air Studio tokens', metadata: { kind: 'tokens', amount } }, {
-        onReadyForServerApproval: (paymentId) => { serverPay('/pay/approve', { paymentId }); },
-        onReadyForServerCompletion: async (paymentId, txid) => { const r = await serverPay('/pay/complete', { paymentId, txid }); resolve(r && r.ok ? { ok: true, tokens: r.tokens } : { ok: false, error: (r && r.error) || 'server' }); },
+        onReadyForServerApproval: async (paymentId) => { const r = await serverPay('/pay/approve', { paymentId }); if (!r || !r.ok) resolve({ ok: false, error: 'approve: ' + ((r && r.error) || 'no_response') + (r && r.message ? ' — ' + r.message : '') }); },
+        onReadyForServerCompletion: async (paymentId, txid) => { const r = await serverPay('/pay/complete', { paymentId, txid }); resolve(r && r.ok ? { ok: true, tokens: r.tokens } : { ok: false, error: 'complete: ' + ((r && r.error) || 'no_response') + (r && r.message ? ' — ' + r.message : '') }); },
         onCancel: () => resolve({ ok: false, error: 'cancelled' }),
         onError: (err) => resolve({ ok: false, error: String((err && err.message) || err) }),
       });
