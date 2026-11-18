@@ -48,7 +48,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.10.6';
+const VERSION = '1.10.7';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -1242,7 +1242,7 @@ function buildProfile() {
 $('pName').addEventListener('change', () => { const v = $('pName').value.replace(/[<>]/g, '').trim().slice(0, 16); $('pName').value = v; store.set('name', v); });
 // features that need the hosting server: the buttons are in place, and for now they answer with a small "coming soon" note
 function soonNote() { const n = $('soonNote'); n.textContent = '🚧 Coming Soon'; n.hidden = false; sfx.click(); clearTimeout(soonNote.h); soonNote.h = setTimeout(() => { n.hidden = true; }, 1800); }
-function syncSoon() { document.querySelectorAll('button.soon').forEach((b) => { b.textContent = b.dataset.ic + ' ' + t(b.dataset.soon); b.onclick = b.id === 'stTopup' ? openTopup : soonNote; }); }
+function syncSoon() { document.querySelectorAll('button.soon').forEach((b) => { b.textContent = b.dataset.ic + ' ' + t(b.dataset.soon); b.onclick = b.id === 'stTopup' ? openTopup : soonNote; if (b.id === 'stTopup') b.classList.toggle('live', /kph4nwbnvm-hub|localhost|127\.0\.0\.1/.test(location.hostname)); }); }
 const confirmRestore = { armed: false };
 // token packs paid in Pi (Testnet: Test-Pi). The server approves, completes and credits each payment once.
 const PI_PACKS = [0.1, 0.2, 0.4, 1, 2.5];
