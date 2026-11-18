@@ -48,7 +48,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.10.5';
+const VERSION = '1.10.6';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -454,7 +454,9 @@ function syncCity() { if (cityLang === lang) return; cityLang = lang; citySigns.
   // north row: real city buildings (Downtown City MegaKit, CC0), loaded after start; plain blocks only if loading fails
   const NORTH = [[-21, 6, 0xff8a5c], [-31.5, 8, 0x5fbf8f], [-42, 5.5, 0xb48cf2], [-52.5, 7, 0xffcf3f], [21, 5.5, 0xf2788c], [31.5, 8.5, 0x6f8cf2], [42, 6, 0x4cc9a0], [52.5, 7.5, 0xff8a3d]];
   cityKit.north = NORTH.map(([dx], i) => ({ x: SX + dx, z: -8.2, type: [0, 1, 2, 1, 2, 0, 1, 2][i] }));
-  cityKit.fallback = () => { const pc = cur; cur = ZG.street; NORTH.forEach(([dx, h, c]) => building(SX + dx, -10.2, 9, h, c, 0)); cur = pc; };
+  // the two neighbours of the studio (shawarma shop on the left) were missing, leaving their signs floating in the air
+  cityKit.north.push({ x: SX - 10.5, z: -8.2, type: 2 }, { x: SX + 10.5, z: -8.2, type: 0 });
+  cityKit.fallback = () => { const pc = cur; cur = ZG.street; NORTH.forEach(([dx, h, c]) => building(SX + dx, -10.2, 9, h, c, 0)); building(SX - 10.5, -10.2, 9, 5, 0xffcf3f, 0xffffff); building(SX + 10.5, -10.2, 9, 7.5, 0x4cc9f0, 0xfff3b0); cur = pc; };
   [-56, 56].forEach((dx) => wall(put(box(6, 7, 46, 0x8a93a6), SX + dx, 3.5, 10), 'concrete', 0xd0d0d0)); // end caps
   // row A (between the two streets): gym, café, the store, park, clothes
   shopFront(-40, 12, 15, 5.5, 0x3b4a6b, 0xd9342b, '🏋️', () => t('sh_gym'), () => openPanel('gym'), 'sh_gym');
