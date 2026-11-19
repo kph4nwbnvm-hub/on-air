@@ -135,6 +135,15 @@ h3{font-size:14px;opacity:.75;margin:14px 0 6px;text-align:start}
 .rl span{flex:1}
 .rl i{font-style:normal;opacity:.8;white-space:nowrap}
 .rl li.bad i,.rl li.bad b{color:#ff8a3d}
+.vis-btn{border-color:#ffcf3f !important;color:#ffcf3f}
+.vlist{list-style:none;margin:4px 0 12px;padding:0;display:flex;flex-direction:column;gap:8px;text-align:start}
+.vlist .vs{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)}
+.vlist .vic{font-size:24px;line-height:1.2}
+.vlist b{display:block;font-size:15px}.vlist b i{font-style:normal;opacity:.6}
+.vlist em{font-style:normal;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;margin-inline-start:4px;white-space:nowrap;vertical-align:middle}
+.vlist p{margin:3px 0 0;font-size:13px;line-height:1.5;opacity:.85}
+.vs-now{border-color:rgba(61,220,151,.5)!important}.vs-now em{background:#3ddc97;color:#06281a}
+.vs-soon em{background:#ffcf3f;color:#2a1f00}.vs-future em{background:rgba(255,255,255,.15);color:#fff}
 .howp{text-align:start;font-size:15px;line-height:1.6;margin:0 0 10px}
 #langGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
 #langGrid button{background:rgba(255,255,255,.1);padding:11px 6px;font-size:15px}
@@ -315,6 +324,7 @@ button.soon{opacity:.85}button.soon::after{content:" 🔒";font-size:.8em}button
     <button id="bChar" class="ghost" data-t="customize"></button>
     <button id="bStore" class="ghost store"></button>
     <button id="bHow" class="ghost" data-t="how"></button>
+    <button id="bVision" class="ghost vis-btn"><span>🏙️ </span><span data-t="vis_btn"></span></button>
     <div class="two"><button id="bMp" class="ghost soon" data-soon="sv_mp" data-ic="👥"></button><button id="bLb" class="ghost soon" data-soon="sv_lb" data-ic="🏆"></button></div>
     <div class="two"><button id="bProfile" class="ghost"></button><button id="bSettings" class="ghost"></button></div>
   </div>
@@ -344,6 +354,15 @@ button.soon{opacity:.85}button.soon::after{content:" 🔒";font-size:.8em}button
     <button id="bReset" class="ghost danger" data-t="s_reset"></button>
     <p id="setVer" class="ver"></p>
     <button id="bSetBack" class="ghost" data-t="back"></button>
+  </div>
+</section>
+
+<section id="vision" class="screen" hidden>
+  <div class="panel">
+    <h3><span>🏙️ </span><span data-t="vis_btn"></span></h3>
+    <p class="howp" data-t="vis_intro"></p>
+    <ol class="vlist"><li class="vs vs-now"><span class="vic">🎙️</span><div><b><i>1.</i> <span data-t="vis_1t"></span> <em data-t="vis_now"></em></b><p data-t="vis_1"></p></div></li><li class="vs vs-soon"><span class="vic">🏪</span><div><b><i>2.</i> <span data-t="vis_2t"></span> <em data-t="vis_soon"></em></b><p data-t="vis_2"></p></div></li><li class="vs vs-soon"><span class="vic">🌆</span><div><b><i>3.</i> <span data-t="vis_3t"></span> <em data-t="vis_soon"></em></b><p data-t="vis_3"></p></div></li><li class="vs vs-future"><span class="vic">🗺️</span><div><b><i>4.</i> <span data-t="vis_4t"></span> <em data-t="vis_future"></em></b><p data-t="vis_4"></p></div></li><li class="vs vs-future"><span class="vic">🌍</span><div><b><i>5.</i> <span data-t="vis_5t"></span> <em data-t="vis_future"></em></b><p data-t="vis_5"></p></div></li></ol>
+    <button id="bVisBack" class="ghost" data-t="back"></button>
   </div>
 </section>
 

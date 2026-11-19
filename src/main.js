@@ -48,7 +48,7 @@ setRealEnabled(cfg.real); // before any character is made, so stand-ins are only
 const stats = { rounds: 0, wins: 0, best: 0, since: Date.now(), ...store.get('stats', {}) }; if (!store.get('stats', null)) store.set('stats', stats);
 let licence = store.get('licence', 0); const LIC = [null, { fans: 20, coins: 300, ads: 15 }, { fans: 150, coins: 1500, ads: 35 }, { fans: 600, coins: 5000, ads: 60 }];
 const skills = { steady: 0, charm: 0, deals: 0, learn: 0, ...store.get('skills', {}) };
-const VERSION = '1.10.10';
+const VERSION = '1.11.0';
 const buzz = (p) => { if (cfg.vibe && navigator.vibrate) try { navigator.vibrate(p); } catch (e) {} };
 let avatar = { ...DEFAULT_AVATAR, ...store.get('avatar', {}) }; avatar.acc = { ...(avatar.acc || {}) };
 const t = (k) => (STR[lang] && STR[lang][k]) || STR.en[k] || k;
@@ -800,7 +800,7 @@ function setupFX() {
 }
 function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); } const r = $('pip').getBoundingClientRect(); pip = { x: r.left, y: h - r.bottom, w: r.width, h: r.height }; }
 window.addEventListener('resize', resize); window.addEventListener('orientationchange', () => { setTimeout(resize, 250); setTimeout(resize, 800); }); // phones report the new size a moment after turning
-function show(id) { ['menu', 'hud', 'report', 'how', 'langs', 'creator', 'profile', 'settings', 'storeS', 'tour'].forEach((s) => { $(s).hidden = s !== id; }); if (id === 'menu') checkDaily(); }
+function show(id) { ['menu', 'hud', 'report', 'how', 'vision', 'langs', 'creator', 'profile', 'settings', 'storeS', 'tour'].forEach((s) => { $(s).hidden = s !== id; }); if (id === 'menu') checkDaily(); }
 function buildLangs() { const g = $('langGrid'); g.innerHTML = ''; LANGS.forEach((l) => { const b = document.createElement('button'); b.textContent = l.name; b.dir = l.rtl ? 'rtl' : 'ltr'; if (l.code === lang) b.className = 'sel'; b.onclick = () => { lang = l.code; store.set('lang', lang); applyLang(); show('settings'); buildSettings(); }; g.appendChild(b); }); }
 // remember where the player stands, so closing and reopening the game puts them back on the same spot
 function savePos() { if ($('hud').hidden || G.on || !ZONES[G.zone]) return; store.set('pos', { z: G.zone, x: +(G.px - ZONES[G.zone].ox).toFixed(2), zz: +G.pz.toFixed(2), f: +G.face.toFixed(3), at: Date.now() }); }
@@ -880,7 +880,7 @@ $('dClaim').onclick = () => { ev('daily');
 function showPiUser() { const el = $('piUser'); const nat = store.get('nat', ''); el.hidden = !PiState.user && !nat; el.textContent = (nat ? flagOf(nat) + ' ' : '') + (PiState.user ? 'π ' + PiState.user : ''); }
 piSignIn().then(showPiUser); showLevel();
 $('bPlay').onclick = () => { sfx.click(); enterRoam(true); }; $('bAgain').onclick = startRound; $('bMenu').onclick = enterRoam;
-$('bHow').onclick = () => show('how'); $('bHowBack').onclick = () => show('menu'); $('langBtn').onclick = () => { buildLangs(); show('langs'); }; $('bLangBack').onclick = () => { show('settings'); buildSettings(); };
+$('bHow').onclick = () => show('how'); $('bVision').onclick = () => { sfx.click(); ev('vision'); show('vision'); }; $('bVisBack').onclick = () => show('menu'); $('bHowBack').onclick = () => show('menu'); $('langBtn').onclick = () => { buildLangs(); show('langs'); }; $('bLangBack').onclick = () => { show('settings'); buildSettings(); };
 $('bChar').onclick = () => { sfx.click(); G.zone = 'studio'; G.light = true; syncScene(); buildCreator(); show('creator'); }; $('bCharDone').onclick = () => { sfx.click(); stripUnowned(); store.set('avatar', avatar); rebuildPlayer(); if (afterCreator) { afterCreator = false; startStory(); } else show('menu'); };
 // app-token store
 function gToast(msg) { const el = $('gToast'); el.textContent = msg; el.hidden = false; clearTimeout(gToast.h); gToast.h = setTimeout(() => { el.hidden = true; }, 2200); }
